@@ -34,13 +34,21 @@ if (Astro.request.method === 'POST') {
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#00602b;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#1c1b1b}
+    html,body{overflow-x:clip}
+    body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#00602b;min-height:100vh;display:flex;align-items:center;justify-content:center;color:#1c1b1b;padding:16px}
+    :focus-visible{outline:2px solid #1B7A3D;outline-offset:2px;border-radius:6px}
     .login-card{background:white;border-radius:16px;padding:40px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
-    h1{font-size:24px;font-weight:800;margin-bottom:4px}
-    .sub{font-size:14px;color:#6f7a6e;margin-bottom:28px}
+    h1{font-size:24px;font-weight:800;margin-bottom:4px;text-align:center}
+    .sub{font-size:14px;color:#5a6459;margin-bottom:28px;text-align:center}
     label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#3f493f}
     input{width:100%;padding:12px 14px;border:1px solid rgba(0,0,0,0.12);border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:16px}
     input:focus{outline:none;border-color:#1B7A3D;box-shadow:0 0 0 3px rgba(27,122,61,0.1)}
+    .pw-wrap{position:relative}
+    .pw-wrap input{margin-bottom:0;padding-right:46px}
+    .pw-toggle{position:absolute;top:0;right:0;height:100%;width:44px;display:flex;align-items:center;justify-content:center;background:none;border:none;padding:0;cursor:pointer;color:#5a6459}
+    .pw-toggle:hover{color:#1B7A3D}
+    .pw-toggle .material-symbols-outlined{font-size:20px}
+    .pw-field{margin-bottom:16px}
     button{width:100%;padding:14px;background:#1B7A3D;color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
     button:hover{background:#145a2d}
     .error{background:#fef2f2;color:#dc2626;padding:12px;border-radius:8px;font-size:13px;margin-bottom:16px;text-align:center}
@@ -58,12 +66,33 @@ if (Astro.request.method === 'POST') {
       <label for="username">Username</label>
       <input type="text" id="username" name="username" required autofocus/>
       <label for="password">Password</label>
-      <input type="password" id="password" name="password" required/>
+      <div class="pw-field">
+        <div class="pw-wrap">
+          <input type="password" id="password" name="password" required/>
+          <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Tampilkan password" aria-pressed="false">
+            <span class="material-symbols-outlined" id="pw-icon">visibility</span>
+          </button>
+        </div>
+      </div>
       <button type="submit">Masuk</button>
     </form>
     <div style="text-align:center;margin-top:20px">
       <a href="/" style="font-size:13px;color:#1B7A3D;text-decoration:none;font-weight:600">&larr; Kembali ke website</a>
     </div>
   </div>
+  <script>
+    const toggle = document.getElementById('pw-toggle');
+    const input = document.getElementById('password') as HTMLInputElement | null;
+    const icon = document.getElementById('pw-icon');
+    toggle?.addEventListener('click', () => {
+      if (!input || !icon) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      icon.textContent = show ? 'visibility_off' : 'visibility';
+      toggle.setAttribute('aria-pressed', String(show));
+      toggle.setAttribute('aria-label', show ? 'Sembunyikan password' : 'Tampilkan password');
+      input.focus();
+    });
+  </script>
 </body>
 </html>

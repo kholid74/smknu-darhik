@@ -68,14 +68,28 @@ const groups = [
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
   <style is:global>
+    /* Design tokens — single source for brand colour + contrast-safe neutrals.
+       Values kept as source hex to preserve exact brand green; only the washed
+       grey (#6f7a6e) is darkened to --color-muted to clear WCAG AA. */
+    :root{
+      --color-brand:#00602b; --color-accent:#1B7A3D; --color-accent-dark:#145a2d;
+      --color-ink:#1c1b1b; --color-muted:#5a6459; --color-muted-strong:#3f493f;
+      --color-paper:#f6f3f2; --color-line:rgba(0,0,0,0.08); --color-danger:#dc2626;
+    }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:#f6f3f2;color:#1c1b1b;min-height:100vh}
+    html,body{overflow-x:clip}
+    body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--color-paper);color:var(--color-ink);min-height:100vh}
+    /* Keyboard focus — visible ring on every interactive element, shown instantly. */
+    :focus-visible{outline:2px solid var(--color-accent);outline-offset:2px;border-radius:4px}
+    .sidebar a:focus-visible,.sidebar button:focus-visible{outline-color:#fff}
+    /* Contrast backfill: darken washed grey wherever it was hardcoded inline. */
+    [style*="color:#6f7a6e"]{color:var(--color-muted)!important}
     .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:400;font-style:normal;font-size:20px;line-height:1;display:inline-block}
     .sidebar{width:240px;background:#00602b;color:white;position:fixed;top:0;left:0;bottom:0;z-index:40;overflow-y:auto;display:flex;flex-direction:column}
     .sidebar a,.sidebar button{color:white;text-decoration:none;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;transition:background .15s}
     .sidebar a:hover,.sidebar button:hover{background:rgba(255,255,255,0.1)}
     .sidebar a.active{background:rgba(255,255,255,0.2);font-weight:700}
-    .sidebar-group-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,0.5);padding:16px 16px 6px;font-weight:700}
+    .sidebar-group-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,0.72);padding:16px 16px 6px;font-weight:700}
     .main-content{margin-left:240px;min-height:100vh}
     .topbar{background:white;border-bottom:1px solid rgba(0,0,0,0.06);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
     .page-body{padding:24px}
@@ -89,20 +103,38 @@ const groups = [
     .card{background:white;border-radius:12px;border:1px solid rgba(0,0,0,0.06);padding:20px}
     table{width:100%;border-collapse:collapse}
     th,td{text-align:left;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,0.06);font-size:13px}
-    th{font-weight:700;color:#6f7a6e;font-size:12px;text-transform:uppercase}
+    th{font-weight:700;color:var(--color-muted);font-size:12px;text-transform:uppercase}
+    .menu-btn{display:none}
     .badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700}
     .badge-green{background:#e8f5e9;color:#1B7A3D}
     .badge-gold{background:#fdf6e8;color:#7e5700}
-    .badge-gray{background:#f0f0f0;color:#6f7a6e}
+    .badge-gray{background:#f0f0f0;color:var(--color-muted)}
+    .sidebar-overlay{display:none}
+    /* Mobile: sidebar becomes an off-canvas drawer, tables scroll, grids stack. */
+    @media (max-width:768px){
+      .main-content{margin-left:0}
+      .menu-btn{display:inline-flex}
+      .sidebar{transform:translateX(-100%);transition:transform .2s var(--ease,ease);box-shadow:0 0 40px rgba(0,0,0,0.35)}
+      .sidebar.open{transform:translateX(0)}
+      .sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:39;opacity:0;pointer-events:none;transition:opacity .2s}
+      .sidebar-overlay.open{opacity:1;pointer-events:auto}
+      table{min-width:620px}
+      .card{overflow-x:auto}
+      [style*="grid-template-columns"]{grid-template-columns:1fr!important}
+    }
+    @media (prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+    }
   </style>
 </head>
 <body>
   <!-- Sidebar -->
-  <aside class="sidebar">
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+  <aside class="sidebar" id="sidebar">
     <div style="padding:20px 16px;border-bottom:1px solid rgba(255,255,255,0.1);text-align:center">
       <img src="/assets/logo.png" alt="Logo" style="width:48px;height:48px;margin-bottom:8px"/>
       <div style="font-size:15px;font-weight:800">{site.shortName}</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5)">Admin Panel</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.72)">Admin Panel</div>
     </div>
     <nav style="flex:1;padding:8px">
       <a href="/admin" class:list={['', { active: currentPath === '/admin' }]}>
@@ -120,34 +152,28 @@ const groups = [
       ))}
     </nav>
     <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
-      <a href="/" target="_blank" style="font-size:12px;color:rgba(255,255,255,0.6)">
+      <a href="/" target="_blank" style="font-size:12px;color:rgba(255,255,255,0.78)">
         <span class="material-symbols-outlined" style="font-size:16px">open_in_new</span> Lihat Website
       </a>
-      <a href="/admin/logout" id="logout-link" style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;cursor:pointer">
+      <a href="/admin/logout" id="logout-link" style="font-size:12px;color:rgba(255,255,255,0.78);margin-top:4px;cursor:pointer">
         <span class="material-symbols-outlined" style="font-size:16px">logout</span> Keluar
       </a>
-
-      <!-- Custom Logout Modal -->
-      <div id="logout-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center">
-        <div style="background:white;border-radius:16px;padding:32px;max-width:360px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
-          <span class="material-symbols-outlined" style="font-size:48px;color:#C8963E;margin-bottom:12px">logout</span>
-          <h3 style="font-size:18px;font-weight:800;margin-bottom:8px;color:#1c1b1b">Yakin ingin keluar?</h3>
-          <p style="font-size:14px;color:#6f7a6e;margin-bottom:24px">Kamu akan diarahkan ke halaman login.</p>
-          <div style="display:flex;gap:10px;justify-content:center">
-            <button onclick="document.getElementById('logout-modal').style.display='none'" style="padding:10px 24px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:#3f493f">Batal</button>
-            <a href="/admin/logout" style="padding:10px 24px;border-radius:10px;background:#dc2626;color:white;font-size:14px;font-weight:700;text-decoration:none;display:inline-block">Keluar</a>
-          </div>
-        </div>
-      </div>
-
-      <script>
-        document.getElementById('logout-link').addEventListener('click', function(e) {
-          e.preventDefault();
-          document.getElementById('logout-modal').style.display = 'flex';
-        });
-      </script>
     </div>
   </aside>
+
+  <!-- Custom Logout Modal — kept at body level: nesting it inside the sidebar
+       trapped position:fixed inside the sidebar's mobile transform. -->
+  <div id="logout-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:16px;padding:32px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+      <span class="material-symbols-outlined" style="font-size:48px;color:#C8963E;margin-bottom:12px">logout</span>
+      <h3 style="font-size:18px;font-weight:800;margin-bottom:8px;color:#1c1b1b">Yakin ingin keluar?</h3>
+      <p style="font-size:14px;color:#6f7a6e;margin-bottom:24px">Kamu akan diarahkan ke halaman login.</p>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button onclick="document.getElementById('logout-modal').style.display='none'" style="padding:10px 24px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:#3f493f">Batal</button>
+        <a href="/admin/logout" style="padding:10px 24px;border-radius:10px;background:#dc2626;color:white;font-size:14px;font-weight:700;text-decoration:none;display:inline-block">Keluar</a>
+      </div>
+    </div>
+  </div>
 
   <!-- Shared Delete Confirm Modal -->
   <div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:110;align-items:center;justify-content:center">
@@ -172,7 +198,12 @@ const groups = [
   <!-- Main -->
   <div class="main-content">
     <div class="topbar">
-      <div style="font-weight:700;font-size:15px">{title}</div>
+      <div style="display:flex;align-items:center;gap:8px;min-width:0">
+        <button class="menu-btn" id="menu-btn" aria-label="Buka menu" aria-controls="sidebar" aria-expanded="false" style="background:none;border:none;padding:6px;color:var(--color-ink);align-items:center">
+          <span class="material-symbols-outlined">menu</span>
+        </button>
+        <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{title}</div>
+      </div>
       <div style="font-size:12px;color:#6f7a6e;display:flex;align-items:center;gap:12px">
         <span>{new Date().toLocaleDateString('id', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
         <span style="background:#e8f5e9;color:#1B7A3D;padding:2px 10px;border-radius:100px;font-weight:600">{user?.role === 'superadmin' ? 'Super Admin' : 'Editor'}</span>
@@ -209,6 +240,52 @@ const groups = [
     // Auto-hide flash message
     const flash = document.getElementById('flash-msg');
     if (flash) setTimeout(() => flash.remove(), 3000);
+
+    // Mobile drawer sidebar
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const menuBtn = document.getElementById('menu-btn');
+    function setDrawer(open: boolean) {
+      sidebar?.classList.toggle('open', open);
+      overlay?.classList.toggle('open', open);
+      menuBtn?.setAttribute('aria-expanded', String(open));
+    }
+    menuBtn?.addEventListener('click', () => setDrawer(!sidebar?.classList.contains('open')));
+    overlay?.addEventListener('click', () => setDrawer(false));
+    sidebar?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setDrawer(false)));
+
+    // Logout confirmation modal (lives at body level, opened from the sidebar link)
+    const logoutLink = document.getElementById('logout-link');
+    const logoutModal = document.getElementById('logout-modal');
+    logoutLink?.addEventListener('click', e => {
+      e.preventDefault();
+      setDrawer(false);
+      if (logoutModal) logoutModal.style.display = 'flex';
+    });
+    logoutModal?.addEventListener('click', e => {
+      if (e.target === logoutModal) logoutModal.style.display = 'none';
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      setDrawer(false);
+      if (logoutModal) logoutModal.style.display = 'none';
+    });
+
+    // Accessible-name backfill: label icon-only buttons/links that ship no text.
+    const ICON_LABELS: Record<string, string> = {
+      edit: 'Edit', delete: 'Hapus', visibility: 'Lihat', visibility_off: 'Sembunyikan',
+      add: 'Tambah', add_photo_alternate: 'Tambah foto', open_in_new: 'Buka di tab baru',
+      logout: 'Keluar', menu: 'Buka menu', close: 'Tutup', save: 'Simpan',
+      search: 'Cari', settings: 'Pengaturan', arrow_upward: 'Naik', arrow_downward: 'Turun',
+    };
+    document.querySelectorAll<HTMLElement>('button, a').forEach(el => {
+      if (el.getAttribute('aria-label') || el.getAttribute('title')) return;
+      const icon = el.querySelector('.material-symbols-outlined');
+      if (!icon) return;
+      const text = (el.textContent || '').trim();
+      const iconName = (icon.textContent || '').trim();
+      if (text === iconName && ICON_LABELS[iconName]) el.setAttribute('aria-label', ICON_LABELS[iconName]);
+    });
   </script>
 </body>
 </html>
