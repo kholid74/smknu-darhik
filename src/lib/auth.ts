@@ -1,9 +1,11 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { db } from './prisma';
-import { env } from './env';
+import { requireEnv } from './env';
 
-const SECRET = new TextEncoder().encode(env('JWT_SECRET') || 'smkdh-dev-secret-change-in-production');
+// No committed fallback: a hardcoded default secret in a public repo lets
+// anyone forge a superadmin token. Fail loudly if JWT_SECRET is unset.
+const SECRET = new TextEncoder().encode(requireEnv('JWT_SECRET'));
 const COOKIE_NAME = 'smkdh_token';
 
 // Hash password
