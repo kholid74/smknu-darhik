@@ -1,0 +1,232 @@
+{
+	"version": 3,
+	"routes": [
+		{
+			"handle": "filesystem"
+		},
+		{
+			"src": "^/_astro/(.*)$",
+			"headers": {
+				"cache-control": "public, max-age=31536000, immutable"
+			},
+			"continue": true
+		},
+		{
+			"src": "^/_server-islands/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/_image/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/artikel/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/artikel/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/artikel/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/download/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/download/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/download/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/ekskul/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/ekskul/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/ekskul/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/faq/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/faq/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/faq/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/fasilitas/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/fasilitas/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/fasilitas/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/galeri/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/galeri/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/galeri/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/guru/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/guru/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/guru/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/halaman/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/halaman/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/halaman/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/jurusan/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/jurusan/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/jurusan/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/login/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/logout/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/mitra/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/mitra/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/mitra/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pengaturan/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pengguna/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pengumuman/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pengumuman/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/pengumuman/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/prestasi/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/prestasi/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/prestasi/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/testimoni/delete/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/testimoni/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/testimoni/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/admin/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/image(?:/(.*?))?/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/test/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/api/upload/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/berita/([^/]+?)/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/berita/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/galeri/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/404/?$",
+			"dest": "_render"
+		},
+		{
+			"src": "^/.*$",
+			"dest": "_render",
+			"status": 404
+		}
+	]
+}

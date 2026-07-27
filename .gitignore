@@ -24,3 +24,5 @@ pnpm-debug.log*
 .idea/
 
 /src/generated/prisma
+.env
+dev.db*
