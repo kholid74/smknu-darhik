@@ -28,3 +28,4 @@ pnpm-debug.log*
 dev.db*
 .env
 .vercel
+.env*

@@ -1,11 +1,17 @@
 ---
 export const prerender = false;
-import { db } from '../../lib/prisma';
 
-const settings = await db.setting.findFirst();
-const departments = await db.department.findMany({ orderBy: { order: 'asc' } });
-const teachers = await db.teacher.findMany({ orderBy: { order: 'asc' } });
+let result: any;
+try {
+  const mod = await import('../../lib/prisma');
+  const db = mod.db;
+  const settings = await db.setting.findFirst();
+  const depts = await db.department.findMany({ orderBy: { order: 'asc' } });
+  result = { ok: true, name: settings?.siteName, depts: depts.length };
+} catch (e: any) {
+  result = { error: e.message };
+}
 
-const data = { status: 'ok', settings: { name: settings?.siteName, phone: settings?.phone }, departments, teachers };
+return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
 ---
-{JSON.stringify(data, null, 2)}
+<html></html>

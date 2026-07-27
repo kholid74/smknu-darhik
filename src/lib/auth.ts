@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { db } from './prisma';
+import { env } from './env';
 
-const SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'smkdh-dev-secret-change-in-production');
+const SECRET = new TextEncoder().encode(env('JWT_SECRET') || 'smkdh-dev-secret-change-in-production');
 const COOKIE_NAME = 'smkdh_token';
 
 // Hash password

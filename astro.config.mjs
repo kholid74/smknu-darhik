@@ -7,5 +7,7 @@ export default defineConfig({
   output: 'static',
   adapter: vercel(),
   security: { checkOrigin: false },
-  vite: { plugins: [tailwindcss()] },
+  vite: {
+    plugins: [tailwindcss()],
+  },
 });

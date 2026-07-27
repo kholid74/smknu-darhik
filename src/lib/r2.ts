@@ -1,18 +1,27 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import sharp from 'sharp';
+import { env, requireEnv } from './env';
 
-const r2 = new S3Client({
-  region: 'auto',
-  endpoint: process.env.R2_ENDPOINT!,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY!,
-    secretAccessKey: process.env.R2_SECRET_KEY!,
-  },
-  forcePathStyle: true,
-});
+// Built on first use, not at import time: pages that never touch R2 should not
+// fail to render just because the R2 credentials are absent.
+let client: S3Client | null = null;
+function r2Client(): S3Client {
+  if (!client) {
+    client = new S3Client({
+      region: 'auto',
+      endpoint: requireEnv('R2_ENDPOINT'),
+      credentials: {
+        accessKeyId: requireEnv('R2_ACCESS_KEY'),
+        secretAccessKey: requireEnv('R2_SECRET_KEY'),
+      },
+      forcePathStyle: true,
+    });
+  }
+  return client;
+}
 
-const BUCKET = process.env.R2_BUCKET || 'smknu-darulhikam-assets';
-const PUBLIC_URL = process.env.R2_PUBLIC_URL || '/api/image';
+const BUCKET = () => env('R2_BUCKET') || 'smknu-darulhikam-assets';
+const PUBLIC_URL = () => env('R2_PUBLIC_URL') || '/api/image';
 
 export async function uploadToR2(file: File, folder = 'uploads'): Promise<string> {
   const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
@@ -35,18 +44,18 @@ export async function uploadToR2(file: File, folder = 'uploads'): Promise<string
   } catch {
     // If sharp fails (e.g., non-image file), use original
   }
-  await r2.send(new PutObjectCommand({
-    Bucket: BUCKET,
+  await r2Client().send(new PutObjectCommand({
+    Bucket: BUCKET(),
     Key: key,
     Body: finalBuffer,
     ContentType: contentType,
     ACL: 'public-read',
   }));
-  return `${PUBLIC_URL}/${key}`;
+  return `${PUBLIC_URL()}/${key}`;
 }
 
 export async function deleteFromR2(key: string): Promise<void> {
-  await r2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+  await r2Client().send(new DeleteObjectCommand({ Bucket: BUCKET(), Key: key }));
 }
 
 // Extract key from public URL
@@ -59,7 +68,7 @@ export function keyFromUrl(url: string): string | null {
 
 export async function getFileFromR2(key: string): Promise<{ bytes: Uint8Array; contentType: string } | null> {
   try {
-    const obj = await r2.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+    const obj = await r2Client().send(new GetObjectCommand({ Bucket: BUCKET(), Key: key }));
     const bytes = await obj.Body?.transformToByteArray();
     if (!bytes) return null;
     return { bytes, contentType: obj.ContentType || 'application/octet-stream' };
