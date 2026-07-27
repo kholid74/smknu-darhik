@@ -1,0 +1,31 @@
+---
+import { nav } from '../data/site';
+---
+
+<div class="fixed inset-0 bg-[#fcf9f8] z-[100] hidden flex-col" id="mobile-menu">
+  <div class="flex justify-between items-center h-16 px-4 border-b border-black/5">
+    <span class="font-extrabold text-[#00602b] text-lg">Menu</span>
+    <button class="p-2 -mr-2" id="menu-close" aria-label="Tutup menu">
+      <span class="material-symbols-outlined">close</span>
+    </button>
+  </div>
+  <nav class="flex-1 flex flex-col p-6 gap-1 text-base font-semibold overflow-y-auto">
+    {nav.main.map(item => (
+      item.children ? (
+        <details class="py-1">
+          <summary class="py-3 text-[#3f493f] cursor-pointer list-none flex justify-between items-center">
+            {item.label} <span class="material-symbols-outlined text-[#6f7a6e]">expand_more</span>
+          </summary>
+          <div class="ml-4 space-y-1 pb-2">
+            {item.children.map(child => (
+              <a href={child.href} class="block py-2 text-sm text-[#3f493f]">{child.label}</a>
+            ))}
+          </div>
+        </details>
+      ) : (
+        <a href={item.href} class="py-3 text-[#3f493f]">{item.label}</a>
+      )
+    ))}
+    <a href="/ppdb" class="mt-4 block w-full bg-[#1B7A3D] text-white text-center py-4 rounded-lg font-bold">Daftar PPDB Sekarang</a>
+  </nav>
+</div>

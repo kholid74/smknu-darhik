@@ -1,0 +1,91 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site, stockPhotoNote } from '../data/site';
+
+const fasilitasUtama = [
+  { name: 'Ruang Kelas', desc: 'Ruang kelas nyaman dan representatif untuk pembelajaran.', img: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&q=80', icon: 'meeting_room' },
+  { name: 'Lab Komputer', desc: 'Laboratorium komputer untuk praktik multimedia dan administrasi perkantoran.', img: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&q=80', icon: 'computer' },
+  { name: 'Studio Multimedia', desc: 'Studio lengkap untuk produksi konten, editing video, dan desain grafis.', img: 'https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=600&q=80', icon: 'palette' },
+  { name: 'Mini Bank Syariah', desc: 'Ruang praktik simulasi layanan perbankan syariah seperti teller dan customer service.', img: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=80', icon: 'account_balance' },
+  { name: 'Musholla', desc: 'Tempat ibadah yang bersih dan nyaman untuk sholat berjamaah dan kegiatan keagamaan.', img: 'https://images.unsplash.com/photo-1584646518828-5a84e511e792?w=600&q=80', icon: 'mosque' },
+  { name: 'Perpustakaan', desc: 'Koleksi buku pelajaran, referensi, dan bacaan Islami.', img: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=600&q=80', icon: 'menu_book' },
+  { name: 'Lapangan Olahraga', desc: 'Lapangan multifungsi untuk olahraga, upacara, dan kegiatan outdoor.', img: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&q=80', icon: 'sports_soccer' },
+  { name: 'Ruang Praktik Siswa', desc: 'Bengkel dan ruang kerja untuk praktik keterampilan kejuruan.', img: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=600&q=80', icon: 'handyman' },
+];
+
+const fasilitasPendukung = [
+  { icon: 'wifi', name: 'WiFi Sekolah' },
+  { icon: 'local_hospital', name: 'UKS' },
+  { icon: 'local_parking', name: 'Parkir Luas' },
+  { icon: 'water_drop', name: 'Air Bersih' },
+  { icon: 'local_cafe', name: 'Kantin' },
+  { icon: 'cleaning_services', name: 'Kebersihan' },
+  { icon: 'security', name: 'Keamanan 24 Jam' },
+  { icon: 'accessible', name: 'Aksesibilitas' },
+];
+---
+
+<BaseLayout title="Fasilitas" description={`Fasilitas pendukung pembelajaran di ${site.name} — ruang kelas, lab, studio, musholla, dan lainnya.`}>
+
+<!-- HERO -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1497366216548-37526070297c?w=1200&q=80" alt="Fasilitas sekolah" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/85"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-24 text-center text-white">
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">Fasilitas Sekolah</h1>
+    <p class="text-base md:text-lg text-white/80 leading-relaxed max-w-xl mx-auto">Sarana dan prasarana pendukung pembelajaran di {site.name} untuk menunjang keterampilan siswa.</p>
+  </div>
+</section>
+
+<!-- FASILITAS UTAMA GRID 3X3 -->
+<section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="max-w-2xl mb-12">
+    <span class="rule-mark mb-5"></span>
+    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Fasilitas Utama</h2>
+    <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Berbagai fasilitas yang tersedia untuk mendukung kegiatan belajar mengajar dan pengembangan keterampilan siswa.</p>
+  </div>
+
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+    {fasilitasUtama.map(f => (
+      <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden group hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow">
+        <div class="h-44 bg-gray-200 overflow-hidden relative">
+          <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={f.img} alt={f.name} loading="lazy" onerror="this.style.display='none'" />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
+          <div class="absolute top-3 left-3 bg-white/90 backdrop-blur rounded-full p-1.5">
+            <span class="material-symbols-outlined text-[#1B7A3D] text-base">{f.icon}</span>
+          </div>
+        </div>
+        <div class="p-4">
+          <h3 class="font-bold text-sm text-[#1c1b1b] mb-1">{f.name}</h3>
+          <p class="text-xs text-[#6f7a6e] leading-relaxed">{f.desc}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<!-- FASILITAS PENDUKUNG -->
+<section class="bg-white border-y border-black/5">
+  <div class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-20">
+    <div class="max-w-2xl mb-12">
+      <span class="rule-mark mb-5"></span>
+      <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Fasilitas Pendukung</h2>
+      <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Fasilitas tambahan yang membuat lingkungan belajar lebih nyaman dan kondusif.</p>
+    </div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {fasilitasPendukung.map(f => (
+        <div class="bg-[#fcf9f8] rounded-xl border border-black/5 p-4 text-center hover:shadow-[0_4px_12px_rgba(27,122,61,0.08)] transition-shadow">
+          <span class="material-symbols-outlined text-2xl text-[#1B7A3D] mb-2 block">{f.icon}</span>
+          <p class="text-xs font-semibold text-[#1c1b1b]">{f.name}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<p class="text-xs text-[#6f7a6e] text-center py-8 italic">{stockPhotoNote}</p>
+
+</BaseLayout>

@@ -1,0 +1,30 @@
+---
+export const prerender = false;
+import { verifyToken } from '../../lib/auth';
+import { uploadToR2 } from '../../lib/r2';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return new Response('Unauthorized', { status: 401 });
+const session = await verifyToken(token);
+if (!session) return new Response('Unauthorized', { status: 401 });
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const file = formData.get('file') as File;
+    if (!file || file.size === 0) {
+      return new Response(JSON.stringify({ error: 'No file' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: 'Max 10MB' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+    const folder = formData.get('folder')?.toString() || 'uploads';
+    const url = await uploadToR2(file, folder);
+    return new Response(JSON.stringify({ url }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+---

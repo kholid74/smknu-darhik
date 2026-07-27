@@ -1,0 +1,48 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+const item = isEdit ? await db.teacher.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !item) return Astro.redirect('/admin/guru?saved=1');
+
+const levels = ['Yayasan', 'Kepala Sekolah', 'Waka', 'Kaprog', 'Guru', 'Staf'];
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const record: any = {
+    name: data.get('name')?.toString() || '',
+    title: data.get('title')?.toString() || null,
+    position: data.get('position')?.toString() || '',
+    subject: data.get('subject')?.toString() || null,
+    level: data.get('level')?.toString() || 'Guru',
+    photoUrl: data.get('photoUrl')?.toString() || null,
+    order: parseInt(data.get('order')?.toString() || '0'),
+  };
+  if (isEdit) await db.teacher.update({ where: { id: id! }, data: record });
+  else await db.teacher.create({ data: record });
+  return Astro.redirect('/admin/guru?saved=1');
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit Guru/Staf' : 'Tambah Guru/Staf'} user={{ role: session.role }}>
+  <form method="POST" style="max-width:600px">
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={item?.name||''} required/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Gelar</label><input type="text" name="title" value={item?.title||''} placeholder="S.E.,M.Pd."/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Jabatan *</label><input type="text" name="position" value={item?.position||''} placeholder="Kepala Sekolah" required/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Mata Pelajaran</label><input type="text" name="subject" value={item?.subject||''} placeholder="Matematika"/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Level</label><select name="level" style="width:100%">{levels.map(l=>(<option value={l} selected={item?.level===l}>{l}</option>))}</select></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Photo URL</label><input type="text" name="photoUrl" value={item?.photoUrl||''} placeholder="https://..."/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Order</label><input type="number" name="order" value={item?.order??0} style="width:80px"/></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/guru" class="btn btn-outline">Batal</a></div>
+  </form>
+</AdminLayout>

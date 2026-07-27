@@ -1,0 +1,124 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../data/site';
+
+const struktur = [
+  {
+    level: 'Yayasan / Komite',
+    role: 'Pembina',
+    members: [
+      { name: 'KH. Ahmad ..., M.Pd.I', title: 'Ketua Yayasan', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80&fit=crop&crop=face' },
+    ],
+    color: 'bg-[#C8963E]/90 text-white',
+  },
+  {
+    level: 'Kepala Sekolah',
+    role: 'Penanggung Jawab',
+    members: [
+      { name: 'Hadi Santoso, M.Pd', title: 'Kepala Sekolah', img: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?w=200&q=80&fit=crop&crop=face' },
+    ],
+    color: 'bg-[#1B7A3D] text-white',
+  },
+  {
+    level: 'Wakil Kepala Sekolah',
+    role: 'Waka',
+    members: [
+      { name: 'Dra. Siti ..., M.Pd', title: 'Waka Kurikulum', img: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&q=80&fit=crop&crop=face' },
+      { name: 'Drs. Budi ...', title: 'Waka Kesiswaan', img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&q=80&fit=crop&crop=face' },
+      { name: '..., S.Ag', title: 'Waka Humas', img: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&q=80&fit=crop&crop=face' },
+      { name: '..., S.Pd.I', title: 'Waka Sarpras', img: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=200&q=80&fit=crop&crop=face' },
+    ],
+    color: 'bg-[#145a2d] text-white',
+  },
+  {
+    level: 'Ketua Program Keahlian',
+    role: 'Kaprog',
+    members: [
+      { name: '..., S.E.Sy', title: 'Kaprog Perbankan Syariah', img: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&q=80&fit=crop&crop=face' },
+      { name: '..., S.Kom', title: 'Kaprog DKV', img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80&fit=crop&crop=face' },
+    ],
+    color: 'bg-[#00602b] text-white',
+  },
+  {
+    level: 'Guru & Staf TU',
+    role: 'Pelaksana',
+    members: [
+      { name: 'Dewan Guru', title: '± 20 Guru Mapel & Produktif', icon: 'school' },
+      { name: 'Staf TU', title: '± 3 Staf Administrasi', icon: 'description' },
+    ],
+    color: 'bg-[#f0f7f1] text-[#1c1b1b]',
+  },
+];
+---
+
+<BaseLayout title="Struktur Organisasi" description={`Struktur organisasi ${site.name} — dari yayasan hingga guru dan staf.`}>
+
+<!-- HERO -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80" alt="Struktur organisasi" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/85"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-24 text-center text-white">
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">Struktur Organisasi</h1>
+    <p class="text-base md:text-lg text-white/80 leading-relaxed max-w-xl mx-auto">Susunan organisasi {site.name} — dari yayasan, kepala sekolah, waka, kaprog, hingga dewan guru dan staf.</p>
+  </div>
+</section>
+
+<!-- STRUKTUR DIAGRAM -->
+<section class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="max-w-2xl mb-12 text-center mx-auto">
+    <span class="rule-mark mb-5 mx-auto"></span>
+    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Bagan Organisasi</h2>
+    <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Garis komando dan koordinasi di lingkungan {site.shortName}.</p>
+  </div>
+
+  <div class="flex flex-col items-center gap-0">
+    {struktur.map((level, idx) => (
+      <>
+        {/* connector line */}
+        {idx > 0 && (
+          <div class="flex justify-center py-3">
+            <svg width="2" height="32" viewBox="0 0 2 32" class="text-[#1B7A3D]/30">
+              <line x1="1" y1="0" x2="1" y2="32" stroke="currentColor" stroke-width="2" stroke-dasharray="4,3"/>
+            </svg>
+          </div>
+        )}
+
+        <div class="w-full flex flex-col items-center gap-3">
+          {/* level label */}
+          <div class="flex items-center gap-3 w-full max-w-lg">
+            <div class="flex-1 h-px bg-[#1B7A3D]/15 hidden sm:block"></div>
+            <span class={level.color + ' text-xs font-bold px-3 py-1 rounded-full flex-shrink-0'}>
+              {level.level}
+            </span>
+            <div class="flex-1 h-px bg-[#1B7A3D]/15 hidden sm:block"></div>
+          </div>
+
+          {/* members */}
+          <div class={`grid gap-4 w-full ${level.members.length <= 1 ? 'max-w-sm' : level.members.length === 2 ? 'max-w-lg grid-cols-2' : 'max-w-3xl grid-cols-2 md:grid-cols-4'}`}>
+            {level.members.map(m => (
+              <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] p-4 text-center hover:shadow-[0_8px_24px_rgba(27,122,61,0.1)] transition-shadow">
+                {'img' in m ? (
+                  <div class="w-16 h-16 rounded-full bg-gray-200 mx-auto mb-3 overflow-hidden border-2 border-[#1B7A3D]/20">
+                    <img class="w-full h-full object-cover" src={m.img} alt={m.name} loading="lazy" onerror="this.style.display='none'" />
+                  </div>
+                ) : (
+                  <div class="w-16 h-16 rounded-full bg-[#f0f7f1] mx-auto mb-3 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-2xl text-[#1B7A3D]">{m.icon}</span>
+                  </div>
+                )}
+                <h3 class="font-bold text-sm text-[#1c1b1b] leading-tight">{m.name}</h3>
+                <p class="text-xs text-[#6f7a6e] mt-1">{m.title}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
+    ))}
+  </div>
+
+  <p class="text-xs text-[#6f7a6e] text-center mt-12 italic">[data perlu dikonfirmasi ke sekolah — nama dan jabatan masih placeholder]</p>
+</section>
+
+</BaseLayout>

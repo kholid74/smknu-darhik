@@ -1,0 +1,25 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+const teachers = await db.teacher.findMany({ orderBy: { order: 'asc' } });
+---
+
+<AdminLayout title="Guru &amp; Staf" user={{ role: session.role }}>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <h2 style="font-size:18px;font-weight:800">Guru &amp; Staf</h2>
+    <a href="/admin/guru/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah</a>
+  </div>
+  <div class="card" style="padding:0"><table><thead><tr><th>Foto</th><th>Nama</th><th>Jabatan</th><th>Level</th><th style="width:80px"></th></tr></thead>
+    <tbody>{teachers.length===0?(<tr><td colspan="5" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada guru/staf.</td></tr>):teachers.map((t:any)=>(
+      <tr><td>{t.photoUrl ? <img src={t.photoUrl} alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover"/> : '-'}</td><td style="font-weight:600">{t.name}{t.title ? `, ${t.title}` : ''}</td><td style="font-size:13px">{t.position}</td><td><span class="badge badge-gray">{t.level}</span></td><td><div style="display:flex;gap:4px">
+        <a href={`/admin/guru/${t.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
+        <form method="POST" action="/admin/guru/delete"><input type="hidden" name="id" value={t.id}/><button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button></form>
+      </div></td></tr>))}</tbody></table></div>
+</AdminLayout>

@@ -1,0 +1,169 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site, dummyNote, stockPhotoNote } from '../data/site';
+---
+
+<BaseLayout title="Profil Sekolah" description="Mengenal lebih dekat SMKS NU Darul Hikam Karanggeneng — sekolah kejuruan berbasis nilai Islam Ahlussunnah wal Jamaah.">
+
+<!-- PAGE HERO + BREADCRUMB -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1200&q=80" alt="Gedung sekolah" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/80"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-20 text-white text-center">
+    <nav class="flex items-center justify-center gap-2 text-sm text-white/70 mb-4" aria-label="Breadcrumb">
+      <a href="/" class="hover:text-white transition-colors">Beranda</a>
+      <span class="material-symbols-outlined text-sm">chevron_right</span>
+      <span class="text-white font-medium">Profil</span>
+    </nav>
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-3">Profil Sekolah</h1>
+    <p class="text-base md:text-lg text-white/80 max-w-lg mx-auto leading-relaxed">Mengenal lebih dekat {site.name} — visi, misi, nilai, dan identitas kami.</p>
+  </div>
+</section>
+
+<!-- IDENTITAS SEKOLAH -->
+<section class="max-w-5xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <span class="rule-mark mb-5 mx-auto"></span>
+  <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] text-center mb-10">Identitas Sekolah</h2>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    {[
+      { icon: 'apartment', label: 'Nama Sekolah', value: site.name },
+      { icon: 'calendar_today', label: 'Tahun Berdiri', value: site.founded },
+      { icon: 'verified', label: 'Akreditasi', value: site.accreditation },
+      { icon: 'pin_drop', label: 'Lokasi', value: site.location },
+    ].map(item => (
+      <div class="bg-white rounded-xl border border-black/5 p-5 text-center shadow-[0_2px_8px_rgba(27,122,61,0.06)]">
+        <span class="material-symbols-outlined text-[#1B7A3D] text-3xl mb-3">{item.icon}</span>
+        <p class="text-xs text-[#6f7a6e] uppercase tracking-wider font-semibold mb-1">{item.label}</p>
+        <p class="text-sm font-bold text-[#1c1b1b]">{item.value}</p>
+      </div>
+    ))}
+  </div>
+  <div class="mt-6 bg-white rounded-xl border border-black/5 p-5 md:p-6 shadow-[0_2px_8px_rgba(27,122,61,0.06)]">
+    <div class="flex items-start gap-3">
+      <span class="material-symbols-outlined text-[#1B7A3D] flex-shrink-0 mt-0.5">location_on</span>
+      <div>
+        <p class="text-xs text-[#6f7a6e] uppercase tracking-wider font-semibold mb-1">Alamat Lengkap</p>
+        <p class="text-sm text-[#1c1b1b] leading-relaxed">{site.address}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SAMBUTAN KEPALA SEKOLAH -->
+<section class="bg-white border-y border-black/5">
+  <div class="max-w-5xl mx-auto px-4 md:px-6 py-16 md:py-20">
+    <div class="grid md:grid-cols-12 gap-8 md:gap-12 items-center">
+      <div class="md:col-span-4 flex flex-col items-center md:items-start">
+        <div class="w-40 h-40 md:w-52 md:h-52 rounded-2xl overflow-hidden bg-gray-200 border-4 border-[#1B7A3D]/20 shadow-lg">
+          <img class="w-full h-full object-cover" src="/assets/kepala-sekolah.png" alt="Hadi Santoso, S.E.,M.Pd. — Kepala Sekolah" loading="lazy" onerror="this.style.display='none'" />
+        </div>
+      </div>
+      <div class="md:col-span-8">
+        <span class="rule-mark mb-5"></span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-4">Sambutan Kepala Sekolah</h2>
+        <div class="relative">
+          <span class="text-5xl text-[#1B7A3D]/20 absolute -top-3 -left-1 font-serif leading-none">"</span>
+          <p class="text-sm md:text-base text-[#3f493f] leading-relaxed italic pl-5">Assalamu'alaikum warahmatullahi wabarakatuh. Alhamdulillah, puji syukur ke hadirat Allah SWT. Kami berkomitmen mencetak generasi muda yang terampil dalam bidang kejuruan, beriman dan bertakwa, serta siap menghadapi dunia kerja. Dengan pendekatan <em>learning by doing</em> dan pembiasaan nilai-nilai Islami, kami yakin setiap siswa dapat berkembang sesuai potensinya.</p>
+        </div>
+        <div class="mt-5">
+          <p class="text-base font-bold text-[#1B7A3D]">Hadi Santoso, S.E.,M.Pd.</p>
+          <p class="text-sm text-[#6f7a6e]">Kepala {site.name}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- VISI & MISI -->
+<section id="visi" class="max-w-5xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <span class="rule-mark mb-5 mx-auto"></span>
+  <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] text-center mb-10">Visi & Misi</h2>
+  <div class="grid md:grid-cols-2 gap-8">
+    <!-- Visi -->
+    <div class="bg-[#1B7A3D] text-white rounded-2xl p-6 md:p-8 shadow-[0_4px_16px_rgba(27,122,61,0.25)]">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="material-symbols-outlined text-3xl">visibility</span>
+        <h3 class="text-xl font-extrabold">Visi</h3>
+      </div>
+      <p class="text-white/90 leading-relaxed">Menjadi sekolah kejuruan unggulan yang mencetak lulusan terampil, berakhlak mulia, dan berdaya saing berdasarkan nilai-nilai Islam Ahlussunnah wal Jamaah.</p>
+    </div>
+    <!-- Misi -->
+    <div class="bg-white rounded-2xl border border-[#1B7A3D]/20 p-6 md:p-8">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="material-symbols-outlined text-[#1B7A3D] text-3xl">flag</span>
+        <h3 class="text-xl font-extrabold text-[#1c1b1b]">Misi</h3>
+      </div>
+      <ol class="space-y-3 text-sm text-[#3f493f] leading-relaxed list-decimal pl-4">
+        <li>Menyelenggarakan pendidikan kejuruan yang inovatif dan berbasis praktik.</li>
+        <li>Menanamkan nilai-nilai keislaman dan Aswaja dalam kehidupan sehari-hari.</li>
+        <li>Mengembangkan potensi siswa melalui kegiatan keagamaan, akademik, dan ekstrakurikuler.</li>
+        <li>Membangun kemitraan dengan dunia usaha, industri, dan masyarakat.</li>
+        <li>Membentuk lulusan yang kompeten, berkarakter, dan siap kerja.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- NILAI-NILAI -->
+<section class="bg-white border-y border-black/5">
+  <div class="max-w-5xl mx-auto px-4 md:px-6 py-16 md:py-20">
+    <span class="rule-mark mb-5 mx-auto"></span>
+    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] text-center mb-10">Nilai-Nilai Kami</h2>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {[
+        { icon: 'handshake', title: 'Amanah', desc: 'Menjaga kepercayaan dan tanggung jawab' },
+        { icon: 'group', title: 'Kebersamaan', desc: 'Gotong royong dan saling mendukung' },
+        { icon: 'school', title: 'Keunggulan', desc: 'Terus belajar untuk menjadi yang terbaik' },
+        { icon: 'emoji_objects', title: 'Kreativitas', desc: 'Berinovasi dan berpikir terbuka' },
+      ].map(item => (
+        <div class="bg-[#fcf9f8] rounded-xl border border-black/5 p-6 text-center hover:shadow-[0_4px_12px_rgba(27,122,61,0.08)] transition-shadow">
+          <span class="material-symbols-outlined text-[#C8963E] text-3xl mb-3">{item.icon}</span>
+          <h3 class="font-bold text-[#1c1b1b] mb-2">{item.title}</h3>
+          <p class="text-sm text-[#6f7a6e] leading-relaxed">{item.desc}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<!-- SEJARAH SINGKAT -->
+<section class="max-w-5xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <span class="rule-mark mb-5 mx-auto"></span>
+  <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] text-center mb-10">Sejarah Singkat</h2>
+  <div class="bg-white rounded-2xl border border-black/5 p-6 md:p-8 shadow-[0_2px_8px_rgba(27,122,61,0.06)] max-w-3xl mx-auto">
+    <div class="relative pl-8 border-l-2 border-[#1B7A3D]/30 space-y-8">
+      {[
+        { year: '2010', title: 'Pendirian', desc: 'Berdiri sebagai SMKS NU Darul Hikam Karanggeneng di bawah naungan LP Ma&apos;arif NU, dengan satu program keahlian Perbankan Syariah.' },
+        { year: '2014', title: 'Akreditasi Pertama', desc: 'Mendapatkan akreditasi dari BAN-S/M sebagai bukti kualitas pendidikan yang diakui secara nasional.' },
+        { year: '2018', title: 'Membuka Jurusan Multimedia', desc: 'Membuka program keahlian Multimedia untuk menjawab kebutuhan industri kreatif digital.' },
+        { year: '2022', title: 'Renovasi & Ekspansi', desc: 'Pembangunan lab komputer baru, studio multimedia, dan fasilitas penunjang pembelajaran modern.' },
+        { year: '2025', title: 'Akreditasi A', desc: 'Berhasil meraih akreditasi A, membuktikan komitmen terhadap mutu pendidikan berkelanjutan.' },
+      ].map((item, i) => (
+        <div class="relative">
+          <div class="absolute -left-[29px] top-1 w-3.5 h-3.5 rounded-full bg-[#1B7A3D] border-2 border-white"></div>
+          <span class="inline-block text-xs font-bold text-[#1B7A3D] bg-[#e8f5e9] px-3 py-1 rounded-full mb-2">{item.year}</span>
+          <h3 class="font-bold text-[#1c1b1b] mb-1">{item.title}</h3>
+          <p class="text-sm text-[#6f7a6e] leading-relaxed">{item.desc}</p>
+        </div>
+      ))}
+    </div>
+    <p class="text-xs text-[#6f7a6e] mt-6 italic text-center">{dummyNote}</p>
+  </div>
+</section>
+
+<!-- CTA SECTION -->
+<section class="relative bg-[#1B7A3D] text-white overflow-hidden">
+  <svg class="absolute -top-16 -right-16 w-80 h-80 text-white/10 pointer-events-none" viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M50 5 L61 39 L95 39 L67 60 L78 95 L50 74 L22 95 L33 60 L5 39 L39 39 Z" stroke="currentColor" stroke-width="0.8"/></svg>
+  <div class="relative max-w-3xl mx-auto px-4 md:px-6 py-16 md:py-20 text-center">
+    <h2 class="text-2xl md:text-4xl font-extrabold tracking-tight mb-4">Ingin tahu lebih banyak?</h2>
+    <p class="text-white/85 mb-8 text-sm md:text-lg leading-relaxed max-w-xl mx-auto">Kunjungi langsung sekolah kami di {site.location} atau hubungi kami untuk informasi lebih lanjut.</p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+      <a href="/kontak" class="inline-flex items-center justify-center gap-2 bg-[#C8963E] text-white font-bold px-8 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-[#C8963E]/90 transition-colors">Hubungi Kami</a>
+      <a href="/ppdb" class="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/40 text-white font-bold px-8 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-white/20 transition-colors">Daftar PPDB</a>
+    </div>
+  </div>
+</section>
+
+</BaseLayout>

@@ -1,0 +1,85 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../data/site';
+
+const guruList = [
+  { name: 'Hadi Santoso, S.E.,M.Pd.', mapel: 'Kepala Sekolah', img: '/assets/kepala-sekolah.png' },
+  { name: 'Dra. Siti ..., M.Pd', mapel: 'Waka Kurikulum', img: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&q=80&fit=crop&crop=face' },
+  { name: 'Drs. Budi ...', mapel: 'Waka Kesiswaan', img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&q=80&fit=crop&crop=face' },
+  { name: '..., S.Ag', mapel: 'Pendidikan Agama Islam', img: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=300&q=80&fit=crop&crop=face' },
+  { name: '..., S.Pd', mapel: 'Bahasa Indonesia', img: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&q=80&fit=crop&crop=face' },
+  { name: '..., S.Pd', mapel: 'Bahasa Inggris', img: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&q=80&fit=crop&crop=face' },
+  { name: '..., S.Pd', mapel: 'Matematika', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&q=80&fit=crop&crop=face' },
+  { name: '..., S.Kom', mapel: 'Produktif Multimedia', img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&q=80&fit=crop&crop=face' },
+];
+
+const tuList = [
+  { name: '..., S.E', title: 'Kepala TU', icon: 'admin_panel_settings' },
+  { name: '...', title: 'Staf Administrasi', icon: 'description' },
+  { name: '...', title: 'Staf Keuangan', icon: 'account_balance' },
+];
+---
+
+<BaseLayout title="Guru & Staf" description={`Profil guru dan staf ${site.name} — pendidik profesional yang membimbing siswa.`}>
+
+<!-- HERO -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1200&q=80" alt="Guru dan staf" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/85"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-24 text-center text-white">
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">Guru & Staf</h1>
+    <p class="text-base md:text-lg text-white/80 leading-relaxed max-w-xl mx-auto">Para pendidik dan tenaga kependidikan yang berdedikasi di {site.name}.</p>
+  </div>
+</section>
+
+<!-- DEWAN GURU -->
+<section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="max-w-2xl mb-12">
+    <span class="rule-mark mb-5"></span>
+    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Dewan Guru</h2>
+    <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Tenaga pendidik profesional yang siap membimbing siswa meraih prestasi terbaik.</p>
+  </div>
+
+  <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
+    {guruList.map(g => (
+      <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow group">
+        <div class="h-48 bg-gray-200 overflow-hidden">
+          <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={g.img} alt={g.name} loading="lazy" onerror="this.style.display='none'" />
+        </div>
+        <div class="p-4 text-center">
+          <h3 class="font-bold text-sm text-[#1c1b1b] mb-1">{g.name}</h3>
+          <p class="text-xs text-[#6f7a6e]">{g.mapel}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+</section>
+
+<!-- STAF TU -->
+<section class="bg-white border-y border-black/5">
+  <div class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-20">
+    <div class="max-w-2xl mb-12">
+      <span class="rule-mark mb-5"></span>
+      <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Staf Tata Usaha</h2>
+      <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Tenaga kependidikan yang memastikan administrasi sekolah berjalan lancar.</p>
+    </div>
+
+    <div class="grid sm:grid-cols-3 gap-5 md:gap-6">
+      {tuList.map(t => (
+        <div class="bg-[#fcf9f8] rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-6 text-center hover:shadow-[0_8px_24px_rgba(27,122,61,0.08)] transition-shadow">
+          <div class="w-16 h-16 rounded-full bg-[#f0f7f1] mx-auto mb-4 flex items-center justify-center">
+            <span class="material-symbols-outlined text-2xl text-[#1B7A3D]">{t.icon}</span>
+          </div>
+          <h3 class="font-bold text-sm text-[#1c1b1b] mb-1">{t.name}</h3>
+          <p class="text-xs text-[#6f7a6e]">{t.title}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<p class="text-xs text-[#6f7a6e] text-center py-8 italic">[data perlu dikonfirmasi ke sekolah — data guru dan staf masih placeholder]</p>
+
+</BaseLayout>

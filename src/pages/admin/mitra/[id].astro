@@ -1,0 +1,35 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+const item = isEdit ? await db.partner.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !item) return Astro.redirect('/admin/mitra?saved=1');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const record: any = { name: data.get('name')?.toString() || '', logoUrl: data.get('logoUrl')?.toString() || null, type: data.get('type')?.toString() || null, order: parseInt(data.get('order')?.toString() || '0') || 0 };
+  if (isEdit) await db.partner.update({ where: { id: id! }, data: record });
+  else await db.partner.create({ data: record });
+  return Astro.redirect('/admin/mitra?saved=1');
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit Mitra' : 'Tambah Mitra'} user={{ role: session.role }}>
+  <form method="POST" style="max-width:600px">
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={item?.name||''} required/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Logo</label><input type="url" name="logoUrl" value={item?.logoUrl||''} placeholder="https://..."/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Tipe</label><select name="type"><option value="">-</option><option value="Industri" selected={(item?.type==='Industri') || undefined}>Industri</option><option value="Institusi" selected={(item?.type==='Institusi') || undefined}>Institusi</option><option value="Pemerintah" selected={(item?.type==='Pemerintah') || undefined}>Pemerintah</option></select></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Urutan</label><input type="number" name="order" value={item?.order??0}/></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/mitra" class="btn btn-outline">Batal</a></div>
+  </form>
+</AdminLayout>

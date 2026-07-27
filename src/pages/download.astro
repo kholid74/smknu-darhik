@@ -1,0 +1,71 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../data/site';
+
+const downloads = [
+  { icon: 'description', name: 'Brosur Sekolah 2026', desc: 'Informasi lengkap profil sekolah, jurusan, dan fasilitas.', size: '2.4 MB', type: 'PDF', color: 'bg-blue-50 text-blue-600', href: '#' },
+  { icon: 'assignment', name: 'Formulir PPDB 2026/2027', desc: 'Formulir pendaftaran peserta didik baru tahun ajaran mendatang.', size: '1.1 MB', type: 'PDF', color: 'bg-green-50 text-green-700', href: '#' },
+  { icon: 'calendar_month', name: 'Kalender Akademik 2025/2026', desc: 'Jadwal kegiatan akademik, ujian, libur, dan acara sekolah.', size: '890 KB', type: 'PDF', color: 'bg-orange-50 text-orange-600', href: '#' },
+  { icon: 'list_alt', name: 'Tata Tertib Siswa', desc: 'Peraturan dan tata tertib yang berlaku di lingkungan sekolah.', size: '650 KB', type: 'PDF', color: 'bg-red-50 text-red-600', href: '#' },
+  { icon: 'book', name: 'Buku Panduan PKL', desc: 'Panduan lengkap pelaksanaan Praktik Kerja Lapangan bagi siswa.', size: '1.8 MB', type: 'PDF', color: 'bg-purple-50 text-purple-600', href: '#' },
+  { icon: 'school', name: 'Profil Lulusan & Alumni', desc: 'Data dan informasi mengenai alumni serta tracer study sekolah.', size: '420 KB', type: 'PDF', color: 'bg-teal-50 text-teal-600', href: '#' },
+];
+---
+
+<BaseLayout title="Download" description={`Unduh brosur, formulir, kalender akademik, dan dokumen resmi ${site.name}.`}>
+
+<!-- HERO -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=1200&q=80" alt="Download dokumen" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/85"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-24 text-center text-white">
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">Download</h1>
+    <p class="text-base md:text-lg text-white/80 leading-relaxed max-w-xl mx-auto">Unduh dokumen resmi {site.name} — brosur, formulir, kalender akademik, dan lainnya.</p>
+  </div>
+</section>
+
+<!-- DOWNLOAD GRID -->
+<section class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="max-w-2xl mb-12">
+    <span class="rule-mark mb-5"></span>
+    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Dokumen & File</h2>
+    <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Kumpulan dokumen yang dapat diunduh untuk keperluan siswa, orang tua, dan masyarakat umum.</p>
+  </div>
+
+  <div class="space-y-4">
+    {downloads.map((d, i) => (
+      <a href={d.href} class="flex items-center gap-4 md:gap-5 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4 md:p-5 hover:shadow-[0_8px_24px_rgba(27,122,61,0.1)] transition-shadow group">
+        <div class={`w-11 h-11 rounded-lg ${d.color} flex items-center justify-center flex-shrink-0`}>
+          <span class="material-symbols-outlined text-lg">{d.icon}</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="font-bold text-sm md:text-base text-[#1c1b1b] mb-0.5">{d.name}</h3>
+          <p class="text-xs md:text-sm text-[#6f7a6e]">{d.desc}</p>
+          <div class="flex items-center gap-2 mt-1.5">
+            <span class="text-[10px] font-semibold text-white bg-[#1B7A3D] px-2 py-0.5 rounded-full">{d.type}</span>
+            <span class="text-[10px] text-[#6f7a6e]">{d.size}</span>
+          </div>
+        </div>
+        <div class="flex-shrink-0 text-[#1B7A3D] group-hover:translate-x-1 transition-transform">
+          <span class="material-symbols-outlined text-lg">download</span>
+        </div>
+      </a>
+    ))}
+  </div>
+</section>
+
+<!-- NOTE -->
+<section class="bg-white border-y border-black/5">
+  <div class="max-w-3xl mx-auto px-4 md:px-6 py-12 text-center">
+    <div class="inline-flex items-center gap-2 text-sm text-[#6f7a6e]">
+      <span class="material-symbols-outlined text-[#C8963E] text-base">info</span>
+      <span>Untuk dokumen yang belum tersedia, silakan hubungi kantor TU atau kirim email ke <a href="mailto:{site.email}" class="text-[#1B7A3D] font-semibold underline hover:no-underline">{site.email}</a></span>
+    </div>
+  </div>
+</section>
+
+<p class="text-xs text-[#6f7a6e] text-center py-8 italic">[dokumen perlu dikonfirmasi — link download masih placeholder]</p>
+
+</BaseLayout>

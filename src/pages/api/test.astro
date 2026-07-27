@@ -1,0 +1,11 @@
+---
+export const prerender = false;
+import { db } from '../../lib/prisma';
+
+const settings = await db.setting.findFirst();
+const departments = await db.department.findMany({ orderBy: { order: 'asc' } });
+const teachers = await db.teacher.findMany({ orderBy: { order: 'asc' } });
+
+const data = { status: 'ok', settings: { name: settings?.siteName, phone: settings?.phone }, departments, teachers };
+---
+{JSON.stringify(data, null, 2)}

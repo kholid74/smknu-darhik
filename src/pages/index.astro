@@ -1,11 +1,269 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<Layout>
-	<Welcome />
-</Layout>
+<BaseLayout title="Beranda" description="Sekolah kejuruan berbasis nilai Islam di Karanggeneng Lamongan — terampil, beriman, siap kerja.">
+
+<!-- ====== HERO — Modern Islamic Vocational ====== -->
+<!-- Arah: ambil energi & palet hijau-NU dari IG, layout bersih, luas, aspiratif -->
+<section class="relative bg-green-deep text-white overflow-hidden">
+  <!-- Girih geometric ornament -->
+  <svg class="absolute -top-10 -right-16 w-72 h-72 text-white/[0.06] pointer-events-none" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+    <g stroke="currentColor" stroke-width="0.8">
+      <path d="M50 5 L61 39 L95 39 L67 60 L78 95 L50 74 L22 95 L33 60 L5 39 L39 39 Z"/>
+      <path d="M50 20 L57 42 L80 42 L61 55 L69 78 L50 64 L31 78 L39 55 L20 42 L43 42 Z"/>
+    </g>
+  </svg>
+  <!-- Leaf ornament -->
+  <svg class="absolute -bottom-8 -right-8 w-48 h-48 text-white/[0.04] pointer-events-none rotate-45" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+    <path d="M50 10 Q75 5 85 25 Q90 50 70 65 Q45 80 45 60 Q43 45 55 35 Q65 25 50 20 Q35 18 35 35 Q35 55 50 70" stroke="currentColor" stroke-width="0.6" fill="none"/>
+    <path d="M50 20 Q65 17 70 32 Q73 48 58 58 Q43 68 43 54 Q42 44 50 38 Q58 32 50 28" stroke="currentColor" stroke-width="0.5" fill="none"/>
+  </svg>
+
+  <div class="relative max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
+    <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+
+      <!-- Kiri: Foto -->
+      <div class="lg:col-span-5 order-2 lg:order-1">
+        <div class="relative">
+          <div class="absolute -inset-3 bg-white/[0.06] rounded-3xl -rotate-2"></div>
+          <div class="relative rounded-2xl overflow-hidden aspect-[4/5] shadow-[0_20px_60px_rgba(0,0,0,0.25)] border-2 border-white/10">
+            <img class="w-full h-full object-cover" src="/assets/hero-siswa.png" alt="Siswa SMKS NU Darul Hikam praktik di lab" loading="eager" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,#00602b,#145a2d)'"/>
+            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gold/80"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kanan: Text -->
+      <div class="lg:col-span-7 min-w-0 order-1 lg:order-2">
+        <span class="inline-flex items-center gap-2 bg-white/15 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full mb-6 border border-white/10">
+          <span class="material-symbols-outlined text-sm text-gold">verified</span>
+          Berbasis Aswaja &middot; Terakreditasi A
+        </span>
+
+        <h1 class="text-[2rem] leading-[1.12] md:text-5xl md:leading-[1.08] font-extrabold tracking-tight [overflow-wrap:anywhere]">
+          Belajar keterampilan nyata,<br class="hidden sm:block"/>
+          bangun <span class="text-gold">masa depan cerah</span>
+        </h1>
+
+        <p class="mt-5 text-base md:text-lg text-white/80 leading-relaxed max-w-lg">
+          Sekolah kejuruan di Karanggeneng, Lamongan — memadukan keterampilan kerja, pendidikan karakter Islami, dan nilai-nilai Ahlussunnah wal Jamaah.
+        </p>
+
+        <!-- Statistik -->
+        <div class="mt-8 flex flex-wrap gap-x-8 gap-y-3">
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl md:text-3xl font-extrabold text-gold">A</span>
+            <span class="text-sm text-white/70 font-medium">Akreditasi</span>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl md:text-3xl font-extrabold text-gold">2</span>
+            <span class="text-sm text-white/70 font-medium">Program Keahlian</span>
+          </div>
+          <div class="flex items-baseline gap-1.5">
+            <span class="text-2xl md:text-3xl font-extrabold text-gold">20+</span>
+            <span class="text-sm text-white/70 font-medium">Mitra Industri</span>
+          </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="mt-8 flex flex-col sm:flex-row gap-3">
+          <a href="/ppdb" class="inline-flex items-center justify-center gap-2 bg-gold text-white font-bold px-6 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-gold-deep transition-colors shadow-lg shadow-gold/20">
+            Daftar PPDB 2026
+            <span class="material-symbols-outlined text-lg">arrow_forward</span>
+          </a>
+          <a href="/jurusan" class="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/25 text-white font-bold px-6 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-white/20 transition-colors backdrop-blur">
+            Lihat Program Keahlian
+          </a>
+        </div>
+
+        <p class="mt-6 flex items-center gap-2 text-sm text-white/50">
+          <span class="material-symbols-outlined text-base">location_on</span>
+          Jl. Sultan Hasanuddin No.44, Tracal — Karanggeneng, Lamongan
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SAMBUTAN KEPALA SEKOLAH -->
+<section class="bg-white border-y border-black/5">
+  <div class="max-w-5xl mx-auto px-4 md:px-6 py-14 md:py-16">
+    <div class="grid md:grid-cols-[220px_1fr] gap-8 md:gap-12 items-center">
+      <div class="w-40 md:w-full mx-auto md:mx-0 aspect-[4/5] rounded-2xl overflow-hidden bg-green-light border border-black/5 shadow-card">
+        <img class="w-full h-full object-cover" src="/assets/kepala-sekolah.png" alt="Hadi Santoso, S.E.,M.Pd. — Kepala SMKS NU Darul Hikam" loading="lazy" onerror="this.parentElement.style.background='#e8f5e9'"/>
+      </div>
+      <div class="relative min-w-0">
+        <span class="material-symbols-outlined text-gold/40 text-6xl absolute -top-8 -left-1 select-none" aria-hidden="true">format_quote</span>
+        <blockquote class="relative pt-4">
+          <p class="text-lg md:text-2xl font-medium text-ink leading-relaxed italic [overflow-wrap:anywhere]">Kami percaya setiap anak punya potensi. Di sini, kami membimbing siswa menjadi lulusan yang terampil, berakhlak, dan siap kerja — dibekali nilai-nilai Islam Ahlussunnah wal Jamaah.</p>
+          <footer class="mt-6">
+            <div class="text-base font-bold text-green-deep">Hadi Santoso, S.E.,M.Pd.</div>
+            <div class="text-sm text-muted">Kepala SMKS NU Darul Hikam</div>
+          </footer>
+        </blockquote>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KENAPA -->
+<section id="kenapa" class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="grid lg:grid-cols-12 gap-10 lg:gap-12">
+    <div class="lg:col-span-4">
+      <div class="lg:sticky lg:top-24">
+        <span class="rule-mark mb-5"></span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-ink [overflow-wrap:anywhere]">Kenapa memilih Darul Hikam?</h2>
+        <p class="mt-4 text-sm md:text-base text-ink-soft leading-relaxed">Sekolah kejuruan di desa bukan berarti tertinggal. Di sini kamu fokus belajar, dekat dengan guru, dan tetap dapat keterampilan yang dibutuhkan dunia kerja.</p>
+      </div>
+    </div>
+    <div class="lg:col-span-8 grid sm:grid-cols-2 gap-x-8 gap-y-8">
+      <div class="flex gap-4 min-w-0"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">handyman</span><div class="min-w-0"><h3 class="font-bold text-base mb-1">Belajar sambil praktik</h3><p class="text-sm text-muted leading-relaxed">Lebih banyak praktik di bengkel dan lab daripada teori. Lulus dengan skill yang langsung terpakai.</p></div></div>
+      <div class="flex gap-4 min-w-0"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">mosque</span><div class="min-w-0"><h3 class="font-bold text-base mb-1">Karakter Islami sehari-hari</h3><p class="text-sm text-muted leading-relaxed">Nilai Islam dan Aswaja bukan cuma pelajaran, tapi pembiasaan setiap hari.</p></div></div>
+      <div class="flex gap-4 min-w-0"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">payments</span><div class="min-w-0"><h3 class="font-bold text-base mb-1">Biaya terjangkau</h3><p class="text-sm text-muted leading-relaxed">Pendidikan kejuruan berkualitas tanpa harus ke kota.</p></div></div>
+      <div class="flex gap-4 min-w-0"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">nature_people</span><div class="min-w-0"><h3 class="font-bold text-base mb-1">Lingkungan tenang</h3><p class="text-sm text-muted leading-relaxed">Jauh dari kebisingan kota. Suasana desa yang asri bikin fokus.</p></div></div>
+      <div class="flex gap-4 min-w-0"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">diversity_3</span><div class="min-w-0"><h3 class="font-bold text-base mb-1">Jaringan NU yang luas</h3><p class="text-sm text-muted leading-relaxed">Bagian dari keluarga besar Nahdlatul Ulama. Alumni tersebar dan saling mendukung.</p></div></div>
+      <div class="flex gap-4 min-w-0"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">school</span><div class="min-w-0"><h3 class="font-bold text-base mb-1">Guru dekat dengan siswa</h3><p class="text-sm text-muted leading-relaxed">Kelas kecil, guru lebih perhatian. Kamu bukan sekadar nomor absen.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRESTASI — card dengan foto siswa -->
+<section class="relative bg-green-deep text-white overflow-hidden">
+  <svg class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] text-white/5 pointer-events-none" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+    <path d="M50 5 L61 39 L95 39 L67 60 L78 95 L50 74 L22 95 L33 60 L5 39 L39 39 Z" stroke="currentColor" stroke-width="0.7"/>
+    <path d="M50 20 L57 42 L80 42 L61 55 L69 78 L50 64 L31 78 L39 55 L20 42 L43 42 Z" stroke="currentColor" stroke-width="0.7"/>
+  </svg>
+  <div class="relative max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+    <div class="flex items-end justify-between gap-4 mb-8">
+      <div>
+        <span class="rule-mark mb-5"></span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight">Prestasi Siswa</h2>
+      </div>
+      <a href="/prestasi" class="hidden sm:inline-flex items-center gap-1 text-gold font-semibold text-sm hover:gap-2 transition-all whitespace-nowrap">Lihat semua <span class="material-symbols-outlined text-base">arrow_forward</span></a>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <!-- Prestasi 1 -->
+      <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10">
+        <div class="aspect-[4/3] overflow-hidden">
+          <img class="w-full h-full object-cover" src="/assets/prestasi-1.png" alt="Siswa juara LKS" loading="lazy" onerror="this.style.display='none'"/>
+        </div>
+        <div class="p-5">
+          <div class="text-2xl mb-2">🏆</div>
+          <h3 class="font-bold text-base mb-1">Juara 1 LKS Kabupaten</h3>
+          <p class="text-white/70 text-sm leading-relaxed">Bidang Akuntansi & Keuangan tingkat Kabupaten Lamongan.</p>
+          <p class="text-xs text-white/40 mt-2">[nama siswa · tahun — perlu dikonfirmasi]</p>
+        </div>
+      </div>
+      <!-- Prestasi 2 -->
+      <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10">
+        <div class="aspect-[4/3] overflow-hidden">
+          <img class="w-full h-full object-cover" src="/assets/prestasi-2.png" alt="Siswa MTQ" loading="lazy" onerror="this.style.display='none'"/>
+        </div>
+        <div class="p-5">
+          <div class="text-2xl mb-2">🥇</div>
+          <h3 class="font-bold text-base mb-1">MTQ Pelajar Tingkat Provinsi</h3>
+          <p class="text-white/70 text-sm leading-relaxed">Peringkat 3 Musabaqah Tilawatil Quran antar sekolah kejuruan se-Jawa Timur.</p>
+          <p class="text-xs text-white/40 mt-2">[nama siswa · tahun — perlu dikonfirmasi]</p>
+        </div>
+      </div>
+      <!-- Prestasi 3 -->
+      <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10">
+        <div class="aspect-[4/3] overflow-hidden">
+          <img class="w-full h-full object-cover" src="/assets/prestasi-3.png" alt="Karya DKV" loading="lazy" onerror="this.style.display='none'"/>
+        </div>
+        <div class="p-5">
+          <div class="text-2xl mb-2">🌟</div>
+          <h3 class="font-bold text-base mb-1">Karya DKV Terbaik</h3>
+          <p class="text-white/70 text-sm leading-relaxed">Film pendek karya siswa masuk nominasi festival pelajar tingkat provinsi.</p>
+          <p class="text-xs text-white/40 mt-2">[tim · tahun — perlu dikonfirmasi]</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-8 text-center sm:hidden">
+      <a href="/prestasi" class="inline-flex items-center gap-1 text-gold font-semibold text-sm">Lihat semua prestasi <span class="material-symbols-outlined text-base">arrow_forward</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- KEGIATAN TERBARU -->
+<section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="flex items-end justify-between gap-4 mb-8">
+    <div><span class="rule-mark mb-5"></span><h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-ink">Kegiatan Terbaru</h2></div>
+    <a href="/berita" class="hidden sm:inline-flex items-center gap-1 text-green-deep font-semibold text-sm hover:gap-2 transition-all whitespace-nowrap">Lihat semua <span class="material-symbols-outlined text-base">arrow_forward</span></a>
+  </div>
+  <div class="grid lg:grid-cols-2 gap-6">
+    <a href="/berita" class="sink block bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline">
+      <div class="aspect-[16/9] overflow-hidden"><img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1559027617705-36b81b498221?w=800&q=80" alt="Bakti sosial Ramadhan" loading="lazy" onerror="this.style.display='none'"/></div>
+      <div class="p-6"><span class="text-xs font-semibold text-gold-deep">15 Mei 2025</span><h3 class="font-bold text-lg mt-2 mb-2 text-ink">Kegiatan Bakti Sosial Ramadhan 1446 H</h3><p class="text-sm text-muted leading-relaxed">Siswa-siswi membagikan sembako kepada warga sekitar sekolah sebagai bagian pembelajaran kepedulian sosial.</p></div>
+    </a>
+    <div class="flex flex-col gap-6">
+      <a href="/berita" class="sink flex gap-4 bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline p-3">
+        <div class="w-28 sm:w-36 flex-shrink-0 rounded-xl overflow-hidden aspect-square"><img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1530049470-ebf6a518ea8b?w=400&q=80" alt="Workshop desain grafis" loading="lazy" onerror="this.style.display='none'"/></div>
+        <div class="min-w-0 py-1 pr-2"><span class="text-xs font-semibold text-gold-deep">02 Juni 2025</span><h3 class="font-bold text-sm sm:text-base mt-1 mb-1 text-ink">Workshop Desain Grafis Bareng Praktisi</h3><p class="text-xs sm:text-sm text-muted leading-relaxed line-clamp-2">Siswa Multimedia belajar teknik desain terkini langsung dari praktisi industri kreatif Lamongan.</p></div>
+      </a>
+      <a href="/berita" class="sink flex gap-4 bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline p-3">
+        <div class="w-28 sm:w-36 flex-shrink-0 rounded-xl overflow-hidden aspect-square"><img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1492725764893-90b379c2b6e7?w=400&q=80" alt="Lomba film pendek" loading="lazy" onerror="this.style.display='none'"/></div>
+        <div class="min-w-0 py-1 pr-2"><span class="text-xs font-semibold text-gold-deep">20 Juni 2025</span><h3 class="font-bold text-sm sm:text-base mt-1 mb-1 text-ink">Juara Lomba Film Pendek Pelajar</h3><p class="text-xs sm:text-sm text-muted leading-relaxed line-clamp-2">Tim jurnalistik sekolah meraih juara dalam kompetisi film pendek tingkat Kabupaten Lamongan.</p></div>
+      </a>
+    </div>
+  </div>
+  <div class="mt-8 sm:hidden"><a href="/berita" class="inline-flex items-center gap-1 text-green-deep font-semibold text-sm">Lihat semua berita <span class="material-symbols-outlined text-base">arrow_forward</span></a></div>
+</section>
+
+<!-- DHTV HIGHLIGHT -->
+<section class="relative bg-green-deep text-white overflow-hidden">
+  <svg class="absolute -top-10 -right-16 w-72 h-72 text-white/[0.06] pointer-events-none" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+    <g stroke="currentColor" stroke-width="0.8">
+      <path d="M50 5 L61 39 L95 39 L67 60 L78 95 L50 74 L22 95 L33 60 L5 39 L39 39 Z"/>
+      <path d="M50 20 L57 42 L80 42 L61 55 L69 78 L50 64 L31 78 L39 55 L20 42 L43 42 Z"/>
+    </g>
+  </svg>
+  <div class="relative max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+    <div class="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
+      <!-- Kiri: YouTube Embed -->
+      <div class="rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/10 aspect-video bg-black">
+        <iframe class="w-full h-full" src="https://www.youtube.com/embed/pW8MRWOVfUQ" title="DHTV — SMKS NU Darul Hikam" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+      </div>
+      <!-- Kanan: Teks -->
+      <div>
+        <span class="inline-flex items-center gap-2 bg-white/15 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full mb-4 border border-white/10">
+          <span class="material-symbols-outlined text-sm text-gold">live_tv</span>
+          DHtv — Streaming Sekolah
+        </span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight mb-4">Kegiatan sekolah, langsung dari layar kamu</h2>
+        <p class="text-white/70 text-sm md:text-base leading-relaxed mb-6">DHTV adalah channel YouTube resmi SMKS NU Darul Hikam. Tonton live streaming event sekolah, karya DKV, dokumenter kegiatan, dan konten kreatif buatan siswa.</p>
+        <div class="flex flex-wrap gap-3">
+          <a href="https://www.youtube.com/@dhtvsmkdh9648" target="_blank" rel="noopener" class="inline-flex items-center gap-2 bg-gold text-white font-bold px-6 py-3 rounded-lg text-sm hover:bg-gold-deep transition-colors">
+            <svg class="w-4 h-4" fill="white" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            Tonton di YouTube
+          </a>
+          <a href="/galeri" class="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-white font-bold px-6 py-3 rounded-lg text-sm hover:bg-white/20 transition-colors">Lihat Galeri Foto</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LOKASI -->
+<section id="lokasi" class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+    <div class="rounded-2xl overflow-hidden border border-black/5 shadow-card h-[300px] md:h-[380px] order-2 lg:order-1">
+      <iframe title="Peta lokasi SMKS NU Darul Hikam" allowfullscreen="" height="100%" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.284752535745!2d112.3370925!3d-6.9834338!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e77eea100a68de7%3A0xa6b58228d3ebab52!2sSMK%20NU%20Darul%20Hikam!5e0!3m2!1sid!2sid!4v1700000000000" style="border:0;" width="100%"></iframe>
+    </div>
+    <div class="order-1 lg:order-2">
+      <span class="rule-mark mb-5"></span>
+      <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-ink">Kunjungi Sekolah kami</h2>
+      <p class="mt-4 text-sm md:text-base text-ink-soft leading-relaxed">Kami terbuka untuk calon siswa dan orang tua yang ingin melihat langsung suasana dan fasilitas sekolah.</p>
+      <div class="mt-8 space-y-6">
+        <div class="flex gap-4"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">location_on</span><div><h3 class="font-bold text-sm mb-1">Alamat</h3><p class="text-sm text-muted leading-relaxed">Jl. Sultan Hasanuddin No.44, Tracal, Kec. Karanggeneng, Kab. Lamongan, Jawa Timur 62254</p></div></div>
+        <div class="flex gap-4"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">schedule</span><div><h3 class="font-bold text-sm mb-1">Jam operasional</h3><p class="text-sm text-muted leading-relaxed">Senin – Sabtu, 07.00 – selesai kegiatan<br><span class="text-xs text-gold-deep">[jam pastinya perlu dikonfirmasi]</span></p></div></div>
+        <div class="flex gap-4"><span class="material-symbols-outlined text-green bg-green-tint rounded-lg p-2.5 flex-shrink-0">call</span><div><h3 class="font-bold text-sm mb-1">Kontak</h3><p class="text-sm text-muted leading-relaxed">WhatsApp: <span class="text-gold-deep">0851-5658-9720</span><br>Email: <span class="text-gold-deep">info@smknudarulhikam.sch.id</span></p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</BaseLayout>

@@ -1,0 +1,126 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import TiptapEditor from '../../../components/TiptapEditor.astro';
+import UploadWidget from '../../../components/UploadWidget.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+
+let article = isEdit ? await db.article.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !article) return Astro.redirect('/admin/artikel');
+
+// Handle form submit
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const title = data.get('title')?.toString() || '';
+  const slug = data.get('slug')?.toString() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const body = data.get('body')?.toString() || '';
+  const excerpt = data.get('excerpt')?.toString() || body.replace(/<[^>]*>/g, '').substring(0, 160);
+  const category = data.get('category')?.toString() || 'Akademik';
+  const published = data.get('published') === '1';
+  const featured = data.get('featured') === '1';
+  const imageUrl = data.get('imageUrl')?.toString() || null;
+
+  if (isEdit) {
+    await db.article.update({ where: { id: id! }, data: { title, slug, body, excerpt, category, published, featured, imageUrl } });
+  } else {
+    await db.article.create({ data: { title, slug, body, excerpt, category, published, featured, imageUrl } });
+  }
+  return Astro.redirect('/admin/artikel?saved=1');
+}
+
+const initialBody = article?.body || '';
+const initialTitle = article?.title || '';
+const initialExcerpt = article?.excerpt || '';
+const initialSlug = article?.slug || '';
+const initialCategory = article?.category || 'Akademik';
+const initialPublished = article?.published ?? false;
+const initialFeatured = article?.featured ?? false;
+const initialImageUrl = article?.imageUrl || '';
+---
+
+<AdminLayout title={isEdit ? 'Edit Artikel' : 'Tulis Artikel'} user={{ role: session.role }}>
+  <form method="POST" id="article-form">
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul</label>
+          <input type="text" name="title" id="title" value={initialTitle} required placeholder="Judul artikel..."/>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Slug</label>
+          <input type="text" name="slug" id="slug-input" value={initialSlug} placeholder="auto-dari-judul"/>
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kutipan (excerpt)</label>
+        <textarea name="excerpt" rows="2" style="resize:vertical" placeholder="Ringkasan singkat...">{initialExcerpt}</textarea>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:8px">Isi Artikel</label>
+      <input type="hidden" name="body" value={initialBody}/>
+      <TiptapEditor content={initialBody} client:load />
+    </div>
+
+    <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kategori</label>
+        <select name="category">
+          {['Akademik','Keagamaan','Prestasi','Ekstrakurikuler','PPDB'].map(c => (
+            <option value={c} selected={initialCategory === c}>{c}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Gambar Sampul</label>
+        {initialImageUrl && (
+          <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;background:#f0f7f1;border-radius:8px;padding:8px 12px">
+            <img src={initialImageUrl} style="width:80px;height:60px;object-fit:cover;border-radius:6px" alt="Preview"/>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:12px;font-weight:600;color:#1c1b1b;margin:0">Gambar tersimpan</p>
+              <p style="font-size:11px;color:#6f7a6e;margin:0;word-break:break-all">{initialImageUrl}</p>
+            </div>
+          </div>
+        )}
+        <input type="text" name="imageUrl" value={initialImageUrl} placeholder="https://... atau upload baru"/>
+        <details style="margin-top:8px"><summary style="font-size:12px;color:#1B7A3D;cursor:pointer;font-weight:600">Upload gambar baru</summary><div style="margin-top:8px"><UploadWidget client:load /></div></details>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:16px;padding-bottom:4px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
+          <input type="checkbox" name="published" value="1" checked={initialPublished} style="width:auto"/> Publish
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
+          <input type="checkbox" name="featured" value="1" checked={initialFeatured} style="width:auto"/> Featured
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button>
+      <a href="/admin/artikel" class="btn btn-outline">Batal</a>
+    </div>
+  </form>
+</AdminLayout>
+
+<script>
+  // Auto slug from title
+  document.getElementById('title')!.addEventListener('input', function(this: HTMLInputElement) {
+    const slugInput = document.getElementById('slug-input') as HTMLInputElement;
+    if (!slugInput.dataset.manual) {
+      slugInput.value = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+  });
+  document.getElementById('slug-input')!.addEventListener('input', function(this: HTMLInputElement) {
+    this.dataset.manual = 'true';
+  });
+</script>

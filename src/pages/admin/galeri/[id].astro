@@ -1,0 +1,35 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+const item = isEdit ? await db.galleryImage.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !item) return Astro.redirect('/admin/galeri?saved=1');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const record: any = { title: data.get('title')?.toString() || null, imageUrl: data.get('imageUrl')?.toString() || '', album: data.get('album')?.toString() || null };
+  if (isEdit) await db.galleryImage.update({ where: { id: id! }, data: record });
+  else await db.galleryImage.create({ data: record });
+  return Astro.redirect('/admin/galeri?saved=1');
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit Foto' : 'Tambah Foto'} user={{ role: session.role }}>
+  <form method="POST" style="max-width:600px">
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul</label><input type="text" name="title" value={item?.title||''} placeholder="Opsional"/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Gambar *</label><input type="url" name="imageUrl" value={item?.imageUrl||''} placeholder="https://..." required/></div>
+      {item?.imageUrl && (<div style="margin-bottom:4px"><img src={item.imageUrl} alt="Preview" style="max-width:200px;border-radius:8px;border:1px solid rgba(0,0,0,0.1)"/></div>)}
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Album</label><input type="text" name="album" value={item?.album||''} placeholder="Kegiatan 2026"/></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/galeri" class="btn btn-outline">Batal</a></div>
+  </form>
+</AdminLayout>

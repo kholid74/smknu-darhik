@@ -1,0 +1,48 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const settings = await db.setting.findFirst({ where: { id: 'main' } }) || {};
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  await db.setting.upsert({
+    where: { id: 'main' },
+    update: {
+      siteName: data.get('siteName')?.toString() || '',
+      tagline: data.get('tagline')?.toString() || '',
+      address: data.get('address')?.toString() || '',
+      phone: data.get('phone')?.toString() || '',
+      email: data.get('email')?.toString() || '',
+      wa: data.get('wa')?.toString() || '',
+      instagram: data.get('instagram')?.toString() || '',
+      facebook: data.get('facebook')?.toString() || '',
+      tiktok: data.get('tiktok')?.toString() || '',
+      youtube: data.get('youtube')?.toString() || '',
+    },
+    create: { id: 'main' },
+  });
+  return Astro.redirect('/admin/pengaturan');
+}
+---
+
+<AdminLayout title="Pengaturan" user={{ role: session.role }}>
+  <form method="POST" style="max-width:600px">
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:14px">Informasi Sekolah</h3>
+      {[{n:'siteName',l:'Nama Sekolah'},{n:'tagline',l:'Tagline'},{n:'address',l:'Alamat'},{n:'phone',l:'Telepon'},{n:'email',l:'Email'},{n:'wa',l:'WhatsApp (628...)'}].map(f=>(<div style="margin-bottom:10px"><label style="display:block;font-size:13px;font-weight:600;margin-bottom:3px">{f.l}</label><input type="text" name={f.n} value={(settings as any)[f.n]||''}/></div>))}
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:14px">Media Sosial</h3>
+      {[{n:'instagram',l:'Instagram'},{n:'facebook',l:'Facebook'},{n:'tiktok',l:'TikTok'},{n:'youtube',l:'YouTube (@channel)'}].map(f=>(<div style="margin-bottom:10px"><label style="display:block;font-size:13px;font-weight:600;margin-bottom:3px">{f.l}</label><input type="text" name={f.n} value={(settings as any)[f.n]||''}/></div>))}
+    </div>
+    <button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan Pengaturan</button>
+  </form>
+</AdminLayout>

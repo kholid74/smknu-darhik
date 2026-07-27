@@ -1,0 +1,128 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site, dummyNote } from '../data/site';
+---
+
+<BaseLayout title="FAQ" description="Pertanyaan yang sering diajukan seputar SMKS NU Darul Hikam Karanggeneng.">
+
+<!-- PAGE HERO + BREADCRUMB -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=1200&q=80" alt="FAQ" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/80"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-20 text-white text-center">
+    <nav class="flex items-center justify-center gap-2 text-sm text-white/70 mb-4" aria-label="Breadcrumb">
+      <a href="/" class="hover:text-white transition-colors">Beranda</a>
+      <span class="material-symbols-outlined text-sm">chevron_right</span>
+      <span class="text-white font-medium">FAQ</span>
+    </nav>
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-3">Pertanyaan Umum</h1>
+    <p class="text-base md:text-lg text-white/80 max-w-lg mx-auto leading-relaxed">Temukan jawaban atas pertanyaan yang sering diajukan tentang {site.name}.</p>
+  </div>
+</section>
+
+<!-- FAQ ACCORDION -->
+<section class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <!-- Category: Umum -->
+  <div class="mb-12">
+    <div class="flex items-center gap-3 mb-6">
+      <span class="material-symbols-outlined text-[#1B7A3D] text-2xl">help</span>
+      <h2 class="text-xl md:text-2xl font-extrabold text-[#1c1b1b]">Pertanyaan Umum</h2>
+    </div>
+    <div class="space-y-3">
+      {[
+        { q: 'Apa itu SMKS NU Darul Hikam?', a: `SMKS NU Darul Hikam adalah Sekolah Menengah Kejuruan Swasta di bawah naungan LP Ma'arif Nahdlatul Ulama yang berlokasi di ${site.location}. Sekolah ini memadukan pendidikan kejuruan dengan nilai-nilai Islam Ahlussunnah wal Jamaah.` },
+        { q: 'Apa akreditasi sekolah ini?', a: `SMKS NU Darul Hikam telah terakreditasi ${site.accreditation} oleh Badan Akreditasi Nasional Sekolah/Madrasah (BAN-S/M), yang menandakan standar mutu pendidikan yang tinggi.` },
+        { q: 'Apakah harus dari NU untuk mendaftar?', a: 'Tidak. Sekolah kami terbuka untuk semua calon siswa dari berbagai latar belakang organisasi Islam. Yang terpenting adalah kemauan untuk belajar dan mematuhi tata tertib sekolah.' },
+        { q: 'Bagaimana lingkungan belajar di sini?', a: `Terletak di pedesaan ${site.location}, lingkungan belajar kami tenang, asri, dan jauh dari kebisingan kota. Suasana ini mendukung fokus belajar dan pengembangan karakter Islami.` },
+      ].map((faq, i) => (
+        <details class="bg-white rounded-xl border border-black/5 group shadow-[0_2px_8px_rgba(27,122,61,0.04)]">
+          <summary class="flex items-center justify-between p-5 cursor-pointer font-bold text-[#1c1b1b] text-sm md:text-base list-none">
+            <span class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded-full bg-[#e8f5e9] text-[#1B7A3D] text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+              {faq.q}
+            </span>
+            <span class="material-symbols-outlined text-[#6f7a6e] group-open:rotate-180 transition-transform">expand_more</span>
+          </summary>
+          <div class="px-5 pb-5 pl-14">
+            <p class="text-sm text-[#3f493f] leading-relaxed">{faq.a}</p>
+          </div>
+        </details>
+      ))}
+    </div>
+  </div>
+
+  <!-- Category: Akademik -->
+  <div class="mb-12">
+    <div class="flex items-center gap-3 mb-6">
+      <span class="material-symbols-outlined text-[#1B7A3D] text-2xl">school</span>
+      <h2 class="text-xl md:text-2xl font-extrabold text-[#1c1b1b]">Akademik & Jurusan</h2>
+    </div>
+    <div class="space-y-3">
+      {[
+        { q: 'Apa saja jurusan yang tersedia?', a: `<a href="/jurusan" class="text-[#1B7A3D] font-semibold hover:underline">Perbankan Syariah</a> — mempelajari dasar-dasar perbankan sesuai prinsip syariah, akad-akad keuangan Islam, dan layanan nasabah. <a href="/jurusan" class="text-[#1B7A3D] font-semibold hover:underline">Multimedia</a> — mempelajari desain grafis, fotografi, videografi, animasi, dan editing video.` },
+        { q: 'Apakah ada program magang atau PKL?', a: 'Ya. Siswa kelas XI mengikuti Praktik Kerja Lapangan (PKL) selama 3-6 bulan di mitra industri, seperti bank syariah, BMT, studio kreatif, dan UMKM. Ini memberi pengalaman kerja nyata sebelum lulus.' },
+        { q: 'Bagaimana metode pembelajarannya?', a: 'Kami menerapkan pendekatan <em>learning by doing</em> dengan porsi praktik 70% dan teori 30%. Pembelajaran di lab komputer, studio multimedia, dan mini bank syariah memastikan siswa siap kerja.' },
+        { q: 'Apakah ada kegiatan ekstrakurikuler?', a: 'Ya, tersedia berbagai ekskul: Pramuka, Pencak Silat Pagar Nusa, Banjari & Hadrah, Marching Band, Desain Grafis Club, dan Jurnalistik. Kegiatan ekskul wajib Pramuka dan ekstra pilihan sesuai minat.' },
+      ].map((faq, i) => (
+        <details class="bg-white rounded-xl border border-black/5 group shadow-[0_2px_8px_rgba(27,122,61,0.04)]">
+          <summary class="flex items-center justify-between p-5 cursor-pointer font-bold text-[#1c1b1b] text-sm md:text-base list-none">
+            <span class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded-full bg-[#e8f5e9] text-[#1B7A3D] text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+              {faq.q}
+            </span>
+            <span class="material-symbols-outlined text-[#6f7a6e] group-open:rotate-180 transition-transform">expand_more</span>
+          </summary>
+          <div class="px-5 pb-5 pl-14">
+            <p class="text-sm text-[#3f493f] leading-relaxed">{faq.a}</p>
+          </div>
+        </details>
+      ))}
+    </div>
+  </div>
+
+  <!-- Category: PPDB -->
+  <div>
+    <div class="flex items-center gap-3 mb-6">
+      <span class="material-symbols-outlined text-[#1B7A3D] text-2xl">how_to_reg</span>
+      <h2 class="text-xl md:text-2xl font-extrabold text-[#1c1b1b]">Pendaftaran (PPDB)</h2>
+    </div>
+    <div class="space-y-3">
+      {[
+        { q: 'Bagaimana cara mendaftar?', a: 'Pendaftaran bisa dilakukan secara online melalui halaman <a href="/ppdb" class="text-[#1B7A3D] font-semibold hover:underline">PPDB</a> kami atau datang langsung ke sekolah. Tim PPDB kami akan membantu proses pendaftaran Anda.' },
+        { q: 'Kapan pendaftaran dibuka?', a: 'Pendaftaran gelombang 1 dibuka 1 Mei – 30 Juni 2026, dan gelombang 2 dibuka 1 Juli – 10 Agustus 2026 (jika kuota masih tersedia). Silakan cek halaman PPDB untuk jadwal lengkap.' },
+      ].map((faq, i) => (
+        <details class="bg-white rounded-xl border border-black/5 group shadow-[0_2px_8px_rgba(27,122,61,0.04)]">
+          <summary class="flex items-center justify-between p-5 cursor-pointer font-bold text-[#1c1b1b] text-sm md:text-base list-none">
+            <span class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded-full bg-[#e8f5e9] text-[#1B7A3D] text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+              {faq.q}
+            </span>
+            <span class="material-symbols-outlined text-[#6f7a6e] group-open:rotate-180 transition-transform">expand_more</span>
+          </summary>
+          <div class="px-5 pb-5 pl-14">
+            <p class="text-sm text-[#3f493f] leading-relaxed">{faq.a}</p>
+          </div>
+        </details>
+      ))}
+    </div>
+  </div>
+
+  <p class="text-xs text-[#6f7a6e] mt-10 text-center italic">{dummyNote}</p>
+</section>
+
+<!-- CTA SECTION -->
+<section class="relative bg-[#1B7A3D] text-white overflow-hidden">
+  <svg class="absolute -top-16 -right-16 w-80 h-80 text-white/10 pointer-events-none" viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M50 5 L61 39 L95 39 L67 60 L78 95 L50 74 L22 95 L33 60 L5 39 L39 39 Z" stroke="currentColor" stroke-width="0.8"/></svg>
+  <div class="relative max-w-3xl mx-auto px-4 md:px-6 py-16 md:py-20 text-center">
+    <h2 class="text-2xl md:text-4xl font-extrabold tracking-tight mb-4">Punya pertanyaan lain?</h2>
+    <p class="text-white/85 mb-8 text-sm md:text-lg leading-relaxed max-w-xl mx-auto">Jangan ragu untuk menghubungi kami langsung. Tim kami siap membantu Anda.</p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+      <a href="https://wa.me/62" class="inline-flex items-center justify-center gap-2 bg-[#C8963E] text-white font-bold px-8 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-[#C8963E]/90 transition-colors">Chat WhatsApp</a>
+      <a href="/kontak" class="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/40 text-white font-bold px-8 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-white/20 transition-colors">Halaman Kontak</a>
+    </div>
+  </div>
+</section>
+
+</BaseLayout>

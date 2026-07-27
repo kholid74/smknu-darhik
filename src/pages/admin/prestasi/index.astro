@@ -1,0 +1,110 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const url = new URL(Astro.request.url);
+const search = url.searchParams.get('q') || '';
+const levelFilter = url.searchParams.get('level') || '';
+const categoryFilter = url.searchParams.get('category') || '';
+const page = parseInt(url.searchParams.get('page') || '1');
+const limit = 15;
+
+const where: any = {};
+if (search) where.title = { contains: search };
+if (levelFilter) where.level = levelFilter;
+if (categoryFilter) where.category = categoryFilter;
+
+const [achievements, total] = await Promise.all([
+  db.achievement.findMany({ where, orderBy: { order: 'asc' }, skip: (page - 1) * limit, take: limit }),
+  db.achievement.count({ where }),
+]);
+
+const totalPages = Math.ceil(total / limit);
+
+const levelBadge: Record<string, string> = {
+  Kabupaten: 'badge-green',
+  Provinsi: 'badge-blue',
+  Nasional: 'badge-gold',
+  Internasional: 'badge-red',
+};
+---
+
+<AdminLayout title="Prestasi" user={{ role: session.role }}>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div style="display:flex;gap:10px;align-items:center">
+      <form method="GET" style="display:flex;gap:8px">
+        <input type="text" name="q" value={search} placeholder="Cari judul..." style="width:200px"/>
+        <select name="level" style="width:130px" onchange="this.form.submit()">
+          <option value="">Semua Level</option>
+          {['Kabupaten','Provinsi','Nasional','Internasional'].map(l => (
+            <option value={l} selected={levelFilter === l}>{l}</option>
+          ))}
+        </select>
+        <select name="category" style="width:140px" onchange="this.form.submit()">
+          <option value="">Semua Kategori</option>
+          {['Akademik','Non-Akademik','Keagamaan'].map(c => (
+            <option value={c} selected={categoryFilter === c}>{c}</option>
+          ))}
+        </select>
+        <button type="submit" class="btn btn-outline" style="padding:10px 14px">Cari</button>
+      </form>
+    </div>
+    <a href="/admin/prestasi/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah Prestasi</a>
+  </div>
+
+  <div class="card" style="padding:0">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:35%">Judul</th>
+          <th>Level</th>
+          <th>Kategori</th>
+          <th>Tahun</th>
+          <th>Siswa</th>
+          <th style="width:80px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {achievements.length === 0 ? (
+          <tr><td colspan="6" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada prestasi.</td></tr>
+        ) : achievements.map(a => (
+          <tr>
+            <td style="font-weight:600">{a.title}
+              {a.featured && <span class="badge badge-gold" style="margin-left:6px">Featured</span>}
+            </td>
+            <td><span class={`badge ${levelBadge[a.level] || 'badge-gray'}`}>{a.level}</span></td>
+            <td><span class="badge badge-gray">{a.category || '-'}</span></td>
+            <td style="font-size:12px">{a.year}</td>
+            <td style="font-size:12px;color:#6f7a6e">{a.student || '-'}</td>
+            <td>
+              <div style="display:flex;gap:4px">
+                <a href={`/admin/prestasi/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
+                <form method="POST" action="/admin/prestasi/delete" style="display:inline">
+                  <input type="hidden" name="id" value={a.id}/>
+                  <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  {totalPages > 1 && (
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
+      {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
+        <a href={`?page=${p}&q=${search}&level=${levelFilter}&category=${categoryFilter}`} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
+      ))}
+    </div>
+  )}
+
+  <p style="font-size:12px;color:#6f7a6e;margin-top:12px">Total: {total} prestasi</p>
+</AdminLayout>

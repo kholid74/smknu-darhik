@@ -1,0 +1,67 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { db } from '../lib/prisma';
+
+export const prerender = false;
+
+const url = new URL(Astro.request.url);
+const album = url.searchParams.get('album') || '';
+
+// Get distinct albums for filter
+const allImages = await db.galleryImage.findMany({ orderBy: { createdAt: 'desc' } });
+const albums = [...new Set(allImages.map((i: any) => i.album).filter(Boolean))] as string[];
+
+// Filter
+const images = album
+  ? allImages.filter((i: any) => i.album === album)
+  : allImages;
+---
+
+<BaseLayout title="Galeri Foto" description="Galeri foto kegiatan dan fasilitas SMKS NU Darul Hikam Karanggeneng.">
+
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0 bg-[#145a2d]"></div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-20 text-white text-center">
+    <nav class="flex items-center justify-center gap-2 text-sm text-white/70 mb-4"><a href="/" class="hover:text-white">Beranda</a><span class="material-symbols-outlined text-sm">chevron_right</span><span class="text-white font-medium">Galeri Foto</span></nav>
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-3">Galeri Foto</h1>
+    <p class="text-base md:text-lg text-white/80 max-w-lg mx-auto leading-relaxed">Dokumentasi kegiatan, fasilitas, dan kehidupan di SMKS NU Darul Hikam.</p>
+  </div>
+</section>
+
+<section class="max-w-6xl mx-auto px-4 md:px-6 py-12 md:py-16">
+  <!-- Filter Albums -->
+  {albums.length > 0 && (
+    <div class="flex flex-wrap gap-2 justify-center mb-10">
+      <a href="/galeri" class={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${!album ? 'bg-[#1B7A3D] text-white' : 'bg-white border border-black/10 text-[#3f493f] hover:border-[#1B7A3D]'}`}>
+        Semua
+      </a>
+      {albums.map(a => (
+        <a href={`/galeri?album=${encodeURIComponent(a)}`} class={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${album === a ? 'bg-[#1B7A3D] text-white' : 'bg-white border border-black/10 text-[#3f493f] hover:border-[#1B7A3D]'}`}>
+          {a}
+        </a>
+      ))}
+    </div>
+  )}
+
+  {images.length === 0 ? (
+    <p class="text-center text-[#6f7a6e] py-16">Belum ada foto. Admin bisa upload melalui admin panel.</p>
+  ) : (
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {images.map((img: any) => (
+        <a href={img.imageUrl} target="_blank" rel="noopener" class="group block rounded-xl overflow-hidden bg-white border border-black/5 shadow-[0_2px_8px_rgba(27,122,61,0.04)] hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow">
+          <div class="aspect-square overflow-hidden bg-[#e8f5e9]">
+            <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src={img.imageUrl} alt={img.title || 'Foto'} loading="lazy" onerror="this.style.display='none'"/>
+          </div>
+          {img.title && (
+            <div class="p-3">
+              <p class="text-xs font-semibold text-[#1c1b1b] line-clamp-1">{img.title}</p>
+              {img.album && <p class="text-[10px] text-[#6f7a6e] mt-0.5">{img.album}</p>}
+            </div>
+          )}
+        </a>
+      ))}
+    </div>
+  )}
+</section>
+
+</BaseLayout>

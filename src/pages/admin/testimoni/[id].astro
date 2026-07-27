@@ -1,0 +1,76 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+
+let testimonial = isEdit ? await db.testimonial.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !testimonial) return Astro.redirect('/admin/testimoni?saved=1');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const name = data.get('name')?.toString() || '';
+  const role = data.get('role')?.toString() || 'Siswa';
+  const content = data.get('content')?.toString() || '';
+  const photoUrl = data.get('photoUrl')?.toString() || null;
+  const verified = data.get('verified') === '1';
+
+  if (isEdit) {
+    await db.testimonial.update({ where: { id: id! }, data: { name, role, content, photoUrl, verified } });
+  } else {
+    await db.testimonial.create({ data: { name, role, content, photoUrl, verified } });
+  }
+  return Astro.redirect('/admin/testimoni?saved=1');
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit Testimoni' : 'Tambah Testimoni'} user={{ role: session.role }}>
+  <form method="POST">
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label>
+          <input type="text" name="name" value={testimonial?.name || ''} required placeholder="Nama pemberi testimoni..."/>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Role *</label>
+          <select name="role">
+            {['Siswa','Orang Tua','Alumni','Mitra'].map(r => (
+              <option value={r} selected={(testimonial?.role || 'Siswa') === r}>{r}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Konten Testimoni *</label>
+      <textarea name="content" rows="6" style="resize:vertical" required placeholder="Tulis testimoni di sini...">{testimonial?.content || ''}</textarea>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Foto</label>
+        <input type="text" name="photoUrl" value={testimonial?.photoUrl || ''} placeholder="https://... atau /uploads/..."/>
+      </div>
+      <div style="padding-bottom:4px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
+          <input type="checkbox" name="verified" value="1" checked={testimonial?.verified ?? false} style="width:auto"/> Terverifikasi
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button>
+      <a href="/admin/testimoni" class="btn btn-outline">Batal</a>
+    </div>
+  </form>
+</AdminLayout>

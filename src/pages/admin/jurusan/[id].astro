@@ -1,0 +1,48 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+const item = isEdit ? await db.department.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !item) return Astro.redirect('/admin/jurusan?saved=1');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const record: any = {
+    name: data.get('name')?.toString() || '',
+    slug: data.get('slug')?.toString() || '',
+    icon: data.get('icon')?.toString() || null,
+    description: data.get('description')?.toString() || '',
+    kompetensi: data.get('kompetensi')?.toString() || '',
+    karir: data.get('karir')?.toString() || '',
+    imageUrl: data.get('imageUrl')?.toString() || null,
+    order: parseInt(data.get('order')?.toString() || '0'),
+  };
+  if (isEdit) await db.department.update({ where: { id: id! }, data: record });
+  else await db.department.create({ data: record });
+  return Astro.redirect('/admin/jurusan?saved=1');
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit Jurusan' : 'Tambah Jurusan'} user={{ role: session.role }}>
+  <form method="POST" style="max-width:600px">
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={item?.name||''} required/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Slug</label><input type="text" name="slug" value={item?.slug||''} placeholder="perbankan-syariah"/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Icon</label><input type="text" name="icon" value={item?.icon||''} placeholder="school"/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Deskripsi</label><textarea name="description" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.description||''}</textarea></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kompetensi (JSON)</label><textarea name="kompetensi" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.kompetensi||''}</textarea></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Karir (JSON)</label><textarea name="karir" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.karir||''}</textarea></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Image URL</label><input type="text" name="imageUrl" value={item?.imageUrl||''} placeholder="https://..."/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Order</label><input type="number" name="order" value={item?.order??0} style="width:80px"/></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/jurusan" class="btn btn-outline">Batal</a></div>
+  </form>
+</AdminLayout>

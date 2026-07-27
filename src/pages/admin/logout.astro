@@ -1,0 +1,12 @@
+---
+export const prerender = false;
+
+if (Astro.request.method === 'GET') {
+  Astro.cookies.delete('smkdh_token', { path: '/' });
+  return Astro.redirect('/admin/login');
+}
+---
+<!DOCTYPE html>
+<html>
+<body><p>Logging out...</p></body>
+</html>

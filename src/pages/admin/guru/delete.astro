@@ -1,0 +1,11 @@
+---
+export const prerender = false;
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+if (!await verifyToken(token)) return Astro.redirect('/admin/login');
+if (Astro.request.method === 'POST') { const d = await Astro.request.formData(); const id = d.get('id')?.toString(); if (id) await db.teacher.delete({ where: { id } }).catch(()=>{}); }
+return Astro.redirect('/admin/guru');
+---
+<html></html>

@@ -1,0 +1,168 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ──── KONTEN ────
+
+model Article {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  excerpt   String?
+  body      String                      // HTML dari Tiptap
+  category  String                      // Prestasi | Keagamaan | Akademik | Ekstrakurikuler | PPDB
+  imageUrl  String?
+  published Boolean  @default(false)
+  featured  Boolean  @default(false)    // tampil di homepage
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String                    // "Perbankan Syariah" | "DKV (Desain Komunikasi Visual)"
+  icon        String?                   // material symbol name
+  description String
+  kompetensi  String                    // JSON string[]
+  karir       String                    // JSON string[]
+  imageUrl    String?
+  order       Int     @default(0)
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique           // "profil" | "visi-misi" | "sejarah"
+  title     String
+  content   String
+  metaDesc  String?
+  published Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model Achievement {
+  id          String  @id @default(cuid())
+  title       String
+  level       String                    // Kabupaten | Provinsi | Nasional
+  year        String
+  category    String?                   // Akademik | Non-Akademik | Keagamaan
+  student     String?                   // nama siswa/tim
+  description String?
+  imageUrl    String?
+  featured    Boolean @default(false)   // tampil di homepage
+  order       Int     @default(0)
+}
+
+model Teacher {
+  id       String  @id @default(cuid())
+  name     String
+  title    String?                      // "S.E.,M.Pd."
+  position String                       // Kepala Sekolah | Waka Kurikulum | Guru Mapel
+  subject  String?
+  photoUrl String?
+  level    String  @default("Guru")     // Yayasan | Kepala Sekolah | Waka | Kaprog | Guru | Staf
+  order    Int     @default(0)
+}
+
+model Extracurricular {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  imageUrl    String?
+}
+
+model Facility {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  icon        String?
+  imageUrl    String?
+  order       Int     @default(0)
+}
+
+model Partner {
+  id      String  @id @default(cuid())
+  name    String
+  logoUrl String?
+  type    String?                       // Industri | Institusi | Pemerintah
+  order   Int     @default(0)
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  role      String                      // Siswa | Orang Tua | Alumni | Mitra
+  content   String
+  photoUrl  String?
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Faq {
+  id       String  @id @default(cuid())
+  question String
+  answer   String
+  order    Int     @default(0)
+}
+
+model GalleryImage {
+  id        String   @id @default(cuid())
+  title     String?
+  imageUrl  String
+  album     String?                     // Kegiatan 2026 | Fasilitas | Prestasi
+  createdAt DateTime @default(now())
+}
+
+model Announcement {
+  id        String    @id @default(cuid())
+  title     String
+  body      String?
+  linkUrl   String?
+  linkLabel String?
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+}
+
+model Download {
+  id        String   @id @default(cuid())
+  title     String
+  fileUrl   String
+  category  String?                     // Formulir | Brosur | Akademik
+  createdAt DateTime @default(now())
+}
+
+// ──── ADMIN ────
+
+model Admin {
+  id       String @id @default(cuid())
+  username String @unique
+  password String                        // bcrypt hash
+  role     String @default("editor")     // superadmin | editor
+}
+
+// ──── SETTINGS ────
+
+model Setting {
+  id              String @id @default("main")
+  siteName        String?
+  siteShortName   String?
+  tagline         String?
+  address         String?
+  phone           String?
+  email           String?
+  wa              String?
+  instagram       String?
+  facebook        String?
+  tiktok          String?
+  youtube         String?
+  metaDefaultTitle String?
+  metaDefaultDesc  String?
+}

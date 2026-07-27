@@ -1,0 +1,49 @@
+---
+import { nav, site } from '../data/site';
+const currentPath = Astro.url.pathname;
+---
+
+<header class="sticky top-0 z-50 bg-[#fcf9f8]/90 backdrop-blur border-b border-black/5">
+  <div class="flex justify-between items-center h-16 px-4 md:px-6 max-w-6xl mx-auto">
+    <a href="/" class="flex items-center gap-3 no-underline">
+      <img src="/assets/logo.png" alt="Logo SMKS NU Darul Hikam" class="w-10 h-10 object-contain" />
+      <div class="leading-tight">
+        <div class="text-sm font-extrabold text-[#00602b] tracking-tight">{site.name}</div>
+        <div class="text-[11px] text-[#6f7a6e]">{site.location}</div>
+      </div>
+    </a>
+
+    <!-- Desktop Nav -->
+    <nav class="hidden md:flex items-center gap-6 text-sm font-semibold">
+      {nav.main.map(item => (
+        item.children ? (
+          <div class="dropdown">
+            <a href={item.children[0].href} class={`flex items-center gap-1 transition-colors ${currentPath.startsWith(item.children[0].href) && item.children[0].href !== '/' ? 'text-[#00602b]' : 'text-[#3f493f] hover:text-[#00602b]'}`}>
+              {item.label} <span class="material-symbols-outlined text-base">expand_more</span>
+            </a>
+            <div class="dropdown-menu mt-2 bg-white rounded-xl border border-black/5 shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-2">
+              {item.children.map(child => (
+                <a href={child.href} class={`block px-4 py-2.5 rounded-lg text-sm transition-colors ${currentPath === child.href ? 'bg-[#f0f7f1] text-[#00602b] font-semibold' : 'text-[#3f493f] hover:bg-[#f0f7f1] hover:text-[#00602b]'}`}>
+                  {child.label}
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <a href={item.href} class={`transition-colors ${currentPath === item.href ? 'text-[#00602b]' : 'text-[#3f493f] hover:text-[#00602b]'}`}>
+            {item.label}
+          </a>
+        )
+      ))}
+    </nav>
+
+    <div class="flex items-center gap-3">
+      <a href="https://www.youtube.com/@dhtvsmkdh9648" target="_blank" rel="noopener" class="bg-[#1B7A3D] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hidden sm:inline-flex items-center gap-1.5 hover:bg-[#145a2d] transition-colors">
+        <span class="material-symbols-outlined text-base">live_tv</span> DHTV
+      </a>
+      <button class="md:hidden p-2 -mr-2 text-[#1c1b1b]" id="menu-open" aria-label="Buka menu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+    </div>
+  </div>
+</header>

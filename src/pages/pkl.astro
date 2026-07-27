@@ -1,0 +1,142 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../data/site';
+---
+
+<BaseLayout title="PKL / Magang" description={`Program Praktik Kerja Lapangan (PKL) di ${site.name} — latar belakang, tujuan, syarat, dan mitra DU-DI.`}>
+
+<!-- HERO -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=1200&q=80" alt="PKL Magang" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/85"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-24 text-center text-white">
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">PKL / Magang</h1>
+    <p class="text-base md:text-lg text-white/80 leading-relaxed max-w-xl mx-auto">Program Praktik Kerja Lapangan untuk siswa {site.shortName} — jembatan antara teori di kelas dan praktik di dunia industri.</p>
+  </div>
+</section>
+
+<!-- STICKY SIDEBAR LAYOUT -->
+<section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="grid lg:grid-cols-12 gap-10 lg:gap-12">
+
+    <!-- SIDEBAR - STICKY -->
+    <aside class="lg:col-span-4">
+      <div class="lg:sticky lg:top-28 space-y-4">
+        <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] p-5">
+          <h3 class="font-bold text-sm text-[#1c1b1b] mb-3">Navigasi Cepat</h3>
+          <ul class="space-y-2">
+            <li><a href="#latar" class="flex items-center gap-2 text-sm text-[#6f7a6e] hover:text-[#1B7A3D] transition-colors"><span class="material-symbols-outlined text-base">chevron_right</span>Latar Belakang</a></li>
+            <li><a href="#tujuan" class="flex items-center gap-2 text-sm text-[#6f7a6e] hover:text-[#1B7A3D] transition-colors"><span class="material-symbols-outlined text-base">chevron_right</span>Tujuan PKL</a></li>
+            <li><a href="#syarat" class="flex items-center gap-2 text-sm text-[#6f7a6e] hover:text-[#1B7A3D] transition-colors"><span class="material-symbols-outlined text-base">chevron_right</span>Syarat & Ketentuan</a></li>
+            <li><a href="#mitra" class="flex items-center gap-2 text-sm text-[#6f7a6e] hover:text-[#1B7A3D] transition-colors"><span class="material-symbols-outlined text-base">chevron_right</span>Mitra DU-DI</a></li>
+          </ul>
+        </div>
+
+        <div class="bg-[#f0f7f1] rounded-xl border border-[#1B7A3D]/10 p-5">
+          <h3 class="font-bold text-sm text-[#1c1b1b] mb-2 flex items-center gap-2"><span class="material-symbols-outlined text-[#1B7A3D] text-base">info</span> Info Penting</h3>
+          <p class="text-xs text-[#6f7a6e] leading-relaxed">PKL dilaksanakan di kelas XI semester 4 selama <strong class="text-[#1c1b1b]">± 3 bulan</strong>. Siswa wajib menyusun laporan PKL sebagai syarat kenaikan kelas.</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CONTENT AREA -->
+    <div class="lg:col-span-8 space-y-16">
+
+      <!-- Latar Belakang -->
+      <div id="latar">
+        <span class="rule-mark mb-5"></span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-6">Latar Belakang</h2>
+        <div class="prose prose-sm md:prose-base max-w-none text-[#3f493f] leading-relaxed space-y-4">
+          <p>Praktik Kerja Lapangan (PKL) merupakan program wajib bagi siswa SMK sebagai bagian dari implementasi kurikulum berbasis kompetensi. PKL menjadi jembatan antara teori yang dipelajari di kelas dengan praktik nyata di dunia usaha dan dunia industri (DU-DI).</p>
+          <p>{site.shortName} mewajibkan seluruh siswa kelas XI untuk mengikuti program PKL. Program ini dirancang agar siswa memiliki pengalaman kerja langsung sebelum lulus, memahami budaya kerja profesional, dan membangun jaringan dengan calon pemberi kerja.</p>
+          <p>Dengan pendekatan <em>teaching factory</em> dan kemitraan strategis dengan DU-DI, PKL di {site.shortName} menjadi salah satu keunggulan sekolah dalam mencetak lulusan yang siap kerja.</p>
+          <div class="bg-[#f0f7f1] border-l-4 border-[#1B7A3D] rounded-r-lg p-4 mt-4">
+            <p class="text-sm text-[#1c1b1b] leading-relaxed"><strong>💡 Fakta:</strong> Lebih dari 80% lulusan SMK terserap di tempat PKL atau mendapat rekomendasi kerja dari mitra DU-DI.<span class="text-xs text-[#6f7a6e] italic"> [data perlu dikonfirmasi]</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tujuan PKL -->
+      <div id="tujuan">
+        <span class="rule-mark mb-5"></span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-6">Tujuan PKL</h2>
+        <div class="grid sm:grid-cols-2 gap-4">
+          {[
+            { icon: 'check_circle', text: 'Menerapkan dan memantapkan kompetensi keahlian yang telah dipelajari di sekolah' },
+            { icon: 'handshake', text: 'Mengenal budaya kerja, etika profesi, dan disiplin di lingkungan industri' },
+            { icon: 'groups', text: 'Mengembangkan soft skill: komunikasi, kerjasama tim, dan problem-solving' },
+            { icon: 'work', text: 'Membangun portofolio pengalaman kerja sebagai nilai tambah setelah lulus' },
+            { icon: 'lightbulb', text: 'Memahami perkembangan teknologi dan tren terbaru di dunia industri' },
+            { icon: 'network_node', text: 'Memperluas jaringan profesional dengan praktisi dan perusahaan mitra' },
+          ].map(item => (
+            <div class="flex gap-3 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4">
+              <span class="material-symbols-outlined text-[#1B7A3D] flex-shrink-0 mt-0.5 text-lg">{item.icon}</span>
+              <p class="text-sm text-[#3f493f] leading-relaxed">{item.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Syarat -->
+      <div id="syarat">
+        <span class="rule-mark mb-5"></span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-6">Syarat & Ketentuan</h2>
+        <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden">
+          <div class="divide-y divide-black/5">
+            {[
+              { no: '01', title: 'Status Siswa Aktif', desc: 'Terdaftar sebagai siswa aktif kelas XI di {site.shortName}.' },
+              { no: '02', title: 'Lunas Administrasi', desc: 'Tidak memiliki tunggakan SPP dan administrasi sekolah lainnya.' },
+              { no: '03', title: 'Nilai Kompetensi Tuntas', desc: 'Telah menyelesaikan seluruh mata pelajaran produktif dengan nilai tuntas.' },
+              { no: '04', title: 'Surat Izin Orang Tua', desc: 'Mendapatkan persetujuan tertulis dari orang tua/wali.' },
+              { no: '05', title: 'Mengikuti Pembekalan', desc: 'Wajib mengikuti program pembekalan PKL (soft skill, K3, etika kerja).' },
+              { no: '06', title: 'Laporan & Monitoring', desc: 'Menyusun laporan harian dan mengikuti monitoring oleh guru pembimbing.' },
+            ].map((s, i) => (
+              <div class="flex gap-4 p-4 md:p-5 hover:bg-[#fcf9f8] transition-colors">
+                <span class="text-2xl font-extrabold text-[#1B7A3D]/20 flex-shrink-0 leading-none mt-0.5">{s.no}</span>
+                <div>
+                  <h4 class="font-bold text-sm text-[#1c1b1b] mb-1">{s.title}</h4>
+                  <p class="text-xs md:text-sm text-[#6f7a6e] leading-relaxed">{s.desc.replace('{site.shortName}', site.shortName)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <!-- Mitra DU-DI -->
+      <div id="mitra">
+        <span class="rule-mark mb-5"></span>
+        <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-6">Mitra DU-DI</h2>
+        <p class="text-sm md:text-base text-[#3f493f] mb-8 leading-relaxed">Berikut beberapa mitra dunia usaha dan dunia industri yang telah bekerja sama dengan {site.shortName} untuk program PKL:</p>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          {[
+            { name: 'Bank Syariah Indonesia', bidang: 'Perbankan', icon: 'account_balance', color: 'bg-emerald-50 text-emerald-600' },
+            { name: 'BMT NU Jawa Timur', bidang: 'Keuangan Mikro', icon: 'savings', color: 'bg-teal-50 text-teal-600' },
+            { name: 'Percetakan & Desain Grafis', bidang: 'Multimedia', icon: 'print', color: 'bg-amber-50 text-amber-600' },
+            { name: 'Studio Foto Lokal', bidang: 'Fotografi', icon: 'photo_camera', color: 'bg-rose-50 text-rose-600' },
+            { name: 'Koperasi Syariah', bidang: 'Perbankan', icon: 'group_work', color: 'bg-indigo-50 text-indigo-600' },
+            { name: 'Digital Agency Lokal', bidang: 'Multimedia', icon: 'globe', color: 'bg-violet-50 text-violet-600' },
+          ].map(m => (
+            <div class="flex items-center gap-4 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4 hover:shadow-[0_8px_24px_rgba(27,122,61,0.08)] transition-shadow">
+              <div class={`w-10 h-10 rounded-lg ${m.color} flex items-center justify-center flex-shrink-0`}>
+                <span class="material-symbols-outlined text-lg">{m.icon}</span>
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-bold text-sm text-[#1c1b1b] truncate">{m.name}</h4>
+                <p class="text-xs text-[#6f7a6e]">{m.bidang}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p class="text-xs text-[#6f7a6e] italic mt-6">[data mitra perlu dikonfirmasi ke sekolah — masih placeholder]</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+</BaseLayout>

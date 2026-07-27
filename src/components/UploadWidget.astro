@@ -1,0 +1,89 @@
+<!-- UploadWidget: drag & drop + copy URL -->
+<div class="upload-widget" id="upload-widget">
+  <div class="upload-dropzone" id="upload-dropzone">
+    <span class="material-symbols-outlined" style="font-size:32px;color:#9ca3af;margin-bottom:8px">cloud_upload</span>
+    <p style="font-size:13px;color:#6f7a6e;margin:0">Drag & drop gambar di sini, atau</p>
+    <label style="font-size:13px;color:#1B7A3D;font-weight:700;cursor:pointer;margin-top:4px;display:inline-block">
+      pilih file
+      <input type="file" accept="image/*" style="display:none" id="upload-input"/>
+    </label>
+    <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Max 10MB · JPG, PNG, WebP</p>
+  </div>
+  <div id="upload-progress" style="display:none;padding:12px;text-align:center;font-size:13px;color:#6f7a6e">
+    <span style="display:inline-block;width:20px;height:20px;border:2px solid #1B7A3D;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span> Mengupload...
+  </div>
+  <div id="upload-result" style="display:none"></div>
+</div>
+
+<style>
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .upload-dropzone {
+    border:2px dashed #d1d5db;border-radius:12px;padding:32px;
+    text-align:center;transition:all 0.2s;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .upload-dropzone:hover,.upload-dropzone.drag-over {
+    border-color:#1B7A3D;background:#f0f7f1;
+  }
+</style>
+
+<script>
+  const dropzone = document.getElementById('upload-dropzone')!;
+  const fileInput = document.getElementById('upload-input')! as HTMLInputElement;
+  const progress = document.getElementById('upload-progress')!;
+  const result = document.getElementById('upload-result')!;
+
+  ['dragenter','dragover'].forEach(e => dropzone.addEventListener(e, (ev) => { ev.preventDefault(); dropzone.classList.add('drag-over') }));
+  ['dragleave','drop'].forEach(e => dropzone.addEventListener(e, () => dropzone.classList.remove('drag-over')));
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer?.files?.[0];
+    if (file) uploadFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files?.[0];
+    if (file) uploadFile(file);
+  });
+
+  async function uploadFile(file: File) {
+    if (file.size > 10 * 1024 * 1024) { alert('File terlalu besar. Max 10MB.'); return; }
+    dropzone.style.display = 'none';
+    progress.style.display = 'block';
+    result.style.display = 'none';
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', 'uploads');
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      progress.style.display = 'none';
+      if (data.url) {
+        // Auto-fill the nearest imageUrl field
+        const imgInput = document.querySelector('input[name="imageUrl"]') as HTMLInputElement;
+        if (imgInput) imgInput.value = data.url;
+
+        result.style.display = 'block';
+        result.innerHTML = `<div style="background:#f0f7f1;border:1px solid #1B7A3D;border-radius:10px;padding:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <img src="${data.url}" style="width:60px;height:60px;object-fit:cover;border-radius:8px"/>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:13px;font-weight:700;color:#1c1b1b;margin:0">Upload berhasil!</p>
+              <input type="text" value="${data.url}" readonly style="font-size:11px;padding:6px 8px;margin-top:4px;cursor:pointer;background:#f6f3f2" onclick="this.select();document.execCommand('copy')"/>
+            </div>
+          </div>
+          <button onclick="this.closest('#upload-result').style.display='none';document.getElementById('upload-dropzone').style.display='flex'" style="font-size:12px;color:#1B7A3D;font-weight:600;background:none;border:none;cursor:pointer">Upload lagi</button>
+        </div>`;
+      } else {
+        throw new Error(data.error || 'Upload gagal');
+      }
+    } catch (e: any) {
+      progress.style.display = 'none';
+      dropzone.style.display = 'flex';
+      alert('Upload gagal: ' + e.message);
+    }
+  }
+</script>

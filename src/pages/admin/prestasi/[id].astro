@@ -1,0 +1,106 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+
+let achievement = isEdit ? await db.achievement.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !achievement) return Astro.redirect('/admin/prestasi?saved=1');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const title = data.get('title')?.toString() || '';
+  const level = data.get('level')?.toString() || 'Kabupaten';
+  const year = data.get('year')?.toString() || '';
+  const category = data.get('category')?.toString() || null;
+  const student = data.get('student')?.toString() || null;
+  const description = data.get('description')?.toString() || null;
+  const imageUrl = data.get('imageUrl')?.toString() || null;
+  const order = parseInt(data.get('order')?.toString() || '0');
+  const featured = data.get('featured') === '1';
+
+  if (isEdit) {
+    await db.achievement.update({ where: { id: id! }, data: { title, level, year, category, student, description, imageUrl, order, featured } });
+  } else {
+    await db.achievement.create({ data: { title, level, year, category, student, description, imageUrl, order, featured } });
+  }
+  return Astro.redirect('/admin/prestasi?saved=1');
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit Prestasi' : 'Tambah Prestasi'} user={{ role: session.role }}>
+  <form method="POST">
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul Prestasi *</label>
+          <input type="text" name="title" value={achievement?.title || ''} required placeholder="Juara 1 Lomba..."/>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Tahun *</label>
+          <input type="text" name="year" value={achievement?.year || ''} required placeholder="2025"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Level *</label>
+          <select name="level">
+            {['Kabupaten','Provinsi','Nasional','Internasional'].map(l => (
+              <option value={l} selected={(achievement?.level || 'Kabupaten') === l}>{l}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kategori</label>
+          <select name="category">
+            <option value="">- Pilih Kategori -</option>
+            {['Akademik','Non-Akademik','Keagamaan'].map(c => (
+              <option value={c} selected={achievement?.category === c}>{c}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama Siswa/Tim</label>
+        <input type="text" name="student" value={achievement?.student || ''} placeholder="Nama siswa atau tim..."/>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Deskripsi</label>
+      <textarea name="description" rows="4" style="resize:vertical" placeholder="Deskripsi prestasi...">{achievement?.description || ''}</textarea>
+    </div>
+
+    <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Gambar</label>
+        <input type="text" name="imageUrl" value={achievement?.imageUrl || ''} placeholder="https://... atau /uploads/..."/>
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Urutan (Order)</label>
+        <input type="number" name="order" value={achievement?.order ?? 0} min="0"/>
+      </div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:4px">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
+          <input type="checkbox" name="featured" value="1" checked={achievement?.featured ?? false} style="width:auto"/> Featured
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button>
+      <a href="/admin/prestasi" class="btn btn-outline">Batal</a>
+    </div>
+  </form>
+</AdminLayout>

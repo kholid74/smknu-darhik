@@ -1,0 +1,58 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+
+let faq = isEdit ? await db.faq.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !faq) return Astro.redirect('/admin/faq?saved=1');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const question = data.get('question')?.toString() || '';
+  const answer = data.get('answer')?.toString() || '';
+  const order = parseInt(data.get('order')?.toString() || '0');
+
+  if (isEdit) {
+    await db.faq.update({ where: { id: id! }, data: { question, answer, order } });
+  } else {
+    await db.faq.create({ data: { question, answer, order } });
+  }
+  return Astro.redirect('/admin/faq?saved=1');
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit FAQ' : 'Tambah FAQ'} user={{ role: session.role }}>
+  <form method="POST">
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Pertanyaan *</label>
+          <input type="text" name="question" value={faq?.question || ''} required placeholder="Masukkan pertanyaan..."/>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Urutan</label>
+          <input type="number" name="order" value={faq?.order ?? 0} min="0" style="width:80px"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Jawaban *</label>
+      <textarea name="answer" rows="6" style="resize:vertical" required placeholder="Tulis jawaban di sini...">{faq?.answer || ''}</textarea>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button>
+      <a href="/admin/faq" class="btn btn-outline">Batal</a>
+    </div>
+  </form>
+</AdminLayout>

@@ -1,0 +1,68 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../data/site';
+
+const ekskulList = [
+  { icon: 'sports_volleyball', name: 'Bola Voli', desc: 'Latihan teknik dasar, strategi permainan, dan sparing antar sekolah.', color: 'bg-orange-50 text-orange-600' },
+  { icon: 'sports_soccer', name: 'Futsal', desc: 'Pembinaan skill dan teamwork dalam permainan futsal.', color: 'bg-blue-50 text-blue-600' },
+  { icon: 'directions_run', name: 'Pencak Silat', desc: 'Pagar Nusa — bela diri tradisional NU yang membentuk karakter disiplin.', color: 'bg-red-50 text-red-600' },
+  { icon: 'queue_music', name: 'Hadrah / Banjari', desc: 'Seni musik Islami dengan rebana — melatih kekompakan dan kecintaan pada sholawat.', color: 'bg-purple-50 text-purple-600' },
+  { icon: 'campaign', name: 'Pramuka', desc: 'Pendidikan karakter, kepemimpinan, dan kemandirian melalui kegiatan kepramukaan.', color: 'bg-green-50 text-green-700' },
+  { icon: 'computer', name: 'IT Club', desc: 'Belajar coding, desain web, troubleshooting, dan pengenalan jaringan.', color: 'bg-cyan-50 text-cyan-600' },
+  { icon: 'photo_camera', name: 'Fotografi', desc: 'Belajar teknik foto, komposisi, lighting, dan editing foto.', color: 'bg-amber-50 text-amber-600' },
+  { icon: 'video_library', name: 'Videografi', desc: 'Produksi video, sinematografi dasar, dan editing menggunakan software profesional.', color: 'bg-indigo-50 text-indigo-600' },
+  { icon: 'draw', name: 'Desain Grafis', desc: 'Olah kreativitas dengan CorelDraw, Photoshop, dan tools desain lainnya.', color: 'bg-pink-50 text-pink-600' },
+  { icon: 'menu_book', name: 'BTQ / Tilawah', desc: 'Baca Tulis Al-Quran — memperdalam kemampuan membaca dan menulis Al-Quran.', color: 'bg-teal-50 text-teal-600' },
+  { icon: 'translate', name: 'English Club', desc: 'Latihan conversation, debat bahasa Inggris, dan persiapan TOEIC.', color: 'bg-violet-50 text-violet-600' },
+  { icon: 'groups', name: 'OSIS', desc: 'Organisasi siswa — wadah kepemimpinan, kreativitas, dan pengabdian di sekolah.', color: 'bg-rose-50 text-rose-600' },
+];
+---
+
+<BaseLayout title="Ekstrakurikuler" description={`Kegiatan ekstrakurikuler di ${site.name} — olahraga, seni, IT, dan keagamaan.`}>
+
+<!-- HERO -->
+<section class="relative bg-[#145a2d] overflow-hidden">
+  <div class="absolute inset-0">
+    <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1523050854058-8df90110b159?w=1200&q=80" alt="Kegiatan ekstrakurikuler" loading="eager" onerror="this.style.background='#145a2d'" />
+    <div class="absolute inset-0 bg-[#145a2d]/85"></div>
+  </div>
+  <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-24 text-center text-white">
+    <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">Ekstrakurikuler</h1>
+    <p class="text-base md:text-lg text-white/80 leading-relaxed max-w-xl mx-auto">Kembangkan bakat dan minatmu melalui berbagai kegiatan ekstrakurikuler di {site.name} — dari olahraga, seni, IT, hingga keagamaan.</p>
+  </div>
+</section>
+
+<!-- GRID EKSKUL -->
+<section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
+  <div class="max-w-2xl mb-12">
+    <span class="rule-mark mb-5"></span>
+    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Pilihan Ekstrakurikuler</h2>
+    <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">{ekskulList.length} kegiatan yang bisa kamu pilih sesuai minat dan bakatmu.</p>
+  </div>
+
+  <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
+    {ekskulList.map(e => (
+      <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] p-5 md:p-6 hover:shadow-[0_8px_24px_rgba(27,122,61,0.1)] transition-shadow group">
+        <div class={`inline-flex items-center justify-center w-11 h-11 rounded-lg ${e.color} mb-4 group-hover:scale-110 transition-transform`}>
+          <span class="material-symbols-outlined text-xl">{e.icon}</span>
+        </div>
+        <h3 class="font-bold text-sm md:text-base text-[#1c1b1b] mb-2">{e.name}</h3>
+        <p class="text-xs md:text-sm text-[#6f7a6e] leading-relaxed">{e.desc}</p>
+      </div>
+    ))}
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="bg-white border-y border-black/5">
+  <div class="max-w-3xl mx-auto px-4 md:px-6 py-14 md:py-16 text-center">
+    <span class="rule-mark mb-5 mx-auto"></span>
+    <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-4">Mau Daftar Ekskul?</h2>
+    <p class="text-sm md:text-base text-[#3f493f] leading-relaxed mb-8 max-w-xl mx-auto">Hubungi waka kesiswaan atau pembina ekskul pilihanmu. Setiap siswa wajib mengikuti minimal satu kegiatan ekstrakurikuler.</p>
+    <a href="/kontak" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-8 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors">Hubungi Kami <span class="material-symbols-outlined text-lg">arrow_forward</span></a>
+  </div>
+</section>
+
+<p class="text-xs text-[#6f7a6e] text-center py-8 italic">[data perlu dikonfirmasi ke sekolah]</p>
+
+</BaseLayout>

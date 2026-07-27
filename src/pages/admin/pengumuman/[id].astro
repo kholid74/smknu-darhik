@@ -1,0 +1,48 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+const item = isEdit ? await db.announcement.findUnique({ where: { id } }) : null;
+if (id && id !== 'new' && !item) return Astro.redirect('/admin/pengumuman?saved=1');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const record: any = { title: data.get('title')?.toString() || '', body: data.get('body')?.toString() || null, linkUrl: data.get('linkUrl')?.toString() || null, linkLabel: data.get('linkLabel')?.toString() || null, active: data.get('active') === '1' };
+  const expiresAtRaw = data.get('expiresAt')?.toString();
+  if (expiresAtRaw) record.expiresAt = new Date(expiresAtRaw);
+  else record.expiresAt = null;
+  if (isEdit) await db.announcement.update({ where: { id: id! }, data: record });
+  else await db.announcement.create({ data: record });
+  return Astro.redirect('/admin/pengumuman?saved=1');
+}
+
+function toDatetimeLocal(d: Date | null | undefined): string {
+  if (!d) return '';
+  const pad = (n:number) => n.toString().padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+---
+
+<AdminLayout title={isEdit ? 'Edit Pengumuman' : 'Tambah Pengumuman'} user={{ role: session.role }}>
+  <form method="POST" style="max-width:600px">
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul *</label><input type="text" name="title" value={item?.title||''} required/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Isi</label><textarea name="body" rows="8" style="resize:vertical">{item?.body||''}</textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Link</label><input type="url" name="linkUrl" value={item?.linkUrl||''} placeholder="https://..."/></div>
+        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Label Link</label><input type="text" name="linkLabel" value={item?.linkLabel||''} placeholder="Selengkapnya"/></div>
+      </div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kadaluarsa</label><input type="datetime-local" name="expiresAt" value={toDatetimeLocal(item?.expiresAt)}/></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="active" value="1" checked={item?.active??true} style="width:auto"/> Aktif</label>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/pengumuman" class="btn btn-outline">Batal</a></div>
+  </form>
+</AdminLayout>
