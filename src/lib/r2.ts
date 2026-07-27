@@ -3,10 +3,10 @@ import sharp from 'sharp';
 
 const r2 = new S3Client({
   region: 'auto',
-  endpoint: process.env.R2_ENDPOINT || 'https://b6cd21e5b0f983939dc63abc8a90dbcc.r2.cloudflarestorage.com',
+  endpoint: process.env.R2_ENDPOINT!,
   credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY || 'f654312b8a037a2315c375ca646e1fce',
-    secretAccessKey: process.env.R2_SECRET_KEY || 'c9c96fd2232675d5500856b5eec9c95fb30cb6f31b62fb6f82b6fa52d2558ee4',
+    accessKeyId: process.env.R2_ACCESS_KEY!,
+    secretAccessKey: process.env.R2_SECRET_KEY!,
   },
   forcePathStyle: true,
 });
