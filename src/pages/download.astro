@@ -1,15 +1,25 @@
 ---
+export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
+import { db } from '../lib/prisma';
 
-const downloads = [
-  { icon: 'description', name: 'Brosur Sekolah 2026', desc: 'Informasi lengkap profil sekolah, jurusan, dan fasilitas.', size: '2.4 MB', type: 'PDF', color: 'bg-blue-50 text-blue-600', href: '#' },
-  { icon: 'assignment', name: 'Formulir PPDB 2026/2027', desc: 'Formulir pendaftaran peserta didik baru tahun ajaran mendatang.', size: '1.1 MB', type: 'PDF', color: 'bg-green-50 text-green-700', href: '#' },
-  { icon: 'calendar_month', name: 'Kalender Akademik 2025/2026', desc: 'Jadwal kegiatan akademik, ujian, libur, dan acara sekolah.', size: '890 KB', type: 'PDF', color: 'bg-orange-50 text-orange-600', href: '#' },
-  { icon: 'list_alt', name: 'Tata Tertib Siswa', desc: 'Peraturan dan tata tertib yang berlaku di lingkungan sekolah.', size: '650 KB', type: 'PDF', color: 'bg-red-50 text-red-600', href: '#' },
-  { icon: 'book', name: 'Buku Panduan PKL', desc: 'Panduan lengkap pelaksanaan Praktik Kerja Lapangan bagi siswa.', size: '1.8 MB', type: 'PDF', color: 'bg-purple-50 text-purple-600', href: '#' },
-  { icon: 'school', name: 'Profil Lulusan & Alumni', desc: 'Data dan informasi mengenai alumni serta tracer study sekolah.', size: '420 KB', type: 'PDF', color: 'bg-teal-50 text-teal-600', href: '#' },
-];
+// Derive file type + icon from the URL extension — the model stores no type.
+function fileExt(url: string): string {
+  const e = url.split('?')[0].split('.').pop()?.toUpperCase() || '';
+  return e && e.length <= 4 ? e : 'FILE';
+}
+const ICON_BY_TYPE: Record<string, string> = {
+  PDF: 'picture_as_pdf', DOC: 'description', DOCX: 'description',
+  XLS: 'table_chart', XLSX: 'table_chart', PPT: 'slideshow', PPTX: 'slideshow',
+  ZIP: 'folder_zip', RAR: 'folder_zip', JPG: 'image', JPEG: 'image', PNG: 'image',
+};
+
+const items = await db.download.findMany({ orderBy: { createdAt: 'desc' } });
+const downloads = items.map(d => {
+  const type = fileExt(d.fileUrl);
+  return { name: d.title, href: d.fileUrl, category: d.category || '', type, icon: ICON_BY_TYPE[type] || 'draft' };
+});
 ---
 
 <BaseLayout title="Download" description={`Unduh brosur, formulir, kalender akademik, dan dokumen resmi ${site.name}.`}>
@@ -34,26 +44,32 @@ const downloads = [
     <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Kumpulan dokumen yang dapat diunduh untuk keperluan siswa, orang tua, dan masyarakat umum.</p>
   </div>
 
-  <div class="space-y-4">
-    {downloads.map((d, i) => (
-      <a href={d.href} class="flex items-center gap-4 md:gap-5 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4 md:p-5 hover:shadow-[0_8px_24px_rgba(27,122,61,0.1)] transition-shadow group">
-        <div class={`w-11 h-11 rounded-lg ${d.color} flex items-center justify-center flex-shrink-0`}>
-          <span class="material-symbols-outlined text-lg">{d.icon}</span>
-        </div>
-        <div class="flex-1 min-w-0">
-          <h3 class="font-bold text-sm md:text-base text-[#1c1b1b] mb-0.5">{d.name}</h3>
-          <p class="text-xs md:text-sm text-[#6f7a6e]">{d.desc}</p>
-          <div class="flex items-center gap-2 mt-1.5">
-            <span class="text-[10px] font-semibold text-white bg-[#1B7A3D] px-2 py-0.5 rounded-full">{d.type}</span>
-            <span class="text-[10px] text-[#6f7a6e]">{d.size}</span>
+  {downloads.length === 0 ? (
+    <div class="text-center text-[#6f7a6e] py-12">
+      <span class="material-symbols-outlined text-4xl mb-3">folder_open</span>
+      <p class="text-sm">Belum ada dokumen. Tambahkan lewat panel admin.</p>
+    </div>
+  ) : (
+    <div class="space-y-4">
+      {downloads.map((d) => (
+        <a href={d.href} target="_blank" rel="noopener" class="flex items-center gap-4 md:gap-5 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4 md:p-5 hover:shadow-[0_8px_24px_rgba(27,122,61,0.1)] transition-shadow group">
+          <div class="w-11 h-11 rounded-lg bg-[#e8f5e9] text-[#1B7A3D] flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-lg">{d.icon}</span>
           </div>
-        </div>
-        <div class="flex-shrink-0 text-[#1B7A3D] group-hover:translate-x-1 transition-transform">
-          <span class="material-symbols-outlined text-lg">download</span>
-        </div>
-      </a>
-    ))}
-  </div>
+          <div class="flex-1 min-w-0">
+            <h3 class="font-bold text-sm md:text-base text-[#1c1b1b] mb-0.5">{d.name}</h3>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="text-[10px] font-semibold text-white bg-[#1B7A3D] px-2 py-0.5 rounded-full">{d.type}</span>
+              {d.category && <span class="text-[10px] text-[#6f7a6e]">{d.category}</span>}
+            </div>
+          </div>
+          <div class="flex-shrink-0 text-[#1B7A3D] group-hover:translate-x-1 transition-transform">
+            <span class="material-symbols-outlined text-lg">download</span>
+          </div>
+        </a>
+      ))}
+    </div>
+  )}
 </section>
 
 <!-- NOTE -->
@@ -65,7 +81,5 @@ const downloads = [
     </div>
   </div>
 </section>
-
-<p class="text-xs text-[#6f7a6e] text-center py-8 italic">[dokumen perlu dikonfirmasi — link download masih placeholder]</p>
 
 </BaseLayout>
