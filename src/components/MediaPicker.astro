@@ -1,0 +1,190 @@
+---
+// Reusable image picker backed by the media library.
+// Renders a URL field + preview + "Pilih Gambar" button that opens a modal
+// with two tabs: browse the library (/api/media) or upload a new file
+// (/api/upload, which also indexes it). Picking sets the field's value.
+//
+// `field` is the form input name written into (imageUrl, photoUrl, logoUrl…),
+// so the same component works in any form. Multiple instances per page are
+// supported — everything is scoped by a unique id.
+interface Props {
+  field: string;
+  value?: string | null;
+  label?: string;
+  folder?: string;
+}
+const { field, value = '', label = 'Gambar', folder = 'uploads' } = Astro.props;
+const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
+---
+
+<div class="media-picker" data-uid={uid} data-folder={folder}>
+  <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">{label}</label>
+
+  <div class="mp-preview" style={`display:${value ? 'flex' : 'none'};align-items:center;gap:10px;background:#f0f7f1;border-radius:8px;padding:8px 12px;margin-bottom:8px`}>
+    <img class="mp-preview-img" src={value || ''} alt="Preview" style="width:80px;height:60px;object-fit:cover;border-radius:6px"/>
+    <div style="flex:1;min-width:0">
+      <p style="font-size:12px;font-weight:600;color:#1c1b1b;margin:0">Gambar terpilih</p>
+      <p class="mp-preview-url" style="font-size:11px;color:#6f7a6e;margin:0;word-break:break-all">{value}</p>
+    </div>
+    <button type="button" class="mp-clear" style="background:none;border:none;color:#dc2626;cursor:pointer;padding:4px" aria-label="Hapus gambar">
+      <span class="material-symbols-outlined" style="font-size:18px">close</span>
+    </button>
+  </div>
+
+  <div style="display:flex;gap:8px">
+    <input type="text" name={field} value={value} class="mp-input" placeholder="URL atau pilih dari pustaka" style="flex:1"/>
+    <button type="button" class="btn btn-outline mp-open" style="white-space:nowrap"><span class="material-symbols-outlined" style="font-size:16px">photo_library</span> Pilih Gambar</button>
+  </div>
+
+  <!-- Modal -->
+  <div class="mp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:130;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:16px;width:100%;max-width:720px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(0,0,0,0.08)">
+        <div style="display:flex;gap:6px">
+          <button type="button" class="mp-tab btn" data-tab="library" style="font-size:13px;padding:8px 14px">Pustaka</button>
+          <button type="button" class="mp-tab btn" data-tab="upload" style="font-size:13px;padding:8px 14px">Upload Baru</button>
+        </div>
+        <button type="button" class="mp-close" style="background:none;border:none;cursor:pointer;color:#6f7a6e;padding:4px" aria-label="Tutup"><span class="material-symbols-outlined">close</span></button>
+      </div>
+
+      <div class="mp-body" style="padding:20px;overflow-y:auto">
+        <!-- Library tab -->
+        <div class="mp-pane-library">
+          <input type="text" class="mp-search" placeholder="Cari nama file..." style="margin-bottom:14px"/>
+          <div class="mp-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">
+            <p class="mp-loading" style="grid-column:1/-1;text-align:center;color:#6f7a6e;font-size:13px;padding:20px">Memuat…</p>
+          </div>
+        </div>
+        <!-- Upload tab -->
+        <div class="mp-pane-upload" style="display:none">
+          <div class="mp-dropzone" style="border:2px dashed #d1d5db;border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s">
+            <span class="material-symbols-outlined" style="font-size:36px;color:#9ca3af">cloud_upload</span>
+            <p style="font-size:13px;color:#6f7a6e;margin:8px 0 0">Drag & drop atau <label style="color:#1B7A3D;font-weight:700;cursor:pointer">pilih file<input type="file" accept="image/*" class="mp-file" style="display:none"/></label></p>
+            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Max 10MB · JPG, PNG, WebP</p>
+          </div>
+          <p class="mp-upload-status" style="display:none;text-align:center;font-size:13px;color:#6f7a6e;margin-top:12px"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .media-picker .mp-tab { background:#f0f0f0; color:#3f493f; }
+  .media-picker .mp-tab.active { background:#1B7A3D; color:#fff; }
+  .media-picker .mp-thumb { cursor:pointer; border:2px solid transparent; border-radius:8px; overflow:hidden; aspect-ratio:1; background:#f0f7f1; transition:border-color .15s; }
+  .media-picker .mp-thumb:hover { border-color:#1B7A3D; }
+  .media-picker .mp-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .media-picker .mp-dropzone.drag-over { border-color:#1B7A3D; background:#f0f7f1; }
+</style>
+
+<script>
+  function initMediaPickers() {
+    document.querySelectorAll<HTMLElement>('.media-picker').forEach((root) => {
+      if (root.dataset.wired) return;
+      root.dataset.wired = 'true';
+
+      const folder = root.dataset.folder || 'uploads';
+      const input = root.querySelector<HTMLInputElement>('.mp-input')!;
+      const preview = root.querySelector<HTMLElement>('.mp-preview')!;
+      const previewImg = root.querySelector<HTMLImageElement>('.mp-preview-img')!;
+      const previewUrl = root.querySelector<HTMLElement>('.mp-preview-url')!;
+      const modal = root.querySelector<HTMLElement>('.mp-modal')!;
+      const grid = root.querySelector<HTMLElement>('.mp-grid')!;
+      const search = root.querySelector<HTMLInputElement>('.mp-search')!;
+      const paneLib = root.querySelector<HTMLElement>('.mp-pane-library')!;
+      const paneUp = root.querySelector<HTMLElement>('.mp-pane-upload')!;
+      const dropzone = root.querySelector<HTMLElement>('.mp-dropzone')!;
+      const fileInput = root.querySelector<HTMLInputElement>('.mp-file')!;
+      const uploadStatus = root.querySelector<HTMLElement>('.mp-upload-status')!;
+
+      const setValue = (url: string) => {
+        input.value = url;
+        if (url) {
+          previewImg.src = url;
+          previewUrl.textContent = url;
+          preview.style.display = 'flex';
+        } else {
+          preview.style.display = 'none';
+        }
+      };
+
+      // Keep preview in sync when the URL is typed manually.
+      input.addEventListener('input', () => setValue(input.value.trim()));
+      root.querySelector('.mp-clear')?.addEventListener('click', () => setValue(''));
+
+      const openModal = () => { modal.style.display = 'flex'; showTab('library'); loadGrid(); };
+      const closeModal = () => { modal.style.display = 'none'; };
+      root.querySelector('.mp-open')?.addEventListener('click', openModal);
+      root.querySelector('.mp-close')?.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+      function showTab(name: string) {
+        root!.querySelectorAll<HTMLElement>('.mp-tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
+        paneLib.style.display = name === 'library' ? 'block' : 'none';
+        paneUp.style.display = name === 'upload' ? 'block' : 'none';
+      }
+      root.querySelectorAll<HTMLElement>('.mp-tab').forEach((t) => t.addEventListener('click', () => showTab(t.dataset.tab || 'library')));
+
+      async function loadGrid(q = '') {
+        grid.innerHTML = '<p class="mp-loading" style="grid-column:1/-1;text-align:center;color:#6f7a6e;font-size:13px;padding:20px">Memuat…</p>';
+        try {
+          const res = await fetch('/api/media' + (q ? '?q=' + encodeURIComponent(q) : ''));
+          const items = await res.json();
+          if (!Array.isArray(items) || items.length === 0) {
+            grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#6f7a6e;font-size:13px;padding:20px">Belum ada media. Gunakan tab Upload Baru.</p>';
+            return;
+          }
+          grid.innerHTML = '';
+          for (const it of items) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'mp-thumb';
+            btn.title = it.filename;
+            btn.innerHTML = `<img src="${it.url}" alt="${it.filename}" loading="lazy"/>`;
+            btn.addEventListener('click', () => { setValue(it.url); closeModal(); });
+            grid.appendChild(btn);
+          }
+        } catch {
+          grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#dc2626;font-size:13px;padding:20px">Gagal memuat media.</p>';
+        }
+      }
+
+      let searchTimer: ReturnType<typeof setTimeout>;
+      search.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => loadGrid(search.value.trim()), 250);
+      });
+
+      async function uploadFile(file: File) {
+        if (file.size > 10 * 1024 * 1024) { alert('File terlalu besar. Max 10MB.'); return; }
+        uploadStatus.style.display = 'block';
+        uploadStatus.textContent = 'Mengupload…';
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('folder', folder);
+        try {
+          const res = await fetch('/api/upload', { method: 'POST', body: fd });
+          const data = await res.json();
+          if (data.url) {
+            setValue(data.url);
+            uploadStatus.textContent = 'Berhasil!';
+            closeModal();
+          } else {
+            throw new Error(data.error || 'Upload gagal');
+          }
+        } catch (e: any) {
+          uploadStatus.textContent = 'Gagal: ' + e.message;
+        }
+      }
+
+      ['dragenter', 'dragover'].forEach((ev) => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); }));
+      ['dragleave', 'drop'].forEach((ev) => dropzone.addEventListener(ev, () => dropzone.classList.remove('drag-over')));
+      dropzone.addEventListener('drop', (e) => { e.preventDefault(); const f = (e as DragEvent).dataTransfer?.files?.[0]; if (f) uploadFile(f); });
+      fileInput.addEventListener('change', () => { const f = fileInput.files?.[0]; if (f) uploadFile(f); });
+
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.style.display === 'flex') closeModal(); });
+    });
+  }
+  initMediaPickers();
+</script>
