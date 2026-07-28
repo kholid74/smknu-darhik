@@ -1,0 +1,159 @@
+---
+// Visual picker for Material Symbol icon names, so non-technical staff don't
+// have to know the exact symbol name. Renders a text field (fallback for any
+// symbol) + a live preview + a button that opens a curated, searchable grid.
+// `field` is the form input name written into (e.g. "icon"), so it drops into
+// any form. Search matches the symbol name OR its Indonesian aliases.
+interface Props {
+  field: string;
+  value?: string | null;
+  label?: string;
+}
+const { field, value = '', label = 'Icon' } = Astro.props;
+const uid = 'ip-' + Math.random().toString(36).slice(2, 9);
+
+// name -> Indonesian search aliases. Curated for a school's needs.
+const ICONS: Record<string, string> = {
+  // Fasilitas / ruang
+  meeting_room: 'ruang kelas kelas',
+  computer: 'komputer lab tik',
+  palette: 'seni desain studio multimedia dkv',
+  account_balance: 'bank syariah keuangan perbankan',
+  mosque: 'masjid musholla ibadah sholat',
+  menu_book: 'perpustakaan buku baca',
+  sports_soccer: 'olahraga lapangan bola sepak',
+  handyman: 'bengkel praktik kerja alat',
+  science: 'lab ipa sains laboratorium',
+  biotech: 'biologi lab sains',
+  videocam: 'video studio kamera rekam',
+  photo_camera: 'kamera foto fotografi',
+  print: 'printer cetak percetakan',
+  restaurant: 'kantin makan',
+  local_cafe: 'kantin kopi minum',
+  local_hospital: 'uks kesehatan klinik',
+  fitness_center: 'gym olahraga fitness',
+  festival: 'aula gedung acara pentas',
+  // Umum / penunjang
+  wifi: 'wifi internet jaringan',
+  local_parking: 'parkir kendaraan',
+  water_drop: 'air bersih wudhu',
+  cleaning_services: 'kebersihan bersih',
+  security: 'keamanan satpam jaga',
+  accessible: 'aksesibilitas difabel',
+  directions_bus: 'bus transportasi antar jemput',
+  wc: 'toilet kamar mandi',
+  // Jurusan / akademik
+  school: 'sekolah jurusan pendidikan',
+  laptop_mac: 'laptop komputer',
+  design_services: 'desain grafis dkv',
+  brush: 'lukis seni desain',
+  movie: 'film video sinematografi',
+  music_note: 'musik seni',
+  calculate: 'matematika hitung',
+  translate: 'bahasa inggris terjemah',
+  history_edu: 'sejarah pendidikan',
+  public: 'geografi ips dunia',
+  psychology: 'bk konseling psikologi',
+  engineering: 'teknik mesin',
+  agriculture: 'pertanian agribisnis',
+  storefront: 'bisnis pemasaran toko wirausaha',
+  point_of_sale: 'kasir penjualan bisnis',
+  savings: 'tabungan keuangan',
+  // Nilai / kegiatan
+  emoji_events: 'prestasi juara piala penghargaan',
+  volunteer_activism: 'sosial bakti amal',
+  groups: 'organisasi osis kelompok',
+  sports_kabaddi: 'pramuka ekskul bela diri',
+  hiking: 'pramuka jelajah alam hiking',
+  self_improvement: 'ngaji tahfidz keagamaan meditasi',
+  flag: 'upacara bendera',
+  // Ikon status umum
+  check_circle: 'centang ok',
+  star: 'bintang unggulan',
+  favorite: 'suka favorit',
+  verified: 'terverifikasi resmi',
+  lightbulb: 'ide inovasi',
+  rocket_launch: 'peluncuran maju',
+  handshake: 'kerjasama mitra',
+  apartment: 'gedung fasilitas',
+  home: 'rumah beranda',
+  location_on: 'lokasi alamat',
+};
+const iconNames = Object.keys(ICONS);
+---
+
+<div class="icon-picker" data-uid={uid}>
+  <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">{label}</label>
+  <div style="display:flex;gap:8px;align-items:stretch">
+    <div class="ip-current" style="display:flex;align-items:center;justify-content:center;width:44px;border:1px solid rgba(0,0,0,0.12);border-radius:8px;background:#f0f7f1;flex-shrink:0">
+      <span class="material-symbols-outlined ip-preview" style="font-size:22px;color:#1B7A3D">{value || 'help'}</span>
+    </div>
+    <input type="text" name={field} value={value} class="ip-input" placeholder="nama icon (mis. computer)" style="flex:1"/>
+    <button type="button" class="btn btn-outline ip-open" style="white-space:nowrap"><span class="material-symbols-outlined" style="font-size:16px">grid_view</span> Pilih Icon</button>
+  </div>
+
+  <div class="ip-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:130;align-items:center;justify-content:center;padding:16px">
+    <div style="background:white;border-radius:16px;width:100%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(0,0,0,0.08)">
+        <strong style="font-size:14px">Pilih Icon</strong>
+        <button type="button" class="ip-close" style="background:none;border:none;cursor:pointer;color:#6f7a6e;padding:4px" aria-label="Tutup"><span class="material-symbols-outlined">close</span></button>
+      </div>
+      <div style="padding:16px 20px 8px"><input type="text" class="ip-search" placeholder="Cari: komputer, masjid, olahraga…"/></div>
+      <div class="ip-grid" style="padding:8px 20px 20px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px">
+        {iconNames.map(name => (
+          <button type="button" class="ip-cell" data-name={name} data-alias={ICONS[name]} title={name} style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:1px solid transparent;border-radius:8px;background:#f9f9f9;cursor:pointer;overflow:hidden">
+            <span class="material-symbols-outlined" style="font-size:24px;line-height:26px;height:26px;width:100%;overflow:hidden;text-align:center;color:#1B7A3D">{name}</span>
+            <span style="font-size:9px;color:#6f7a6e;text-align:center;line-height:1.1;overflow:hidden;max-height:22px;width:100%">{name}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .icon-picker :global(.ip-cell:hover) { border-color:#1B7A3D; background:#f0f7f1; }
+  .icon-picker :global(.ip-cell.selected) { border-color:#1B7A3D; background:#e8f5e9; }
+</style>
+
+<script>
+  function initIconPickers() {
+    document.querySelectorAll<HTMLElement>('.icon-picker').forEach((root) => {
+      if (root.dataset.wired) return;
+      root.dataset.wired = 'true';
+
+      const input = root.querySelector<HTMLInputElement>('.ip-input')!;
+      const preview = root.querySelector<HTMLElement>('.ip-preview')!;
+      const modal = root.querySelector<HTMLElement>('.ip-modal')!;
+      const search = root.querySelector<HTMLInputElement>('.ip-search')!;
+      const cells = Array.from(root.querySelectorAll<HTMLElement>('.ip-cell'));
+
+      const setIcon = (name: string) => {
+        input.value = name;
+        preview.textContent = name || 'help';
+        cells.forEach((c) => c.classList.toggle('selected', c.dataset.name === name));
+      };
+
+      input.addEventListener('input', () => setIcon(input.value.trim()));
+
+      const open = () => { modal.style.display = 'flex'; search.value = ''; filter(''); search.focus(); };
+      const close = () => { modal.style.display = 'none'; };
+      root.querySelector('.ip-open')?.addEventListener('click', open);
+      root.querySelector('.ip-close')?.addEventListener('click', close);
+      modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && modal.style.display === 'flex') close(); });
+
+      function filter(q: string) {
+        const term = q.toLowerCase();
+        cells.forEach((c) => {
+          const hay = `${c.dataset.name} ${c.dataset.alias}`.toLowerCase();
+          c.style.display = !term || hay.includes(term) ? 'flex' : 'none';
+        });
+      }
+      search.addEventListener('input', () => filter(search.value.trim()));
+
+      cells.forEach((c) => c.addEventListener('click', () => { setIcon(c.dataset.name || ''); close(); }));
+    });
+  }
+  initIconPickers();
+</script>
