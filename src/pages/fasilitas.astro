@@ -1,28 +1,21 @@
 ---
+export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { site, stockPhotoNote } from '../data/site';
+import { site } from '../data/site';
+import { db } from '../lib/prisma';
 
-const fasilitasUtama = [
-  { name: 'Ruang Kelas', desc: 'Ruang kelas nyaman dan representatif untuk pembelajaran.', img: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&q=80', icon: 'meeting_room' },
-  { name: 'Lab Komputer', desc: 'Laboratorium komputer untuk praktik multimedia dan administrasi perkantoran.', img: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=600&q=80', icon: 'computer' },
-  { name: 'Studio Multimedia', desc: 'Studio lengkap untuk produksi konten, editing video, dan desain grafis.', img: 'https://images.unsplash.com/photo-1598550476439-6847785fcea6?w=600&q=80', icon: 'palette' },
-  { name: 'Mini Bank Syariah', desc: 'Ruang praktik simulasi layanan perbankan syariah seperti teller dan customer service.', img: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=80', icon: 'account_balance' },
-  { name: 'Musholla', desc: 'Tempat ibadah yang bersih dan nyaman untuk sholat berjamaah dan kegiatan keagamaan.', img: 'https://images.unsplash.com/photo-1584646518828-5a84e511e792?w=600&q=80', icon: 'mosque' },
-  { name: 'Perpustakaan', desc: 'Koleksi buku pelajaran, referensi, dan bacaan Islami.', img: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=600&q=80', icon: 'menu_book' },
-  { name: 'Lapangan Olahraga', desc: 'Lapangan multifungsi untuk olahraga, upacara, dan kegiatan outdoor.', img: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&q=80', icon: 'sports_soccer' },
-  { name: 'Ruang Praktik Siswa', desc: 'Bengkel dan ruang kerja untuk praktik keterampilan kejuruan.', img: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=600&q=80', icon: 'handyman' },
-];
+// Request a resized thumbnail for uploaded images; leave external URLs alone.
+const thumb = (url: string, w: number) => url.startsWith('/api/image/') ? `${url}?w=${w}` : url;
 
-const fasilitasPendukung = [
-  { icon: 'wifi', name: 'WiFi Sekolah' },
-  { icon: 'local_hospital', name: 'UKS' },
-  { icon: 'local_parking', name: 'Parkir Luas' },
-  { icon: 'water_drop', name: 'Air Bersih' },
-  { icon: 'local_cafe', name: 'Kantin' },
-  { icon: 'cleaning_services', name: 'Kebersihan' },
-  { icon: 'security', name: 'Keamanan 24 Jam' },
-  { icon: 'accessible', name: 'Aksesibilitas' },
-];
+// Facilities with an image render as full cards (Utama); icon-only ones become
+// the compact support chips (Pendukung). No extra schema field needed.
+const facilities = await db.facility.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }] });
+const fasilitasUtama = facilities
+  .filter(f => f.imageUrl)
+  .map(f => ({ name: f.name, desc: f.description || '', img: thumb(f.imageUrl!, 600), icon: f.icon || 'apartment' }));
+const fasilitasPendukung = facilities
+  .filter(f => !f.imageUrl)
+  .map(f => ({ icon: f.icon || 'check_circle', name: f.name }));
 ---
 
 <BaseLayout title="Fasilitas" description={`Fasilitas pendukung pembelajaran di ${site.name} — ruang kelas, lab, studio, musholla, dan lainnya.`}>
@@ -47,6 +40,12 @@ const fasilitasPendukung = [
     <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Berbagai fasilitas yang tersedia untuk mendukung kegiatan belajar mengajar dan pengembangan keterampilan siswa.</p>
   </div>
 
+  {fasilitasUtama.length === 0 && fasilitasPendukung.length === 0 && (
+    <div class="text-center text-[#6f7a6e] py-12">
+      <span class="material-symbols-outlined text-4xl mb-3">apartment</span>
+      <p class="text-sm">Data fasilitas belum tersedia. Tambahkan lewat panel admin.</p>
+    </div>
+  )}
   <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 md:gap-6">
     {fasilitasUtama.map(f => (
       <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden group hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow">
@@ -67,6 +66,7 @@ const fasilitasPendukung = [
 </section>
 
 <!-- FASILITAS PENDUKUNG -->
+{fasilitasPendukung.length > 0 && (
 <section class="bg-white border-y border-black/5">
   <div class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-20">
     <div class="max-w-2xl mb-12">
@@ -85,7 +85,6 @@ const fasilitasPendukung = [
     </div>
   </div>
 </section>
-
-<p class="text-xs text-[#6f7a6e] text-center py-8 italic">{stockPhotoNote}</p>
+)}
 
 </BaseLayout>
