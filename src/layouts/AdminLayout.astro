@@ -86,10 +86,21 @@ const groups = [
     [style*="color:#6f7a6e"]{color:var(--color-muted)!important}
     .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:400;font-style:normal;font-size:20px;line-height:1;display:inline-block}
     .sidebar{width:240px;background:#00602b;color:white;position:fixed;top:0;left:0;bottom:0;z-index:40;overflow-y:auto;display:flex;flex-direction:column}
-    .sidebar a,.sidebar button{color:white;text-decoration:none;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;transition:background .15s}
+    .sidebar a,.sidebar button{color:white;background:transparent;border:none;text-decoration:none;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;transition:background .15s}
     .sidebar a:hover,.sidebar button:hover{background:rgba(255,255,255,0.1)}
     .sidebar a.active{background:rgba(255,255,255,0.2);font-weight:700}
     .sidebar-group-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,0.72);padding:16px 16px 6px;font-weight:700}
+    /* Accordion group: header toggles a collapsible panel of items. */
+    .sidebar-group{margin-top:4px}
+    .sidebar button.sidebar-group-toggle{width:100%;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,0.72);padding:11px 16px}
+    .sidebar button.sidebar-group-toggle:hover{color:#fff}
+    .sidebar-group-toggle .sidebar-chevron{margin-left:auto;font-size:18px;transition:transform .2s ease}
+    .sidebar-group-toggle[aria-expanded="true"] .sidebar-chevron{transform:rotate(180deg)}
+    /* grid 0fr->1fr gives a smooth height animation without measuring. */
+    .sidebar-group-items{display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease}
+    .sidebar-group-items[data-open="true"]{grid-template-rows:1fr}
+    .sidebar-group-inner{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:2px;padding-left:6px}
+    .sidebar-group-inner a{font-size:13px}
     .main-content{margin-left:240px;min-height:100vh}
     .topbar{background:white;border-bottom:1px solid rgba(0,0,0,0.06);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
     .page-body{padding:24px}
@@ -140,16 +151,27 @@ const groups = [
       <a href="/admin" class:list={['', { active: currentPath === '/admin' }]}>
         <span class="material-symbols-outlined">dashboard</span> Dashboard
       </a>
-      {groups.map(g => (
-        <div>
-          <div class="sidebar-group-label">{g.label}</div>
-          {g.items.map(i => (
-            <a href={i.href} class:list={[{ active: currentPath.startsWith(i.href) }]}>
-              {i.label}
-            </a>
-          ))}
-        </div>
-      ))}
+      {groups.map(g => {
+        const groupActive = g.items.some(i => currentPath.startsWith(i.href));
+        return (
+          <div class="sidebar-group" data-group={g.label} data-active={String(groupActive)}>
+            <button type="button" class="sidebar-group-toggle" aria-expanded={groupActive ? 'true' : 'false'}>
+              <span class="material-symbols-outlined" style="font-size:18px">{g.icon}</span>
+              <span>{g.label}</span>
+              <span class="material-symbols-outlined sidebar-chevron">expand_more</span>
+            </button>
+            <div class="sidebar-group-items" data-open={String(groupActive)}>
+              <div class="sidebar-group-inner">
+                {g.items.map(i => (
+                  <a href={i.href} class:list={[{ active: currentPath.startsWith(i.href) }]}>
+                    {i.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </nav>
     <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
       <a href="/" target="_blank" style="font-size:12px;color:rgba(255,255,255,0.78)">
@@ -253,6 +275,30 @@ const groups = [
     menuBtn?.addEventListener('click', () => setDrawer(!sidebar?.classList.contains('open')));
     overlay?.addEventListener('click', () => setDrawer(false));
     sidebar?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setDrawer(false)));
+
+    // Accordion groups: multi-open, active group forced open, rest from localStorage.
+    const GROUP_KEY = 'smkdh_sidebar_groups';
+    let groupState: Record<string, boolean> = {};
+    try { groupState = JSON.parse(localStorage.getItem(GROUP_KEY) || '{}'); } catch {}
+    document.querySelectorAll<HTMLElement>('.sidebar-group').forEach(group => {
+      const label = group.dataset.group || '';
+      const toggle = group.querySelector<HTMLButtonElement>('.sidebar-group-toggle');
+      const panel = group.querySelector<HTMLElement>('.sidebar-group-items');
+      if (!toggle || !panel) return;
+      const isActive = group.dataset.active === 'true';
+      const apply = (open: boolean) => {
+        panel.dataset.open = String(open);
+        toggle.setAttribute('aria-expanded', String(open));
+      };
+      // Active group always opens; others restore their saved state.
+      apply(isActive || (label in groupState ? groupState[label] : false));
+      toggle.addEventListener('click', () => {
+        const next = panel.dataset.open !== 'true';
+        apply(next);
+        groupState[label] = next;
+        try { localStorage.setItem(GROUP_KEY, JSON.stringify(groupState)); } catch {}
+      });
+    });
 
     // Logout confirmation modal (lives at body level, opened from the sidebar link)
     const logoutLink = document.getElementById('logout-link');
