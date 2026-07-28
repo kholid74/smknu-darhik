@@ -73,9 +73,11 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
 <style>
   .media-picker .mp-tab { background:#f0f0f0; color:#3f493f; }
   .media-picker .mp-tab.active { background:#1B7A3D; color:#fff; }
-  .media-picker .mp-thumb { cursor:pointer; border:2px solid transparent; border-radius:8px; overflow:hidden; aspect-ratio:1; background:#f0f7f1; transition:border-color .15s; }
-  .media-picker .mp-thumb:hover { border-color:#1B7A3D; }
-  .media-picker .mp-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  /* Thumbs are created in JS, so they lack Astro's scope attribute — target
+     them globally or these constraints won't apply and images overflow. */
+  .media-picker :global(.mp-thumb) { cursor:pointer; border:2px solid transparent; border-radius:8px; overflow:hidden; aspect-ratio:1; background:#f0f7f1; padding:0; transition:border-color .15s; }
+  .media-picker :global(.mp-thumb:hover) { border-color:#1B7A3D; }
+  .media-picker :global(.mp-thumb img) { width:100%; height:100%; object-fit:cover; display:block; }
   .media-picker .mp-dropzone.drag-over { border-color:#1B7A3D; background:#f0f7f1; }
 </style>
 
