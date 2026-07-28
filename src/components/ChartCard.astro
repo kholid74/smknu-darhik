@@ -1,0 +1,129 @@
+---
+// Reusable chart card. Renders a titled .card and hands its config to a shared
+// client script that boots ApexCharts for every chart on the page.
+// Data comes from the parent page's SSR (Prisma) — passed in as plain arrays.
+interface Props {
+  title: string;
+  subtitle?: string;
+  type?: 'bar' | 'line' | 'area' | 'donut';
+  series: unknown;            // bar/line/area: [{ name, data:[] }] · donut: number[]
+  categories?: string[];      // x-axis labels (bar/line/area)
+  labels?: string[];          // slice labels (donut)
+  colors?: string[];
+  height?: number;
+}
+
+const {
+  title,
+  subtitle,
+  type = 'bar',
+  series,
+  categories = [],
+  labels = [],
+  colors,
+  height = 300,
+} = Astro.props;
+
+const config = JSON.stringify({ type, series, categories, labels, colors, height });
+---
+
+<div class="card chart-card">
+  <div class="chart-card-head">
+    <h3 class="chart-card-title">{title}</h3>
+    {subtitle && <p class="chart-card-sub">{subtitle}</p>}
+  </div>
+  <div class="apex-chart" data-apexchart={config}></div>
+</div>
+
+<style>
+  .chart-card { padding: 20px; }
+  .chart-card-head { margin-bottom: 8px; }
+  .chart-card-title { font-size: 15px; font-weight: 700; color: var(--color-ink, #1c1b1b); }
+  .chart-card-sub { font-size: 12px; color: var(--color-muted, #5a6459); margin-top: 2px; }
+  .apex-chart { min-height: 120px; }
+</style>
+
+<script>
+  import ApexCharts from 'apexcharts';
+
+  const BRAND = '#1B7A3D';
+  // Green-forward palette + gold accent, matches the admin theme.
+  const PALETTE = ['#1B7A3D', '#3fae5f', '#8dd6a1', '#C8963E', '#00602b', '#c0d9c6'];
+  const FONT = "'Plus Jakarta Sans', system-ui, sans-serif";
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  type ChartConfig = {
+    type: 'bar' | 'line' | 'area' | 'donut';
+    series: any;
+    categories: string[];
+    labels: string[];
+    colors?: string[];
+    height: number;
+  };
+
+  function buildOptions(cfg: ChartConfig): ApexCharts.ApexOptions {
+    const colors = cfg.colors && cfg.colors.length ? cfg.colors : PALETTE;
+    const base: ApexCharts.ApexOptions = {
+      chart: {
+        type: cfg.type,
+        height: cfg.height,
+        fontFamily: FONT,
+        toolbar: { show: false },
+        animations: { enabled: !reduceMotion, speed: 350 },
+        parentHeightOffset: 0,
+      },
+      colors,
+      dataLabels: { enabled: false },
+      tooltip: { style: { fontFamily: FONT } },
+      legend: { fontFamily: FONT, fontSize: '12px', markers: { radius: 4 } },
+      grid: { borderColor: 'rgba(0,0,0,0.06)', strokeDashArray: 4 },
+    };
+
+    if (cfg.type === 'donut') {
+      return {
+        ...base,
+        series: cfg.series,
+        labels: cfg.labels,
+        dataLabels: { enabled: true, style: { fontFamily: FONT, fontWeight: 700 } },
+        legend: { ...base.legend, position: 'bottom' },
+        plotOptions: { pie: { donut: { size: '62%' } } },
+        stroke: { width: 2, colors: ['#fff'] },
+      };
+    }
+
+    // bar / line / area
+    return {
+      ...base,
+      series: cfg.series,
+      xaxis: {
+        categories: cfg.categories,
+        labels: { style: { fontFamily: FONT, colors: '#5a6459' } },
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+      },
+      yaxis: { labels: { style: { fontFamily: FONT, colors: '#5a6459' } } },
+      stroke:
+        cfg.type === 'bar'
+          ? { show: false }
+          : { curve: 'smooth', width: 3 },
+      fill:
+        cfg.type === 'area'
+          ? { type: 'gradient', gradient: { shadeIntensity: 0.4, opacityFrom: 0.35, opacityTo: 0.05 } }
+          : { opacity: 1 },
+      plotOptions: { bar: { borderRadius: 6, columnWidth: '52%', borderRadiusApplication: 'end' } },
+    };
+  }
+
+  document.querySelectorAll<HTMLElement>('.apex-chart').forEach((el) => {
+    const raw = el.dataset.apexchart;
+    if (!raw || el.dataset.rendered) return;
+    try {
+      const cfg = JSON.parse(raw) as ChartConfig;
+      const chart = new ApexCharts(el, buildOptions(cfg));
+      chart.render();
+      el.dataset.rendered = 'true';
+    } catch (e) {
+      console.error('ChartCard render failed', e);
+    }
+  });
+</script>

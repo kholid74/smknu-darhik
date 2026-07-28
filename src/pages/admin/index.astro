@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import ChartCard from '../../components/ChartCard.astro';
 import { verifyToken } from '../../lib/auth';
 import { db } from '../../lib/prisma';
 
@@ -22,28 +23,110 @@ const stats = [
   { label: 'Guru & Staf', value: teacherCount, icon: 'group' },
   { label: 'Prestasi', value: achievementCount, icon: 'emoji_events' },
 ];
+
+// --- Chart data (real, from Prisma) ---
+// Article count over the last 6 months.
+const now = new Date();
+const months = Array.from({ length: 6 }, (_, i) => {
+  const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+  return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleDateString('id', { month: 'short' }), count: 0 };
+});
+const since = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+const recentForTrend = await db.article.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true } });
+for (const a of recentForTrend) {
+  const d = new Date(a.createdAt);
+  const m = months.find((x) => x.key === `${d.getFullYear()}-${d.getMonth()}`);
+  if (m) m.count++;
+}
+
+// Article distribution by category.
+const byCat = await db.article.groupBy({ by: ['category'], _count: { _all: true } });
+const catLabels = byCat.map((c) => c.category);
+const catData = byCat.map((c) => c._count._all);
+
+// Recent activity.
+const recent = await db.article.findMany({
+  orderBy: { createdAt: 'desc' },
+  take: 6,
+  select: { id: true, title: true, category: true, createdAt: true, published: true },
+});
+
+const catBadge: Record<string, string> = {
+  Prestasi: 'badge-green', Keagamaan: 'badge-gold', Akademik: 'badge-green',
+  Ekstrakurikuler: 'badge-gold', PPDB: 'badge-green',
+};
 ---
 
 <AdminLayout title="Dashboard" user={{ role: session.role }}>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">
     {stats.map(s => (
       <div class="card" style="display:flex;align-items:center;gap:14px">
         <span class="material-symbols-outlined" style="font-size:32px;color:#1B7A3D;background:#e8f5e9;padding:12px;border-radius:12px">{s.icon}</span>
         <div>
           <div style="font-size:28px;font-weight:800">{s.value}</div>
-          <div style="font-size:13px;color:#6f7a6e">{s.label}</div>
+          <div style="font-size:13px;color:var(--color-muted)">{s.label}</div>
         </div>
       </div>
     ))}
   </div>
 
-  <div class="card">
-    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">Pintasan</h3>
-    <div style="display:flex;flex-wrap:wrap;gap:10px">
-      <a href="/admin/artikel" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tulis Artikel</a>
-      <a href="/admin/galeri" class="btn btn-outline"><span class="material-symbols-outlined">add_photo_alternate</span> Upload Foto</a>
-      <a href="/admin/pengaturan" class="btn btn-outline"><span class="material-symbols-outlined">settings</span> Pengaturan</a>
-      <a href="/" target="_blank" class="btn btn-outline"><span class="material-symbols-outlined">open_in_new</span> Lihat Website</a>
+  <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px">
+    <ChartCard
+      title="Artikel per Bulan"
+      subtitle="6 bulan terakhir"
+      type="bar"
+      series={[{ name: 'Artikel', data: months.map(m => m.count) }]}
+      categories={months.map(m => m.label)}
+      height={300}
+    />
+    {catData.length > 0 ? (
+      <ChartCard
+        title="Distribusi Kategori"
+        subtitle={`${articleCount} artikel total`}
+        type="donut"
+        series={catData}
+        labels={catLabels}
+        height={300}
+      />
+    ) : (
+      <div class="card" style="display:flex;align-items:center;justify-content:center;color:var(--color-muted);font-size:13px;text-align:center;min-height:200px">
+        Belum ada artikel untuk ditampilkan.
+      </div>
+    )}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="font-size:15px;font-weight:700">Aktivitas Terbaru</h3>
+        <a href="/admin/artikel" style="font-size:12px;font-weight:600">Lihat semua</a>
+      </div>
+      {recent.length === 0 ? (
+        <p style="font-size:13px;color:var(--color-muted)">Belum ada artikel.</p>
+      ) : (
+        <div style="display:flex;flex-direction:column">
+          {recent.map(a => (
+            <a href={`/admin/artikel/${a.id}`} style="display:flex;align-items:center;gap:12px;padding:10px 4px;border-bottom:1px solid rgba(0,0,0,0.05);color:inherit;text-decoration:none">
+              <span class="material-symbols-outlined" style="font-size:20px;color:#1B7A3D;background:#e8f5e9;padding:8px;border-radius:8px">article</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{a.title}</div>
+                <div style="font-size:11px;color:var(--color-muted)">{new Date(a.createdAt).toLocaleDateString('id', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+              </div>
+              <span class={`badge ${a.published ? 'badge-green' : 'badge-gray'}`}>{a.published ? 'Publish' : 'Draft'}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">Pintasan</h3>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="/admin/artikel/new" class="btn btn-primary" style="justify-content:flex-start"><span class="material-symbols-outlined">add</span> Tulis Artikel</a>
+        <a href="/admin/galeri" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">add_photo_alternate</span> Upload Foto</a>
+        <a href="/admin/pengaturan" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">settings</span> Pengaturan</a>
+        <a href="/" target="_blank" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">open_in_new</span> Lihat Website</a>
+      </div>
     </div>
   </div>
 </AdminLayout>
