@@ -1,23 +1,25 @@
 ---
+export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
+import { db } from '../lib/prisma';
 
-const guruList = [
-  { name: 'Hadi Santoso, S.E.,M.Pd.', mapel: 'Kepala Sekolah', img: '/assets/kepala-sekolah.png' },
-  { name: 'Dra. Siti ..., M.Pd', mapel: 'Waka Kurikulum', img: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&q=80&fit=crop&crop=face' },
-  { name: 'Drs. Budi ...', mapel: 'Waka Kesiswaan', img: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&q=80&fit=crop&crop=face' },
-  { name: '..., S.Ag', mapel: 'Pendidikan Agama Islam', img: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=300&q=80&fit=crop&crop=face' },
-  { name: '..., S.Pd', mapel: 'Bahasa Indonesia', img: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300&q=80&fit=crop&crop=face' },
-  { name: '..., S.Pd', mapel: 'Bahasa Inggris', img: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&q=80&fit=crop&crop=face' },
-  { name: '..., S.Pd', mapel: 'Matematika', img: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&q=80&fit=crop&crop=face' },
-  { name: '..., S.Kom', mapel: 'Produktif Multimedia', img: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&q=80&fit=crop&crop=face' },
-];
+// Append the academic title unless the name already carries it.
+function withTitle(name: string, title: string | null): string {
+  if (!title) return name;
+  return name.includes(title) ? name : `${name}, ${title}`;
+}
 
-const tuList = [
-  { name: '..., S.E', title: 'Kepala TU', icon: 'admin_panel_settings' },
-  { name: '...', title: 'Staf Administrasi', icon: 'description' },
-  { name: '...', title: 'Staf Keuangan', icon: 'account_balance' },
-];
+const teachers = await db.teacher.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }] });
+
+// Level "Staf" -> Tata Usaha section; everyone else -> Dewan Guru.
+const guruList = teachers
+  .filter(t => t.level !== 'Staf')
+  .map(t => ({ name: withTitle(t.name, t.title), mapel: t.subject || t.position, img: t.photoUrl || '' }));
+
+const tuList = teachers
+  .filter(t => t.level === 'Staf')
+  .map(t => ({ name: withTitle(t.name, t.title), title: t.position, icon: 'badge' }));
 ---
 
 <BaseLayout title="Guru & Staf" description={`Profil guru dan staf ${site.name} — pendidik profesional yang membimbing siswa.`}>
@@ -42,22 +44,34 @@ const tuList = [
     <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Tenaga pendidik profesional yang siap membimbing siswa meraih prestasi terbaik.</p>
   </div>
 
-  <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
-    {guruList.map(g => (
-      <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow group">
-        <div class="h-48 bg-gray-200 overflow-hidden">
-          <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={g.img} alt={g.name} loading="lazy" onerror="this.style.display='none'" />
+  {guruList.length === 0 ? (
+    <div class="text-center text-[#6f7a6e] py-12">
+      <span class="material-symbols-outlined text-4xl mb-3">groups</span>
+      <p class="text-sm">Data guru belum tersedia. Tambahkan lewat panel admin.</p>
+    </div>
+  ) : (
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-6">
+      {guruList.map(g => (
+        <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow group">
+          <div class="h-48 bg-[#f0f7f1] overflow-hidden flex items-center justify-center">
+            {g.img ? (
+              <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={g.img} alt={g.name} loading="lazy" onerror="this.style.display='none'" />
+            ) : (
+              <span class="material-symbols-outlined text-6xl text-[#1B7A3D]/40">person</span>
+            )}
+          </div>
+          <div class="p-4 text-center">
+            <h3 class="font-bold text-sm text-[#1c1b1b] mb-1">{g.name}</h3>
+            <p class="text-xs text-[#6f7a6e]">{g.mapel}</p>
+          </div>
         </div>
-        <div class="p-4 text-center">
-          <h3 class="font-bold text-sm text-[#1c1b1b] mb-1">{g.name}</h3>
-          <p class="text-xs text-[#6f7a6e]">{g.mapel}</p>
-        </div>
-      </div>
-    ))}
-  </div>
+      ))}
+    </div>
+  )}
 </section>
 
 <!-- STAF TU -->
+{tuList.length > 0 && (
 <section class="bg-white border-y border-black/5">
   <div class="max-w-4xl mx-auto px-4 md:px-6 py-16 md:py-20">
     <div class="max-w-2xl mb-12">
@@ -79,7 +93,6 @@ const tuList = [
     </div>
   </div>
 </section>
-
-<p class="text-xs text-[#6f7a6e] text-center py-8 italic">[data perlu dikonfirmasi ke sekolah — data guru dan staf masih placeholder]</p>
+)}
 
 </BaseLayout>
