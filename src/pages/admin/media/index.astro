@@ -45,7 +45,7 @@ function fmtSize(bytes: number | null): string {
       {items.map(m => (
         <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
           <div style="aspect-ratio:4/3;background:#f0f7f1;overflow:hidden">
-            <img src={m.url} alt={m.filename} loading="lazy" style="width:100%;height:100%;object-fit:cover"/>
+            <img src={m.url.startsWith('/api/image/') ? `${m.url}?w=300` : m.url} alt={m.filename} loading="lazy" style="width:100%;height:100%;object-fit:cover"/>
           </div>
           <div style="padding:10px;display:flex;flex-direction:column;gap:6px;flex:1">
             <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.filename}>{m.filename}</div>
