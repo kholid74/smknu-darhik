@@ -21,16 +21,18 @@ if (Astro.request.method === 'POST') {
     }
     const folder = formData.get('folder')?.toString() || 'uploads';
     const url = await uploadToR2(file, folder);
+    // Images render as thumbnails in pickers; everything else is a plain file.
+    const kind = (file.type || '').startsWith('image/') ? 'image' : 'file';
     // Index the upload in the media library. Never fail the upload if this errors.
     let media = null;
     try {
       media = await db.media.create({
-        data: { url, filename: file.name, mimeType: file.type || null, size: file.size, folder },
+        data: { url, filename: file.name, mimeType: file.type || null, size: file.size, folder, kind },
       });
     } catch (e) {
       console.error('[upload] media index failed', e);
     }
-    return new Response(JSON.stringify({ url, id: media?.id ?? null }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ url, id: media?.id ?? null, kind }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }

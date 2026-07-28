@@ -21,6 +21,13 @@ function fmtSize(bytes: number | null): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
+// Icon for non-image files, by extension.
+const FILE_ICON: Record<string, string> = {
+  pdf: 'picture_as_pdf', doc: 'description', docx: 'description',
+  xls: 'table_chart', xlsx: 'table_chart', ppt: 'slideshow', pptx: 'slideshow',
+  zip: 'folder_zip', rar: 'folder_zip',
+};
+const fileIcon = (name: string) => FILE_ICON[name.split('.').pop()?.toLowerCase() || ''] || 'draft';
 ---
 
 <AdminLayout title="Pustaka Media" user={{ role: session.role }}>
@@ -44,8 +51,12 @@ function fmtSize(bytes: number | null): string {
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">
       {items.map(m => (
         <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
-          <div style="aspect-ratio:4/3;background:#f0f7f1;overflow:hidden">
-            <img src={m.url.startsWith('/api/image/') ? `${m.url}?w=300` : m.url} alt={m.filename} loading="lazy" style="width:100%;height:100%;object-fit:cover"/>
+          <div style="aspect-ratio:4/3;background:#f0f7f1;overflow:hidden;display:flex;align-items:center;justify-content:center">
+            {m.kind === 'image' ? (
+              <img src={m.url.startsWith('/api/image/') ? `${m.url}?w=300` : m.url} alt={m.filename} loading="lazy" style="width:100%;height:100%;object-fit:cover"/>
+            ) : (
+              <span class="material-symbols-outlined" style="font-size:44px;color:#1B7A3D">{fileIcon(m.filename)}</span>
+            )}
           </div>
           <div style="padding:10px;display:flex;flex-direction:column;gap:6px;flex:1">
             <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.filename}>{m.filename}</div>

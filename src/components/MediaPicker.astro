@@ -132,7 +132,8 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
       async function loadGrid(q = '') {
         grid.innerHTML = '<p class="mp-loading" style="grid-column:1/-1;text-align:center;color:#6f7a6e;font-size:13px;padding:20px">Memuat…</p>';
         try {
-          const res = await fetch('/api/media' + (q ? '?q=' + encodeURIComponent(q) : ''));
+          // Only images belong in an image picker; documents live in the download flow.
+          const res = await fetch('/api/media?kind=image' + (q ? '&q=' + encodeURIComponent(q) : ''));
           const items = await res.json();
           if (!Array.isArray(items) || items.length === 0) {
             grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#6f7a6e;font-size:13px;padding:20px">Belum ada media. Gunakan tab Upload Baru.</p>';

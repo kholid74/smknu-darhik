@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import FileUpload from '../../../components/FileUpload.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -26,7 +27,7 @@ if (Astro.request.method === 'POST') {
   <form method="POST" style="max-width:600px">
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul *</label><input type="text" name="title" value={item?.title||''} required/></div>
-      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL File *</label><input type="url" name="fileUrl" value={item?.fileUrl||''} placeholder="https://..." required/></div>
+      <FileUpload field="fileUrl" value={item?.fileUrl||''} label="File *" folder="downloads" required />
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kategori</label><select name="category"><option value="">-</option><option value="Formulir" selected={(item?.category==='Formulir') || undefined}>Formulir</option><option value="Brosur" selected={(item?.category==='Brosur') || undefined}>Brosur</option><option value="Akademik" selected={(item?.category==='Akademik') || undefined}>Akademik</option></select></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/download" class="btn btn-outline">Batal</a></div>

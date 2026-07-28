@@ -13,11 +13,11 @@ export const GET: APIRoute = async ({ request }) => {
   }
   const url = new URL(request.url);
   const q = url.searchParams.get('q')?.trim() || '';
-  const items = await db.media.findMany({
-    where: q ? { filename: { contains: q, mode: 'insensitive' } } : {},
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-  });
-  const data = items.map((i) => ({ id: i.id, url: i.url, filename: i.filename, size: i.size }));
+  const kind = url.searchParams.get('kind')?.trim() || ''; // '' = all, 'image', 'file'
+  const where: any = {};
+  if (q) where.filename = { contains: q, mode: 'insensitive' };
+  if (kind) where.kind = kind;
+  const items = await db.media.findMany({ where, orderBy: { createdAt: 'desc' }, take: 100 });
+  const data = items.map((i) => ({ id: i.id, url: i.url, filename: i.filename, size: i.size, kind: i.kind }));
   return new Response(JSON.stringify(data), { headers: { 'Content-Type': 'application/json' } });
 };

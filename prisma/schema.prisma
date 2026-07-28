@@ -176,7 +176,9 @@ model Media {
   mimeType  String?
   size      Int? // bytes (compressed)
   folder    String?  @default("uploads")
+  kind      String   @default("image") // image | file — image pickers show only "image"
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([kind])
 }
