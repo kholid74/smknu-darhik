@@ -1,0 +1,80 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import UploadWidget from '../../../components/UploadWidget.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const [items, total] = await Promise.all([
+  db.media.findMany({ orderBy: { createdAt: 'desc' }, take: 60 }),
+  db.media.count(),
+]);
+
+function fmtSize(bytes: number | null): string {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+---
+
+<AdminLayout title="Pustaka Media" user={{ role: session.role }}>
+  <div class="card" style="margin-bottom:20px">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:4px">Unggah Gambar</h3>
+    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">File yang diunggah tersimpan di pustaka dan bisa dipakai ulang di form mana pun.</p>
+    <UploadWidget client:load />
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h3 style="font-size:15px;font-weight:700">Semua Media</h3>
+    <span style="font-size:12px;color:var(--color-muted)">{total} file{total > 60 ? ' · menampilkan 60 terbaru' : ''}</span>
+  </div>
+
+  {items.length === 0 ? (
+    <div class="card" style="text-align:center;padding:48px;color:var(--color-muted)">
+      <span class="material-symbols-outlined" style="font-size:40px;margin-bottom:8px">image</span>
+      <p style="font-size:13px">Belum ada media. Unggah gambar pertama di atas.</p>
+    </div>
+  ) : (
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px">
+      {items.map(m => (
+        <div class="card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+          <div style="aspect-ratio:4/3;background:#f0f7f1;overflow:hidden">
+            <img src={m.url} alt={m.filename} loading="lazy" style="width:100%;height:100%;object-fit:cover"/>
+          </div>
+          <div style="padding:10px;display:flex;flex-direction:column;gap:6px;flex:1">
+            <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.filename}>{m.filename}</div>
+            <div style="font-size:11px;color:var(--color-muted)">{fmtSize(m.size)} · {new Date(m.createdAt).toLocaleDateString('id')}</div>
+            <div style="display:flex;gap:4px;margin-top:auto">
+              <button type="button" class="btn btn-outline copy-url" data-url={m.url} style="padding:6px 8px;font-size:11px;flex:1" aria-label="Salin URL"><span class="material-symbols-outlined" style="font-size:15px">content_copy</span> Salin</button>
+              <form method="POST" action="/admin/media/delete" style="display:inline">
+                <input type="hidden" name="id" value={m.id}/>
+                <button type="submit" class="btn btn-outline" style="padding:6px 8px;font-size:11px;color:#dc2626" aria-label="Hapus media"><span class="material-symbols-outlined" style="font-size:15px">delete</span></button>
+              </form>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  // Copy URL to clipboard, brief visual confirmation.
+  document.querySelectorAll<HTMLButtonElement>('.copy-url').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const url = btn.dataset.url || '';
+      try {
+        await navigator.clipboard.writeText(new URL(url, location.origin).href);
+        const original = btn.innerHTML;
+        btn.textContent = 'Tersalin';
+        setTimeout(() => { btn.innerHTML = original; }, 1200);
+      } catch {}
+    });
+  });
+</script>

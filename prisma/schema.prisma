@@ -16,11 +16,11 @@ model Article {
   slug      String   @unique
   title     String
   excerpt   String?
-  body      String                      // HTML dari Tiptap
-  category  String                      // Prestasi | Keagamaan | Akademik | Ekstrakurikuler | PPDB
+  body      String // HTML dari Tiptap
+  category  String // Prestasi | Keagamaan | Akademik | Ekstrakurikuler | PPDB
   imageUrl  String?
   published Boolean  @default(false)
-  featured  Boolean  @default(false)    // tampil di homepage
+  featured  Boolean  @default(false) // tampil di homepage
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -28,18 +28,18 @@ model Article {
 model Department {
   id          String  @id @default(cuid())
   slug        String  @unique
-  name        String                    // "Perbankan Syariah" | "DKV (Desain Komunikasi Visual)"
-  icon        String?                   // material symbol name
+  name        String // "Perbankan Syariah" | "DKV (Desain Komunikasi Visual)"
+  icon        String? // material symbol name
   description String
-  kompetensi  String                    // JSON string[]
-  karir       String                    // JSON string[]
+  kompetensi  String // JSON string[]
+  karir       String // JSON string[]
   imageUrl    String?
   order       Int     @default(0)
 }
 
 model Page {
   id        String   @id @default(cuid())
-  slug      String   @unique           // "profil" | "visi-misi" | "sejarah"
+  slug      String   @unique // "profil" | "visi-misi" | "sejarah"
   title     String
   content   String
   metaDesc  String?
@@ -50,24 +50,24 @@ model Page {
 model Achievement {
   id          String  @id @default(cuid())
   title       String
-  level       String                    // Kabupaten | Provinsi | Nasional
+  level       String // Kabupaten | Provinsi | Nasional
   year        String
-  category    String?                   // Akademik | Non-Akademik | Keagamaan
-  student     String?                   // nama siswa/tim
+  category    String? // Akademik | Non-Akademik | Keagamaan
+  student     String? // nama siswa/tim
   description String?
   imageUrl    String?
-  featured    Boolean @default(false)   // tampil di homepage
+  featured    Boolean @default(false) // tampil di homepage
   order       Int     @default(0)
 }
 
 model Teacher {
   id       String  @id @default(cuid())
   name     String
-  title    String?                      // "S.E.,M.Pd."
-  position String                       // Kepala Sekolah | Waka Kurikulum | Guru Mapel
+  title    String? // "S.E.,M.Pd."
+  position String // Kepala Sekolah | Waka Kurikulum | Guru Mapel
   subject  String?
   photoUrl String?
-  level    String  @default("Guru")     // Yayasan | Kepala Sekolah | Waka | Kaprog | Guru | Staf
+  level    String  @default("Guru") // Yayasan | Kepala Sekolah | Waka | Kaprog | Guru | Staf
   order    Int     @default(0)
 }
 
@@ -91,14 +91,14 @@ model Partner {
   id      String  @id @default(cuid())
   name    String
   logoUrl String?
-  type    String?                       // Industri | Institusi | Pemerintah
+  type    String? // Industri | Institusi | Pemerintah
   order   Int     @default(0)
 }
 
 model Testimonial {
   id        String   @id @default(cuid())
   name      String
-  role      String                      // Siswa | Orang Tua | Alumni | Mitra
+  role      String // Siswa | Orang Tua | Alumni | Mitra
   content   String
   photoUrl  String?
   verified  Boolean  @default(false)
@@ -106,17 +106,17 @@ model Testimonial {
 }
 
 model Faq {
-  id       String  @id @default(cuid())
+  id       String @id @default(cuid())
   question String
   answer   String
-  order    Int     @default(0)
+  order    Int    @default(0)
 }
 
 model GalleryImage {
   id        String   @id @default(cuid())
   title     String?
   imageUrl  String
-  album     String?                     // Kegiatan 2026 | Fasilitas | Prestasi
+  album     String? // Kegiatan 2026 | Fasilitas | Prestasi
   createdAt DateTime @default(now())
 }
 
@@ -135,7 +135,7 @@ model Download {
   id        String   @id @default(cuid())
   title     String
   fileUrl   String
-  category  String?                     // Formulir | Brosur | Akademik
+  category  String? // Formulir | Brosur | Akademik
   createdAt DateTime @default(now())
 }
 
@@ -144,25 +144,39 @@ model Download {
 model Admin {
   id       String @id @default(cuid())
   username String @unique
-  password String                        // bcrypt hash
-  role     String @default("editor")     // superadmin | editor
+  password String // bcrypt hash
+  role     String @default("editor") // superadmin | editor
 }
 
 // ──── SETTINGS ────
 
 model Setting {
-  id              String @id @default("main")
-  siteName        String?
-  siteShortName   String?
-  tagline         String?
-  address         String?
-  phone           String?
-  email           String?
-  wa              String?
-  instagram       String?
-  facebook        String?
-  tiktok          String?
-  youtube         String?
+  id               String  @id @default("main")
+  siteName         String?
+  siteShortName    String?
+  tagline          String?
+  address          String?
+  phone            String?
+  email            String?
+  wa               String?
+  instagram        String?
+  facebook         String?
+  tiktok           String?
+  youtube          String?
   metaDefaultTitle String?
   metaDefaultDesc  String?
+}
+
+// ──── MEDIA LIBRARY ────
+
+model Media {
+  id        String   @id @default(cuid())
+  url       String // public URL (via /api/image proxy)
+  filename  String // original file name
+  mimeType  String?
+  size      Int? // bytes (compressed)
+  folder    String?  @default("uploads")
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }

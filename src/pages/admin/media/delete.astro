@@ -1,0 +1,24 @@
+---
+export const prerender = false;
+import { verifyToken } from '../../../lib/auth';
+import { deleteFromR2 } from '../../../lib/r2';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+if (!await verifyToken(token)) return Astro.redirect('/admin/login');
+
+if (Astro.request.method === 'POST') {
+  const d = await Astro.request.formData();
+  const id = d.get('id')?.toString();
+  if (id) {
+    const media = await db.media.findUnique({ where: { id } }).catch(() => null);
+    // Uploaded URLs are proxied as /api/image/<key>; strip the prefix to get the R2 key.
+    const key = media?.url?.replace(/^\/api\/image\//, '');
+    if (key && key !== media?.url) await deleteFromR2(key).catch(() => {});
+    await db.media.delete({ where: { id } }).catch(() => {});
+  }
+}
+return Astro.redirect('/admin/media');
+---
+<html></html>

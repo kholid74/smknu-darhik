@@ -2,6 +2,7 @@
 export const prerender = false;
 import { verifyToken } from '../../lib/auth';
 import { uploadToR2 } from '../../lib/r2';
+import { db } from '../../lib/prisma';
 
 const token = Astro.cookies.get('smkdh_token')?.value;
 if (!token) return new Response('Unauthorized', { status: 401 });
@@ -20,7 +21,16 @@ if (Astro.request.method === 'POST') {
     }
     const folder = formData.get('folder')?.toString() || 'uploads';
     const url = await uploadToR2(file, folder);
-    return new Response(JSON.stringify({ url }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    // Index the upload in the media library. Never fail the upload if this errors.
+    let media = null;
+    try {
+      media = await db.media.create({
+        data: { url, filename: file.name, mimeType: file.type || null, size: file.size, folder },
+      });
+    } catch (e) {
+      console.error('[upload] media index failed', e);
+    }
+    return new Response(JSON.stringify({ url, id: media?.id ?? null }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (e: any) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
