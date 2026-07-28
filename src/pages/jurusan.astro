@@ -1,6 +1,38 @@
 ---
+export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { site, jurusan, dummyNote } from '../data/site';
+import { site, dummyNote } from '../data/site';
+import { db } from '../lib/prisma';
+
+// kompetensi/karir are stored as JSON strings in the DB.
+function parseList(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return raw.split(/\r?\n|,/).map(s => s.trim()).filter(Boolean);
+  }
+}
+
+// Fallback cover images for the seeded programs; used when a row has no imageUrl.
+const fallbackImage: Record<string, string> = {
+  'perbankan-syariah': 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80',
+  'dkv': 'https://images.unsplash.com/photo-1492725764893-90b379c2b6e7?w=800&q=80',
+};
+const genericImage = 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&q=80';
+
+const departments = await db.department.findMany({ orderBy: { order: 'asc' } });
+const jurusan = departments.map((d, i) => ({
+  name: d.name,
+  slug: d.slug,
+  icon: d.icon || 'school',
+  color: i % 2 === 0 ? 'green' : 'gold',   // DB has no colour; alternate for visual rhythm
+  description: d.description,
+  kompetensi: parseList(d.kompetensi),
+  karir: parseList(d.karir),
+  image: d.imageUrl || fallbackImage[d.slug] || genericImage,
+}));
 ---
 
 <BaseLayout title="Program Keahlian" description="Dua program keahlian unggulan SMKS NU Darul Hikam — Perbankan Syariah dan Multimedia.">
@@ -23,6 +55,14 @@ import { site, jurusan, dummyNote } from '../data/site';
 </section>
 
 <!-- JURUSAN DETAIL -->
+{jurusan.length === 0 && (
+  <section class="bg-white border-y border-black/5">
+    <div class="max-w-3xl mx-auto px-4 md:px-6 py-16 md:py-20 text-center text-[#6f7a6e]">
+      <span class="material-symbols-outlined text-4xl mb-3">school</span>
+      <p class="text-sm">Program keahlian belum tersedia. Silakan tambahkan lewat panel admin.</p>
+    </div>
+  </section>
+)}
 {jurusan.map((j, i) => (
   <section id={j.slug} class={i % 2 === 0 ? 'bg-white border-y border-black/5' : ''}>
     <div class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
@@ -32,9 +72,7 @@ import { site, jurusan, dummyNote } from '../data/site';
           <div class="relative rounded-2xl overflow-hidden shadow-lg">
             <img
               class="w-full h-72 md:h-96 object-cover"
-              src={j.slug === 'perbankan-syariah'
-                ? 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80'
-                : 'https://images.unsplash.com/photo-1492725764893-90b379c2b6e7?w=800&q=80'}
+              src={j.image}
               alt={j.name}
               loading="lazy"
               onerror="this.style.display='none'"

@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import UploadWidget from '../../../components/UploadWidget.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -40,7 +41,20 @@ if (Astro.request.method === 'POST') {
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Deskripsi</label><textarea name="description" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.description||''}</textarea></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kompetensi (JSON)</label><textarea name="kompetensi" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.kompetensi||''}</textarea></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Karir (JSON)</label><textarea name="karir" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.karir||''}</textarea></div>
-      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Image URL</label><input type="text" name="imageUrl" value={item?.imageUrl||''} placeholder="https://..."/></div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Gambar Sampul</label>
+        {item?.imageUrl && (
+          <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px;background:#f0f7f1;border-radius:8px;padding:8px 12px">
+            <img src={item.imageUrl} style="width:80px;height:60px;object-fit:cover;border-radius:6px" alt="Preview"/>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:12px;font-weight:600;color:#1c1b1b;margin:0">Gambar tersimpan</p>
+              <p style="font-size:11px;color:#6f7a6e;margin:0;word-break:break-all">{item.imageUrl}</p>
+            </div>
+          </div>
+        )}
+        <input type="text" name="imageUrl" value={item?.imageUrl||''} placeholder="https://... atau upload baru"/>
+        <details style="margin-top:8px"><summary style="font-size:12px;color:#1B7A3D;cursor:pointer;font-weight:600">Upload gambar baru</summary><div style="margin-top:8px"><UploadWidget client:load /></div></details>
+      </div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Order</label><input type="number" name="order" value={item?.order??0} style="width:80px"/></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/jurusan" class="btn btn-outline">Batal</a></div>
