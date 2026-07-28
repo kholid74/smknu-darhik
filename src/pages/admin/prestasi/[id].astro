@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MediaPicker from '../../../components/MediaPicker.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -83,10 +84,7 @@ if (Astro.request.method === 'POST') {
     </div>
 
     <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-      <div>
-        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Gambar</label>
-        <input type="text" name="imageUrl" value={achievement?.imageUrl || ''} placeholder="https://... atau /uploads/..."/>
-      </div>
+      <MediaPicker field="imageUrl" value={achievement?.imageUrl || ''} label="Gambar" folder="prestasi" />
       <div>
         <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Urutan (Order)</label>
         <input type="number" name="order" value={achievement?.order ?? 0} min="0"/>

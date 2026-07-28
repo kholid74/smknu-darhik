@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MediaPicker from '../../../components/MediaPicker.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -57,10 +58,7 @@ if (Astro.request.method === 'POST') {
         <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Icon (Material Symbol)</label>
         <input type="text" name="icon" value={facility?.icon || ''} placeholder="computer, science, sports_soccer..."/>
       </div>
-      <div>
-        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Gambar</label>
-        <input type="text" name="imageUrl" value={facility?.imageUrl || ''} placeholder="https://... atau /uploads/..."/>
-      </div>
+      <MediaPicker field="imageUrl" value={facility?.imageUrl || ''} label="Gambar" folder="fasilitas" />
     </div>
 
     <div style="display:flex;gap:10px">

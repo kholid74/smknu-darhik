@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MediaPicker from '../../../components/MediaPicker.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -26,7 +27,7 @@ if (Astro.request.method === 'POST') {
   <form method="POST" style="max-width:600px">
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={item?.name||''} required/></div>
-      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Logo</label><input type="url" name="logoUrl" value={item?.logoUrl||''} placeholder="https://..."/></div>
+      <MediaPicker field="logoUrl" value={item?.logoUrl||''} label="Logo" folder="mitra" />
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Tipe</label><select name="type"><option value="">-</option><option value="Industri" selected={(item?.type==='Industri') || undefined}>Industri</option><option value="Institusi" selected={(item?.type==='Institusi') || undefined}>Institusi</option><option value="Pemerintah" selected={(item?.type==='Pemerintah') || undefined}>Pemerintah</option></select></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Urutan</label><input type="number" name="order" value={item?.order??0}/></div>
     </div>

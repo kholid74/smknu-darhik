@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MediaPicker from '../../../components/MediaPicker.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -57,10 +58,7 @@ if (Astro.request.method === 'POST') {
     </div>
 
     <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end">
-      <div>
-        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Foto</label>
-        <input type="text" name="photoUrl" value={testimonial?.photoUrl || ''} placeholder="https://... atau /uploads/..."/>
-      </div>
+      <MediaPicker field="photoUrl" value={testimonial?.photoUrl || ''} label="Foto" folder="testimoni" />
       <div style="padding-bottom:4px">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
           <input type="checkbox" name="verified" value="1" checked={testimonial?.verified ?? false} style="width:auto"/> Terverifikasi

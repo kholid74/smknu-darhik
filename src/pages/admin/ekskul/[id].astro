@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MediaPicker from '../../../components/MediaPicker.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -27,7 +28,7 @@ if (Astro.request.method === 'POST') {
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={item?.name||''} required/></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Deskripsi</label><textarea name="description" rows="4" style="resize:vertical">{item?.description||''}</textarea></div>
-      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Gambar</label><input type="url" name="imageUrl" value={item?.imageUrl||''} placeholder="https://..."/></div>
+      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar" folder="ekskul" />
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/ekskul" class="btn btn-outline">Batal</a></div>
   </form>

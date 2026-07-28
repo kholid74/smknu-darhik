@@ -12,8 +12,9 @@ interface Props {
   value?: string | null;
   label?: string;
   folder?: string;
+  required?: boolean;
 }
-const { field, value = '', label = 'Gambar', folder = 'uploads' } = Astro.props;
+const { field, value = '', label = 'Gambar', folder = 'uploads', required = false } = Astro.props;
 const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
 ---
 
@@ -32,7 +33,7 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
   </div>
 
   <div style="display:flex;gap:8px">
-    <input type="text" name={field} value={value} class="mp-input" placeholder="URL atau pilih dari pustaka" style="flex:1"/>
+    <input type="text" name={field} value={value} class="mp-input" placeholder="URL atau pilih dari pustaka" style="flex:1" required={required}/>
     <button type="button" class="btn btn-outline mp-open" style="white-space:nowrap"><span class="material-symbols-outlined" style="font-size:16px">photo_library</span> Pilih Gambar</button>
   </div>
 
@@ -141,7 +142,9 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
             btn.type = 'button';
             btn.className = 'mp-thumb';
             btn.title = it.filename;
-            btn.innerHTML = `<img src="${it.url}" alt="${it.filename}" loading="lazy"/>`;
+            // Request a small thumbnail for the grid; the saved value stays the full URL.
+            const thumb = it.url.startsWith('/api/image/') ? `${it.url}?w=200` : it.url;
+            btn.innerHTML = `<img src="${thumb}" alt="${it.filename}" loading="lazy"/>`;
             btn.addEventListener('click', () => { setValue(it.url); closeModal(); });
             grid.appendChild(btn);
           }
