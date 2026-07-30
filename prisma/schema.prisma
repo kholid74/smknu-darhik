@@ -124,6 +124,7 @@ model Announcement {
   id        String    @id @default(cuid())
   title     String
   body      String?
+  imageUrl  String? // set -> shows as homepage hero spotlight; empty -> text ribbon
   linkUrl   String?
   linkLabel String?
   active    Boolean   @default(true)

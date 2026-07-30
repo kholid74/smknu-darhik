@@ -1,6 +1,7 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MediaPicker from '../../../components/MediaPicker.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -15,7 +16,7 @@ if (id && id !== 'new' && !item) return Astro.redirect('/admin/pengumuman?saved=
 
 if (Astro.request.method === 'POST') {
   const data = await Astro.request.formData();
-  const record: any = { title: data.get('title')?.toString() || '', body: data.get('body')?.toString() || null, linkUrl: data.get('linkUrl')?.toString() || null, linkLabel: data.get('linkLabel')?.toString() || null, active: data.get('active') === '1' };
+  const record: any = { title: data.get('title')?.toString() || '', body: data.get('body')?.toString() || null, imageUrl: data.get('imageUrl')?.toString() || null, linkUrl: data.get('linkUrl')?.toString() || null, linkLabel: data.get('linkLabel')?.toString() || null, active: data.get('active') === '1' };
   const expiresAtRaw = data.get('expiresAt')?.toString();
   if (expiresAtRaw) record.expiresAt = new Date(expiresAtRaw);
   else record.expiresAt = null;
@@ -36,6 +37,8 @@ function toDatetimeLocal(d: Date | null | undefined): string {
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul *</label><input type="text" name="title" value={item?.title||''} required/></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Isi</label><textarea name="body" rows="8" style="resize:vertical">{item?.body||''}</textarea></div>
+      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar Sorotan (opsional)" folder="pengumuman" />
+      <p style="font-size:12px;color:#64748b;margin-top:-6px">Isi gambar → tampil sebagai <strong>hero sorotan</strong> di beranda. Kosongkan → tampil sebagai <strong>ribbon teks</strong> tipis di atas beranda.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Link</label><input type="url" name="linkUrl" value={item?.linkUrl||''} placeholder="https://..."/></div>
         <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Label Link</label><input type="text" name="linkLabel" value={item?.linkLabel||''} placeholder="Selengkapnya"/></div>
