@@ -1,6 +1,16 @@
 ---
+export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
+import { db } from '../lib/prisma';
+
+const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${url}?w=${w}` : url);
+const partners = await db.partner.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }] });
+const typeIcon: Record<string, string> = {
+  Industri: 'factory',
+  Institusi: 'account_balance',
+  Pemerintah: 'apartment',
+};
 ---
 
 <BaseLayout title="PKL / Magang" description={`Program Praktik Kerja Lapangan (PKL) di ${site.name} — latar belakang, tujuan, syarat, dan mitra DU-DI.`}>
@@ -111,28 +121,32 @@ import { site } from '../data/site';
         <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-6">Mitra DU-DI</h2>
         <p class="text-sm md:text-base text-[#3f493f] mb-8 leading-relaxed">Berikut beberapa mitra dunia usaha dan dunia industri yang telah bekerja sama dengan {site.shortName} untuk program PKL:</p>
 
-        <div class="grid sm:grid-cols-2 gap-4">
-          {[
-            { name: 'Bank Syariah Indonesia', bidang: 'Perbankan', icon: 'account_balance', color: 'bg-emerald-50 text-emerald-600' },
-            { name: 'BMT NU Jawa Timur', bidang: 'Keuangan Mikro', icon: 'savings', color: 'bg-teal-50 text-teal-600' },
-            { name: 'Percetakan & Desain Grafis', bidang: 'Multimedia', icon: 'print', color: 'bg-amber-50 text-amber-600' },
-            { name: 'Studio Foto Lokal', bidang: 'Fotografi', icon: 'photo_camera', color: 'bg-rose-50 text-rose-600' },
-            { name: 'Koperasi Syariah', bidang: 'Perbankan', icon: 'group_work', color: 'bg-indigo-50 text-indigo-600' },
-            { name: 'Digital Agency Lokal', bidang: 'Multimedia', icon: 'globe', color: 'bg-violet-50 text-violet-600' },
-          ].map(m => (
-            <div class="flex items-center gap-4 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4 hover:shadow-[0_8px_24px_rgba(27,122,61,0.08)] transition-shadow">
-              <div class={`w-10 h-10 rounded-lg ${m.color} flex items-center justify-center flex-shrink-0`}>
-                <span class="material-symbols-outlined text-lg">{m.icon}</span>
+        {partners.length === 0 ? (
+          <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-8 text-center text-[#6f7a6e]">
+            <span class="material-symbols-outlined text-4xl mb-2 text-[#1B7A3D]/40">handshake</span>
+            <p class="text-sm">Data mitra belum tersedia. Tambahkan lewat panel admin.</p>
+          </div>
+        ) : (
+          <div class="grid sm:grid-cols-2 gap-4">
+            {partners.map(m => (
+              <div class="flex items-center gap-4 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4 hover:shadow-[0_8px_24px_rgba(27,122,61,0.08)] transition-shadow">
+                {m.logoUrl ? (
+                  <div class="w-12 h-12 rounded-lg bg-[#f0f7f1] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <img class="w-full h-full object-contain" src={thumb(m.logoUrl, 96)} alt={m.name} loading="lazy" onerror="this.style.display='none'"/>
+                  </div>
+                ) : (
+                  <div class="w-12 h-12 rounded-lg bg-[#f0f7f1] text-[#1B7A3D] flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-lg">{typeIcon[m.type || ''] || 'business'}</span>
+                  </div>
+                )}
+                <div class="min-w-0">
+                  <h4 class="font-bold text-sm text-[#1c1b1b] truncate">{m.name}</h4>
+                  {m.type && <p class="text-xs text-[#6f7a6e]">{m.type}</p>}
+                </div>
               </div>
-              <div class="min-w-0">
-                <h4 class="font-bold text-sm text-[#1c1b1b] truncate">{m.name}</h4>
-                <p class="text-xs text-[#6f7a6e]">{m.bidang}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <p class="text-xs text-[#6f7a6e] italic mt-6">[data mitra perlu dikonfirmasi ke sekolah — masih placeholder]</p>
+            ))}
+          </div>
+        )}
       </div>
 
     </div>
