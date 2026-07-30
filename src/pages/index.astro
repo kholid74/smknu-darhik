@@ -21,6 +21,15 @@ const news = await db.article.findMany({
 const fmtDate = (d: Date) =>
   new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(d);
 const [lead, ...rest] = news;
+
+// Prestasi unggulan: featured dulu, kalau kurang dari 3 dilengkapi dari sisanya
+const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${url}?w=${w}` : url);
+const featuredAch = await db.achievement.findMany({ where: { featured: true }, orderBy: [{ order: 'asc' }, { year: 'desc' }], take: 3 });
+let achievements = featuredAch;
+if (achievements.length < 3) {
+  const fill = await db.achievement.findMany({ where: { id: { notIn: featuredAch.map((a) => a.id) } }, orderBy: [{ order: 'asc' }, { year: 'desc' }], take: 3 - achievements.length });
+  achievements = [...achievements, ...fill];
+}
 ---
 
 <BaseLayout title="Beranda" description="Sekolah kejuruan berbasis nilai Islam di Karanggeneng Lamongan — terampil, beriman, siap kerja.">
@@ -181,6 +190,7 @@ const [lead, ...rest] = news;
 </section>
 
 <!-- PRESTASI — card dengan foto siswa -->
+{achievements.length > 0 && (
 <section class="relative bg-green-deep text-white overflow-hidden">
   <svg class="absolute bottom-0 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] text-white/5 pointer-events-none" viewBox="0 0 100 100" fill="none" aria-hidden="true">
     <path d="M50 5 L61 39 L95 39 L67 60 L78 95 L50 74 L22 95 L33 60 L5 39 L39 39 Z" stroke="currentColor" stroke-width="0.7"/>
@@ -196,42 +206,23 @@ const [lead, ...rest] = news;
     </div>
 
     <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-5">
-      <!-- Prestasi 1 -->
-      <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10">
-        <div class="aspect-[4/3] overflow-hidden">
-          <img class="w-full h-full object-cover" src="/assets/prestasi-1.png" alt="Siswa juara LKS" loading="lazy" onerror="this.style.display='none'"/>
+      {achievements.map(a => (
+        <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10 flex flex-col">
+          <div class="aspect-[4/3] overflow-hidden bg-white/5 relative">
+            {a.imageUrl ? (
+              <img class="w-full h-full object-cover" src={thumb(a.imageUrl, 500)} alt={a.title} loading="lazy" onerror="this.style.display='none'"/>
+            ) : (
+              <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-5xl text-gold/50">emoji_events</span></div>
+            )}
+            <span class="absolute top-3 left-3 bg-gold text-white text-[11px] font-bold px-2.5 py-1 rounded-full">{a.level}</span>
+          </div>
+          <div class="p-5 flex flex-col flex-1">
+            <h3 class="font-bold text-base mb-1 [overflow-wrap:anywhere]">{a.title}</h3>
+            {a.description && <p class="text-white/70 text-sm leading-relaxed">{a.description}</p>}
+            <p class="text-xs text-white/40 mt-2">{[a.student, a.year].filter(Boolean).join(' · ')}</p>
+          </div>
         </div>
-        <div class="p-5">
-          <div class="text-2xl mb-2">🏆</div>
-          <h3 class="font-bold text-base mb-1">Juara 1 LKS Kabupaten</h3>
-          <p class="text-white/70 text-sm leading-relaxed">Bidang Akuntansi & Keuangan tingkat Kabupaten Lamongan.</p>
-          <p class="text-xs text-white/40 mt-2">[nama siswa · tahun — perlu dikonfirmasi]</p>
-        </div>
-      </div>
-      <!-- Prestasi 2 -->
-      <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10">
-        <div class="aspect-[4/3] overflow-hidden">
-          <img class="w-full h-full object-cover" src="/assets/prestasi-2.png" alt="Siswa MTQ" loading="lazy" onerror="this.style.display='none'"/>
-        </div>
-        <div class="p-5">
-          <div class="text-2xl mb-2">🥇</div>
-          <h3 class="font-bold text-base mb-1">MTQ Pelajar Tingkat Provinsi</h3>
-          <p class="text-white/70 text-sm leading-relaxed">Peringkat 3 Musabaqah Tilawatil Quran antar sekolah kejuruan se-Jawa Timur.</p>
-          <p class="text-xs text-white/40 mt-2">[nama siswa · tahun — perlu dikonfirmasi]</p>
-        </div>
-      </div>
-      <!-- Prestasi 3 -->
-      <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10">
-        <div class="aspect-[4/3] overflow-hidden">
-          <img class="w-full h-full object-cover" src="/assets/prestasi-3.png" alt="Karya DKV" loading="lazy" onerror="this.style.display='none'"/>
-        </div>
-        <div class="p-5">
-          <div class="text-2xl mb-2">🌟</div>
-          <h3 class="font-bold text-base mb-1">Karya DKV Terbaik</h3>
-          <p class="text-white/70 text-sm leading-relaxed">Film pendek karya siswa masuk nominasi festival pelajar tingkat provinsi.</p>
-          <p class="text-xs text-white/40 mt-2">[tim · tahun — perlu dikonfirmasi]</p>
-        </div>
-      </div>
+      ))}
     </div>
 
     <div class="mt-8 text-center sm:hidden">
@@ -239,6 +230,7 @@ const [lead, ...rest] = news;
     </div>
   </div>
 </section>
+)}
 
 <!-- KEGIATAN TERBARU -->
 {news.length > 0 && (
