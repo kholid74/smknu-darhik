@@ -11,6 +11,16 @@ const anns = await db.announcement.findMany({
 });
 const spotlight = anns.find((a) => a.imageUrl);
 const ribbon = anns.find((a) => !a.imageUrl);
+
+// Berita/kegiatan terbaru
+const news = await db.article.findMany({
+  where: { published: true },
+  orderBy: { createdAt: 'desc' },
+  take: 3,
+});
+const fmtDate = (d: Date) =>
+  new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(d);
+const [lead, ...rest] = news;
 ---
 
 <BaseLayout title="Beranda" description="Sekolah kejuruan berbasis nilai Islam di Karanggeneng Lamongan — terampil, beriman, siap kerja.">
@@ -231,29 +241,35 @@ const ribbon = anns.find((a) => !a.imageUrl);
 </section>
 
 <!-- KEGIATAN TERBARU -->
+{news.length > 0 && (
 <section class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
   <div class="flex items-end justify-between gap-4 mb-8">
     <div><span class="rule-mark mb-5"></span><h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-ink">Kegiatan Terbaru</h2></div>
     <a href="/berita" class="hidden sm:inline-flex items-center gap-1 text-green-deep font-semibold text-sm hover:gap-2 transition-all whitespace-nowrap">Lihat semua <span class="material-symbols-outlined text-base">arrow_forward</span></a>
   </div>
   <div class="grid lg:grid-cols-2 gap-6">
-    <a href="/berita" class="sink block bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline">
-      <div class="aspect-[16/9] overflow-hidden"><img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1559027617705-36b81b498221?w=800&q=80" alt="Bakti sosial Ramadhan" loading="lazy" onerror="this.style.display='none'"/></div>
-      <div class="p-6"><span class="text-xs font-semibold text-gold-deep">15 Mei 2025</span><h3 class="font-bold text-lg mt-2 mb-2 text-ink">Kegiatan Bakti Sosial Ramadhan 1446 H</h3><p class="text-sm text-muted leading-relaxed">Siswa-siswi membagikan sembako kepada warga sekitar sekolah sebagai bagian pembelajaran kepedulian sosial.</p></div>
+    <a href={`/berita/${lead.slug}`} class="sink block bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline">
+      <div class="aspect-[16/9] overflow-hidden bg-green-light">
+        {lead.imageUrl && <img class="w-full h-full object-cover" src={lead.imageUrl} alt={lead.title} loading="lazy" onerror="this.style.display='none'"/>}
+      </div>
+      <div class="p-6"><span class="text-xs font-semibold text-gold-deep">{fmtDate(lead.createdAt)}</span><h3 class="font-bold text-lg mt-2 mb-2 text-ink [overflow-wrap:anywhere]">{lead.title}</h3>{lead.excerpt && <p class="text-sm text-muted leading-relaxed line-clamp-3">{lead.excerpt}</p>}</div>
     </a>
+    {rest.length > 0 && (
     <div class="flex flex-col gap-6">
-      <a href="/berita" class="sink flex gap-4 bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline p-3">
-        <div class="w-28 sm:w-36 flex-shrink-0 rounded-xl overflow-hidden aspect-square"><img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1530049470-ebf6a518ea8b?w=400&q=80" alt="Workshop desain grafis" loading="lazy" onerror="this.style.display='none'"/></div>
-        <div class="min-w-0 py-1 pr-2"><span class="text-xs font-semibold text-gold-deep">02 Juni 2025</span><h3 class="font-bold text-sm sm:text-base mt-1 mb-1 text-ink">Workshop Desain Grafis Bareng Praktisi</h3><p class="text-xs sm:text-sm text-muted leading-relaxed line-clamp-2">Siswa Multimedia belajar teknik desain terkini langsung dari praktisi industri kreatif Lamongan.</p></div>
+      {rest.map((a) => (
+      <a href={`/berita/${a.slug}`} class="sink flex gap-4 bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline p-3">
+        <div class="w-28 sm:w-36 flex-shrink-0 rounded-xl overflow-hidden aspect-square bg-green-light">
+          {a.imageUrl && <img class="w-full h-full object-cover" src={a.imageUrl} alt={a.title} loading="lazy" onerror="this.style.display='none'"/>}
+        </div>
+        <div class="min-w-0 py-1 pr-2"><span class="text-xs font-semibold text-gold-deep">{fmtDate(a.createdAt)}</span><h3 class="font-bold text-sm sm:text-base mt-1 mb-1 text-ink [overflow-wrap:anywhere]">{a.title}</h3>{a.excerpt && <p class="text-xs sm:text-sm text-muted leading-relaxed line-clamp-2">{a.excerpt}</p>}</div>
       </a>
-      <a href="/berita" class="sink flex gap-4 bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline p-3">
-        <div class="w-28 sm:w-36 flex-shrink-0 rounded-xl overflow-hidden aspect-square"><img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1492725764893-90b379c2b6e7?w=400&q=80" alt="Lomba film pendek" loading="lazy" onerror="this.style.display='none'"/></div>
-        <div class="min-w-0 py-1 pr-2"><span class="text-xs font-semibold text-gold-deep">20 Juni 2025</span><h3 class="font-bold text-sm sm:text-base mt-1 mb-1 text-ink">Juara Lomba Film Pendek Pelajar</h3><p class="text-xs sm:text-sm text-muted leading-relaxed line-clamp-2">Tim jurnalistik sekolah meraih juara dalam kompetisi film pendek tingkat Kabupaten Lamongan.</p></div>
-      </a>
+      ))}
     </div>
+    )}
   </div>
   <div class="mt-8 sm:hidden"><a href="/berita" class="inline-flex items-center gap-1 text-green-deep font-semibold text-sm">Lihat semua berita <span class="material-symbols-outlined text-base">arrow_forward</span></a></div>
 </section>
+)}
 
 <!-- DHTV HIGHLIGHT -->
 <section class="relative bg-green-deep text-white overflow-hidden">
