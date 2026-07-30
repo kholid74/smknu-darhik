@@ -1,0 +1,44 @@
+---
+export const prerender = false;
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const id = data.get('id')?.toString();
+  if (id) {
+    const src = await db.article.findUnique({ where: { id } });
+    if (src) {
+      // Slug unik: base-salinan, base-salinan-2, dst.
+      const base = `${src.slug}-salinan`;
+      let slug = base;
+      let n = 1;
+      while (await db.article.findUnique({ where: { slug } })) {
+        n += 1;
+        slug = `${base}-${n}`;
+      }
+      const copy = await db.article.create({
+        data: {
+          slug,
+          title: `${src.title} (Salinan)`,
+          excerpt: src.excerpt,
+          body: src.body,
+          category: src.category,
+          imageUrl: src.imageUrl,
+          published: false, // salinan mulai sebagai draft
+          featured: false, // hindari dua artikel featured sekaligus
+        },
+      });
+      return Astro.redirect(`/admin/artikel/${copy.id}`);
+    }
+  }
+}
+
+return Astro.redirect('/admin/artikel');
+---
+<html></html>

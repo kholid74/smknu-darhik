@@ -60,7 +60,7 @@ const catBadge: Record<string, string> = {
           <th>Kategori</th>
           <th>Status</th>
           <th>Tanggal</th>
-          <th style="width:80px"></th>
+          <th style="width:120px"></th>
         </tr>
       </thead>
       <tbody>
@@ -76,7 +76,11 @@ const catBadge: Record<string, string> = {
             <td style="font-size:12px;color:#6f7a6e">{new Date(a.createdAt).toLocaleDateString('id')}</td>
             <td>
               <div style="display:flex;gap:4px">
-                <a href={`/admin/artikel/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
+                <a href={`/admin/artikel/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px" title="Edit"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
+                <form method="POST" action="/admin/artikel/clone" style="display:inline">
+                  <input type="hidden" name="id" value={a.id}/>
+                  <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px" title="Duplikat artikel"><span class="material-symbols-outlined" style="font-size:16px">content_copy</span></button>
+                </form>
                 <form method="POST" action="/admin/artikel/delete" style="display:inline">
                   <input type="hidden" name="id" value={a.id}/>
                   <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button>
