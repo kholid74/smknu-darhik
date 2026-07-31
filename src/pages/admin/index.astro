@@ -10,22 +10,26 @@ if (!token) return Astro.redirect('/admin/login');
 const session = await verifyToken(token);
 if (!session) return Astro.redirect('/admin/login');
 
-const [articleCount, deptCount, teacherCount, achievementCount] = await Promise.all([
-  db.article.count(),
-  db.department.count(),
-  db.teacher.count(),
-  db.achievement.count(),
+// ─── Counts (KPI + ringkasan) ───
+const [
+  alumniTotal, alumniVerified, articleCount, achievementCount, teacherCount, deptCount,
+  facilityCount, ekskulCount, partnerCount, testimonialCount, downloadCount, galleryCount, faqCount,
+] = await Promise.all([
+  db.alumni.count(), db.alumni.count({ where: { verified: true } }),
+  db.article.count(), db.achievement.count(), db.teacher.count(), db.department.count(),
+  db.facility.count(), db.extracurricular.count(), db.partner.count(), db.testimonial.count(),
+  db.download.count(), db.galleryImage.count(), db.faq.count(),
+]);
+const alumniPending = alumniTotal - alumniVerified;
+
+// ─── Alumni ───
+const [alByAngkatan, alByStatus, alByJurusan] = await Promise.all([
+  db.alumni.groupBy({ by: ['angkatan'], _count: { _all: true }, orderBy: { angkatan: 'asc' } }),
+  db.alumni.groupBy({ by: ['status'], _count: { _all: true } }),
+  db.alumni.groupBy({ by: ['jurusan'], _count: { _all: true } }),
 ]);
 
-const stats = [
-  { label: 'Artikel', value: articleCount, icon: 'article' },
-  { label: 'Jurusan', value: deptCount, icon: 'school' },
-  { label: 'Guru & Staf', value: teacherCount, icon: 'group' },
-  { label: 'Prestasi', value: achievementCount, icon: 'emoji_events' },
-];
-
-// --- Chart data (real, from Prisma) ---
-// Article count over the last 6 months.
+// ─── Artikel ───
 const now = new Date();
 const months = Array.from({ length: 6 }, (_, i) => {
   const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
@@ -38,67 +42,164 @@ for (const a of recentForTrend) {
   const m = months.find((x) => x.key === `${d.getFullYear()}-${d.getMonth()}`);
   if (m) m.count++;
 }
+const [byCat, publishedCount] = await Promise.all([
+  db.article.groupBy({ by: ['category'], _count: { _all: true } }),
+  db.article.count({ where: { published: true } }),
+]);
+const draftCount = articleCount - publishedCount;
 
-// Article distribution by category.
-const byCat = await db.article.groupBy({ by: ['category'], _count: { _all: true } });
-const catLabels = byCat.map((c) => c.category);
-const catData = byCat.map((c) => c._count._all);
+// ─── Prestasi ───
+const [achByLevel, achByYear] = await Promise.all([
+  db.achievement.groupBy({ by: ['level'], _count: { _all: true } }),
+  db.achievement.groupBy({ by: ['year'], _count: { _all: true }, orderBy: { year: 'asc' } }),
+]);
 
-// Recent activity.
-const recent = await db.article.findMany({
-  orderBy: { createdAt: 'desc' },
-  take: 6,
-  select: { id: true, title: true, category: true, createdAt: true, published: true },
-});
+// ─── Guru ───
+const teacherByLevel = await db.teacher.groupBy({ by: ['level'], _count: { _all: true } });
 
-const catBadge: Record<string, string> = {
-  Prestasi: 'badge-green', Keagamaan: 'badge-gold', Akademik: 'badge-green',
-  Ekstrakurikuler: 'badge-gold', PPDB: 'badge-green',
-};
+// ─── Recent activity ───
+const recent = await db.article.findMany({ orderBy: { createdAt: 'desc' }, take: 6, select: { id: true, title: true, createdAt: true, published: true } });
+
+const kpis = [
+  { label: 'Alumni', value: alumniTotal, icon: 'diversity_3', href: '/admin/alumni' },
+  { label: 'Artikel', value: articleCount, icon: 'article', href: '/admin/artikel' },
+  { label: 'Prestasi', value: achievementCount, icon: 'emoji_events', href: '/admin/prestasi' },
+  { label: 'Guru & Staf', value: teacherCount, icon: 'group', href: '/admin/guru' },
+  { label: 'Jurusan', value: deptCount, icon: 'school', href: '/admin/jurusan' },
+  { label: 'Mitra', value: partnerCount, icon: 'handshake', href: '/admin/mitra' },
+];
+const ringkasan = [
+  { label: 'Fasilitas', value: facilityCount, icon: 'meeting_room', href: '/admin/fasilitas' },
+  { label: 'Ekstrakurikuler', value: ekskulCount, icon: 'sports_soccer', href: '/admin/ekskul' },
+  { label: 'Mitra Industri', value: partnerCount, icon: 'handshake', href: '/admin/mitra' },
+  { label: 'Testimoni', value: testimonialCount, icon: 'reviews', href: '/admin/testimoni' },
+  { label: 'Download', value: downloadCount, icon: 'download', href: '/admin/download' },
+  { label: 'Galeri Foto', value: galleryCount, icon: 'photo_library', href: '/admin/galeri' },
+  { label: 'FAQ', value: faqCount, icon: 'help', href: '/admin/faq' },
+];
 ---
 
 <AdminLayout title="Dashboard" user={{ role: session.role }}>
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px">
-    {stats.map(s => (
-      <div class="card" style="display:flex;align-items:center;gap:14px">
-        <span class="material-symbols-outlined" style="font-size:32px;color:#1B7A3D;background:#e8f5e9;padding:12px;border-radius:12px">{s.icon}</span>
+  <!-- Ringkasan KPI -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+    {kpis.map(s => (
+      <a href={s.href} class="card" style="display:flex;align-items:center;gap:14px;color:inherit;text-decoration:none">
+        <span class="material-symbols-outlined" style="font-size:30px;color:#1B7A3D;background:#e8f5e9;padding:12px;border-radius:12px">{s.icon}</span>
         <div>
-          <div style="font-size:28px;font-weight:800">{s.value}</div>
+          <div style="font-size:26px;font-weight:800">{s.value}</div>
           <div style="font-size:13px;color:var(--color-muted)">{s.label}</div>
         </div>
-      </div>
+      </a>
     ))}
   </div>
 
-  <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px">
-    <ChartCard
-      title="Artikel per Bulan"
-      subtitle="6 bulan terakhir"
-      type="bar"
+  <!-- SECTION 1: ALUMNI -->
+  <div class="dash-section">
+    <span class="material-symbols-outlined">diversity_3</span>
+    <h2>Statistik Alumni</h2>
+    <span class="dash-meta">{alumniVerified} terverifikasi · {alumniPending} menunggu</span>
+  </div>
+  {alumniTotal === 0 ? (
+    <div class="card dash-empty">Belum ada data alumni.</div>
+  ) : (
+    <div class="dash-grid-2">
+      <ChartCard title="Alumni per Angkatan" subtitle="Tahun lulus" type="bar"
+        series={[{ name: 'Alumni', data: alByAngkatan.map(r => r._count._all) }]}
+        categories={alByAngkatan.map(r => String(r.angkatan))} height={280} />
+      <ChartCard title="Status Alumni" subtitle={`${alumniTotal} total`} type="donut"
+        series={alByStatus.map(r => r._count._all)} labels={alByStatus.map(r => r.status)} height={280} />
+      <ChartCard title="Alumni per Jurusan" subtitle="Sebaran program keahlian" type="donut"
+        series={alByJurusan.map(r => r._count._all)} labels={alByJurusan.map(r => r.jurusan)} height={280} />
+      <ChartCard title="Status Verifikasi" subtitle="Publik vs antrian" type="donut"
+        series={[alumniVerified, alumniPending]} labels={['Terverifikasi', 'Menunggu']} height={280} />
+    </div>
+  )}
+
+  <!-- SECTION 2: KONTEN -->
+  <div class="dash-section">
+    <span class="material-symbols-outlined">article</span>
+    <h2>Statistik Konten</h2>
+    <span class="dash-meta">{publishedCount} publish · {draftCount} draft</span>
+  </div>
+  <div class="dash-grid-2">
+    <ChartCard title="Artikel per Bulan" subtitle="6 bulan terakhir" type="bar"
       series={[{ name: 'Artikel', data: months.map(m => m.count) }]}
-      categories={months.map(m => m.label)}
-      height={300}
-    />
-    {catData.length > 0 ? (
-      <ChartCard
-        title="Distribusi Kategori"
-        subtitle={`${articleCount} artikel total`}
-        type="donut"
-        series={catData}
-        labels={catLabels}
-        height={300}
-      />
+      categories={months.map(m => m.label)} height={280} />
+    {byCat.length > 0 ? (
+      <ChartCard title="Distribusi Kategori" subtitle={`${articleCount} artikel`} type="donut"
+        series={byCat.map(c => c._count._all)} labels={byCat.map(c => c.category)} height={280} />
     ) : (
-      <div class="card" style="display:flex;align-items:center;justify-content:center;color:var(--color-muted);font-size:13px;text-align:center;min-height:200px">
-        Belum ada artikel untuk ditampilkan.
-      </div>
+      <div class="card dash-empty">Belum ada artikel.</div>
     )}
   </div>
 
-  <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px">
+  <!-- SECTION 3: PRESTASI -->
+  <div class="dash-section">
+    <span class="material-symbols-outlined">emoji_events</span>
+    <h2>Statistik Prestasi</h2>
+    <span class="dash-meta">{achievementCount} prestasi</span>
+  </div>
+  {achievementCount === 0 ? (
+    <div class="card dash-empty">Belum ada data prestasi.</div>
+  ) : (
+    <div class="dash-grid-2">
+      <ChartCard title="Prestasi per Tingkat" subtitle="Kabupaten / Provinsi / Nasional" type="donut"
+        series={achByLevel.map(r => r._count._all)} labels={achByLevel.map(r => r.level)} height={280} />
+      <ChartCard title="Prestasi per Tahun" subtitle="Riwayat raihan" type="bar"
+        series={[{ name: 'Prestasi', data: achByYear.map(r => r._count._all) }]}
+        categories={achByYear.map(r => r.year)} height={280} />
+    </div>
+  )}
+
+  <!-- SECTION 4: GURU -->
+  <div class="dash-section">
+    <span class="material-symbols-outlined">group</span>
+    <h2>Statistik Guru & Staf</h2>
+    <span class="dash-meta">{teacherCount} orang</span>
+  </div>
+  {teacherCount === 0 ? (
+    <div class="card dash-empty">Belum ada data guru.</div>
+  ) : (
+    <div class="dash-grid-2">
+      <ChartCard title="Guru & Staf per Jabatan" subtitle="Sebaran level" type="bar"
+        series={[{ name: 'Orang', data: teacherByLevel.map(r => r._count._all) }]}
+        categories={teacherByLevel.map(r => r.level)} height={280} />
+      <div class="card" style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+        {teacherByLevel.map(r => (
+          <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.05)">
+            <span style="color:var(--color-muted)">{r.level}</span><strong>{r._count._all}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <!-- SECTION 5: RINGKASAN SEKOLAH -->
+  <div class="dash-section">
+    <span class="material-symbols-outlined">dashboard</span>
+    <h2>Ringkasan Sekolah</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px">
+    {ringkasan.map(s => (
+      <a href={s.href} class="card" style="display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none">
+        <span class="material-symbols-outlined" style="font-size:24px;color:#1B7A3D;background:#e8f5e9;padding:10px;border-radius:10px">{s.icon}</span>
+        <div>
+          <div style="font-size:22px;font-weight:800">{s.value}</div>
+          <div style="font-size:12px;color:var(--color-muted)">{s.label}</div>
+        </div>
+      </a>
+    ))}
+  </div>
+
+  <!-- Aktivitas + pintasan -->
+  <div class="dash-section">
+    <span class="material-symbols-outlined">history</span>
+    <h2>Aktivitas & Pintasan</h2>
+  </div>
+  <div class="dash-grid-2">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h3 style="font-size:15px;font-weight:700">Aktivitas Terbaru</h3>
+        <h3 style="font-size:15px;font-weight:700">Artikel Terbaru</h3>
         <a href="/admin/artikel" style="font-size:12px;font-weight:600">Lihat semua</a>
       </div>
       {recent.length === 0 ? (
@@ -118,15 +219,24 @@ const catBadge: Record<string, string> = {
         </div>
       )}
     </div>
-
     <div class="card">
       <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">Pintasan</h3>
       <div style="display:flex;flex-direction:column;gap:8px">
         <a href="/admin/artikel/new" class="btn btn-primary" style="justify-content:flex-start"><span class="material-symbols-outlined">add</span> Tulis Artikel</a>
+        <a href="/admin/alumni" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">diversity_3</span> Kelola Alumni</a>
         <a href="/admin/galeri" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">add_photo_alternate</span> Upload Foto</a>
-        <a href="/admin/pengaturan" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">settings</span> Pengaturan</a>
         <a href="/" target="_blank" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">open_in_new</span> Lihat Website</a>
       </div>
     </div>
   </div>
 </AdminLayout>
+
+<style>
+  .dash-section { display:flex; align-items:center; gap:10px; margin:30px 0 14px; padding-bottom:10px; border-bottom:2px solid rgba(27,122,61,.12); }
+  .dash-section .material-symbols-outlined { color:#1B7A3D; font-size:22px; }
+  .dash-section h2 { font-size:17px; font-weight:800; margin:0; }
+  .dash-section .dash-meta { margin-left:auto; font-size:12px; color:var(--color-muted); font-weight:600; }
+  .dash-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .dash-empty { display:flex; align-items:center; justify-content:center; color:var(--color-muted); font-size:13px; text-align:center; min-height:160px; }
+  @media (max-width:768px) { .dash-grid-2 { grid-template-columns:1fr; } .dash-section .dash-meta { display:none; } }
+</style>
