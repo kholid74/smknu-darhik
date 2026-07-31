@@ -9,15 +9,26 @@ const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${ur
 const url = new URL(Astro.request.url);
 const fJurusan = url.searchParams.get('jurusan') || '';
 const fAngkatan = url.searchParams.get('angkatan') || '';
+const page = Math.max(1, parseInt(url.searchParams.get('page') || '1') || 1);
+const limit = 24;
 
 const where: any = { verified: true };
 if (fJurusan) where.jurusan = fJurusan;
 if (fAngkatan) where.angkatan = parseInt(fAngkatan) || undefined;
 
-const [alumni, totalVerified] = await Promise.all([
-  db.alumni.findMany({ where, orderBy: [{ angkatan: 'desc' }, { nama: 'asc' }] }),
+const [alumni, matchCount, totalVerified] = await Promise.all([
+  db.alumni.findMany({ where, orderBy: [{ angkatan: 'desc' }, { nama: 'asc' }], skip: (page - 1) * limit, take: limit }),
+  db.alumni.count({ where }),
   db.alumni.count({ where: { verified: true } }),
 ]);
+const totalPages = Math.ceil(matchCount / limit);
+const qs = (p: number) => {
+  const s = new URLSearchParams();
+  if (fJurusan) s.set('jurusan', fJurusan);
+  if (fAngkatan) s.set('angkatan', fAngkatan);
+  s.set('page', String(p));
+  return `?${s.toString()}`;
+};
 
 // Pilihan filter dari data terverifikasi
 const verifiedAll = await db.alumni.findMany({ where: { verified: true }, select: { jurusan: true, angkatan: true, status: true } });
@@ -118,6 +129,24 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
         </div>
       ))}
     </div>
+  )}
+
+  {totalPages > 1 && (
+    <nav class="flex justify-center items-center gap-1.5 mt-10" aria-label="Navigasi halaman">
+      {page > 1 && (
+        <a href={qs(page - 1)} class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-black/10 text-[#1c1b1b] hover:bg-[#f0f7f1] transition-colors" aria-label="Sebelumnya"><span class="material-symbols-outlined text-lg">chevron_left</span></a>
+      )}
+      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+        <a href={qs(p)} class={`inline-flex items-center justify-center min-w-10 h-10 px-3 rounded-lg text-sm font-semibold transition-colors ${p === page ? 'bg-[#1B7A3D] text-white' : 'border border-black/10 text-[#1c1b1b] hover:bg-[#f0f7f1]'}`}>{p}</a>
+      ))}
+      {page < totalPages && (
+        <a href={qs(page + 1)} class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-black/10 text-[#1c1b1b] hover:bg-[#f0f7f1] transition-colors" aria-label="Berikutnya"><span class="material-symbols-outlined text-lg">chevron_right</span></a>
+      )}
+    </nav>
+  )}
+
+  {matchCount > 0 && (
+    <p class="text-center text-xs text-[#6f7a6e] mt-5">Menampilkan {(page - 1) * limit + 1}–{Math.min(page * limit, matchCount)} dari {matchCount} alumni</p>
   )}
 </section>
 
