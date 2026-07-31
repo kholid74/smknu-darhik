@@ -121,10 +121,7 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
             <td>
               <div style="display:flex;gap:4px">
                 {!a.verified && (
-                  <form method="POST" action="/admin/alumni/verify" style="display:inline">
-                    <input type="hidden" name="id" value={a.id}/>
-                    <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#16a34a" title="Setujui & tampilkan"><span class="material-symbols-outlined" style="font-size:16px">check_circle</span></button>
-                  </form>
+                  <button type="button" class="btn btn-outline js-approve" data-id={a.id} data-nama={a.nama} style="padding:6px 10px;font-size:11px;color:#16a34a" title="Setujui & tampilkan"><span class="material-symbols-outlined" style="font-size:16px">check_circle</span></button>
                 )}
                 <a href={`/admin/alumni/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px" title="Edit"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
                 <form method="POST" action="/admin/alumni/delete" style="display:inline">
@@ -148,6 +145,21 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
   )}
 
   <p style="font-size:12px;color:#6f7a6e;margin-top:12px">Total: {total} alumni</p>
+
+  <div id="approve-modal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="approve-title">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span class="material-symbols-outlined" style="color:#16a34a;font-size:24px">check_circle</span>
+        <h3 id="approve-title" style="font-size:16px;font-weight:800;margin:0">Setujui Alumni?</h3>
+      </div>
+      <p style="font-size:13px;color:#5a6459;line-height:1.5;margin-bottom:18px"><strong id="approve-nama" style="color:#1c1b1b"></strong> akan <strong>terverifikasi</strong> dan tampil publik di direktori alumni.</p>
+      <form method="POST" action="/admin/alumni/verify" style="display:flex;gap:10px;justify-content:flex-end">
+        <input type="hidden" name="id" id="approve-id"/>
+        <button type="button" class="btn btn-outline js-approve-cancel">Batal</button>
+        <button type="submit" class="btn btn-primary" style="background:#16a34a;border-color:#16a34a"><span class="material-symbols-outlined" style="font-size:16px">check</span> Setujui</button>
+      </form>
+    </div>
+  </div>
 </AdminLayout>
 
 <style>
@@ -156,4 +168,26 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
   .th-sort .material-symbols-outlined { font-size:15px; opacity:.35; }
   .th-sort[data-active] { color:#1B7A3D; }
   .th-sort[data-active] .material-symbols-outlined { opacity:1; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px; }
+  .modal-overlay[hidden] { display:none; }
+  .modal-card { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
 </style>
+
+<script>
+  const modal = document.getElementById('approve-modal');
+  const nameEl = document.getElementById('approve-nama');
+  const idEl = document.getElementById('approve-id') as HTMLInputElement | null;
+  const open = (id: string, nama: string) => {
+    if (!modal || !nameEl || !idEl) return;
+    idEl.value = id;
+    nameEl.textContent = nama;
+    modal.hidden = false;
+  };
+  const close = () => { if (modal) modal.hidden = true; };
+  document.querySelectorAll('.js-approve').forEach((btn) => {
+    btn.addEventListener('click', () => open(btn.getAttribute('data-id') || '', btn.getAttribute('data-nama') || ''));
+  });
+  document.querySelector('.js-approve-cancel')?.addEventListener('click', close);
+  modal?.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+</script>
