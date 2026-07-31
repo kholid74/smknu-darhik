@@ -34,6 +34,7 @@ if (Astro.request.method === 'POST') {
         pekerjaan: data.get('pekerjaan')?.toString().trim() || null,
         instansi: data.get('instansi')?.toString().trim() || null,
         cerita: data.get('cerita')?.toString().trim() || null,
+        email: data.get('email')?.toString().trim() || null,
         wa: data.get('wa')?.toString().trim() || null,
         verified: false,
       },
@@ -122,9 +123,16 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
           </div>
         </div>
 
-        <div>
-          <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">No. WhatsApp <span class="font-medium text-[#6f7a6e]">(opsional, privat — tidak ditampilkan publik)</span></label>
-          <input type="text" name="wa" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="08xxxxxxxxxx"/>
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Email <span class="font-medium text-[#6f7a6e]">(opsional, privat)</span></label>
+            <input type="email" name="email" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="nama@email.com"/>
+            <p class="text-xs text-[#6f7a6e] mt-1">Untuk akses dashboard alumni nanti.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">No. WhatsApp <span class="font-medium text-[#6f7a6e]">(opsional, privat)</span></label>
+            <input type="text" name="wa" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="08xxxxxxxxxx"/>
+          </div>
         </div>
 
         <div>
@@ -134,7 +142,7 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
 
         <label class="flex items-start gap-2.5 text-xs text-[#3f493f] leading-relaxed cursor-pointer">
           <input type="checkbox" name="consent" value="1" required class="mt-0.5"/>
-          <span>Saya setuju nama, angkatan, jurusan, dan pekerjaan saya <strong>ditampilkan publik</strong> di direktori alumni setelah diverifikasi. Nomor WhatsApp saya disimpan untuk keperluan sekolah dan <strong>tidak ditampilkan publik</strong>.</span>
+          <span>Saya setuju nama, angkatan, jurusan, dan pekerjaan saya <strong>ditampilkan publik</strong> di direktori alumni setelah diverifikasi. Email dan nomor WhatsApp saya disimpan untuk keperluan sekolah, notifikasi, dan akses akun alumni — <strong>tidak ditampilkan publik</strong>.</span>
         </label>
 
         <div class="pt-1">

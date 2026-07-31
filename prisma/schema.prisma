@@ -141,7 +141,8 @@ model Alumni {
   pekerjaan String?
   instansi  String?
   cerita    String? // pendek, 1 paragraf
-  wa        String? // PRIVAT — admin-only, tak pernah tampil publik
+  email     String? // PRIVAT — jangkar login alumni (magic-link) fase lanjut; tak tampil publik
+  wa        String? // PRIVAT — kontak/recovery, admin-only, tak pernah tampil publik
   photoUrl  String? // admin isi saat verifikasi
   verified  Boolean  @default(false) // gate moderasi
   createdAt DateTime @default(now())

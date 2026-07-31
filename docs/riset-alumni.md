@@ -238,8 +238,10 @@ Model: Alumni → id, nama, angkatan, jurusan, pekerjaan, instansi, foto, cerita
 **Login menyelesaikan semuanya**: hanya alumni terverifikasi bisa upload (auth), tiap aksi terikat akun (akuntabilitas), self-service (hilang bottleneck admin), kontribusi lain (update pekerjaan/cerita, share lowongan→BKK) natural di satu tempat.
 
 **Cakupan Fase Lanjut:**
-- Login alumni (kandidat: OTP WhatsApp — perlu gateway WA berbayar; atau magic-link email — banyak alumni tak punya email). **WA sudah dikumpulkan** di form sekarang → jangkar identitas + channel OTP, tak perlu ubah skema.
+- **Login alumni via email magic-link** (keputusan: lebih murah dari WA OTP — SMTP/Resend ~gratis vs gateway WA berbayar per pesan). **Email + WA dikumpulkan** di form sekarang → email = jangkar login, WA = kontak/recovery. Tak perlu ubah skema saat bangun login.
 - Upload foto self-service (authenticated → aman, semua concern di atas gugur).
 - Edit profil mandiri, dashboard, job board/BKK, tracer study otomatis.
 
 **Sementara (Fase 1):** foto dipasang admin saat approve (alumni kirim via WA). Nol permukaan abuse.
+
+**Catatan implementasi login (saat dibangun):** email jadi kunci unik → tangani duplikat + verifikasi kepemilikan via magic-link. Alumni tanpa email pakai jalur admin (WA).

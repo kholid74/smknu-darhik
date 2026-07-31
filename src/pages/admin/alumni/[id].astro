@@ -25,6 +25,7 @@ if (Astro.request.method === 'POST') {
     pekerjaan: data.get('pekerjaan')?.toString() || null,
     instansi: data.get('instansi')?.toString() || null,
     cerita: data.get('cerita')?.toString() || null,
+    email: data.get('email')?.toString() || null,
     wa: data.get('wa')?.toString() || null,
     photoUrl: data.get('photoUrl')?.toString() || null,
     verified: data.get('verified') === '1',
@@ -75,9 +76,15 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
 
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Cerita singkat</label><textarea name="cerita" rows="4" style="resize:vertical" placeholder="1 paragraf...">{item?.cerita || ''}</textarea></div>
 
-      <div>
-        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">No. WA <span style="font-weight:500;color:#6f7a6e">(privat — tidak tampil publik)</span></label>
-        <input type="text" name="wa" value={item?.wa || ''} placeholder="08xxxx"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Email <span style="font-weight:500;color:#6f7a6e">(privat — login alumni)</span></label>
+          <input type="email" name="email" value={item?.email || ''} placeholder="nama@email.com"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">No. WA <span style="font-weight:500;color:#6f7a6e">(privat)</span></label>
+          <input type="text" name="wa" value={item?.wa || ''} placeholder="08xxxx"/>
+        </div>
       </div>
 
       <MediaPicker field="photoUrl" value={item?.photoUrl || ''} label="Foto (opsional)" folder="alumni" />
