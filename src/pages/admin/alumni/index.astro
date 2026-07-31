@@ -13,25 +13,48 @@ const url = new URL(Astro.request.url);
 const search = url.searchParams.get('q') || '';
 const statusFilter = url.searchParams.get('v') || ''; // '' | pending | verified
 const angkatanFilter = url.searchParams.get('a') || '';
+const jurusanFilter = url.searchParams.get('j') || '';
 const page = parseInt(url.searchParams.get('page') || '1');
 const limit = 15;
+
+// Sort — kolom yang boleh diurutkan (whitelist) + arah
+const sortCols: Record<string, string> = { nama: 'nama', angkatan: 'angkatan', jurusan: 'jurusan', pekerjaan: 'pekerjaan', status: 'verified' };
+const sort = url.searchParams.get('sort') || '';
+const dir = url.searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
+const orderBy: any = sortCols[sort]
+  ? [{ [sortCols[sort]]: dir }, { createdAt: 'desc' }]
+  : [{ verified: 'asc' }, { createdAt: 'desc' }];
 
 const where: any = {};
 if (search) where.nama = { contains: search };
 if (statusFilter === 'pending') where.verified = false;
 if (statusFilter === 'verified') where.verified = true;
 if (angkatanFilter) where.angkatan = parseInt(angkatanFilter) || undefined;
+if (jurusanFilter) where.jurusan = jurusanFilter;
 
-const [alumni, total, pending, angkatanRows] = await Promise.all([
-  db.alumni.findMany({ where, orderBy: [{ verified: 'asc' }, { createdAt: 'desc' }], skip: (page - 1) * limit, take: limit }),
+const [alumni, total, pending, angkatanRows, jurusanRows] = await Promise.all([
+  db.alumni.findMany({ where, orderBy, skip: (page - 1) * limit, take: limit }),
   db.alumni.count({ where }),
   db.alumni.count({ where: { verified: false } }),
   db.alumni.findMany({ distinct: ['angkatan'], select: { angkatan: true }, orderBy: { angkatan: 'desc' } }),
+  db.alumni.findMany({ distinct: ['jurusan'], select: { jurusan: true }, orderBy: { jurusan: 'asc' } }),
 ]);
 
 const angkatanList = angkatanRows.map((r) => r.angkatan);
+const jurusanList = jurusanRows.map((r) => r.jurusan);
 const totalPages = Math.ceil(total / limit);
-const pageQs = (p: number) => `?page=${p}&q=${encodeURIComponent(search)}&v=${statusFilter}&a=${angkatanFilter}`;
+
+// Bangun querystring dgn override, jaga semua filter/sort tetap ada
+const mkQs = (ov: Record<string, string | number> = {}) => {
+  const s = new URLSearchParams();
+  const base: Record<string, string> = { q: search, v: statusFilter, a: angkatanFilter, j: jurusanFilter, sort, dir, page: String(page) };
+  const merged = { ...base, ...Object.fromEntries(Object.entries(ov).map(([k, v]) => [k, String(v)])) };
+  for (const [k, v] of Object.entries(merged)) if (v) s.set(k, v);
+  return `?${s.toString()}`;
+};
+// Header sort: klik toggle arah; kolom baru default desc
+const sortLink = (col: string) => mkQs({ sort: col, dir: sort === col && dir === 'desc' ? 'asc' : 'desc', page: 1 });
+const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' ? 'arrow_upward' : 'arrow_downward');
 ---
 
 <AdminLayout title="Alumni" user={{ role: session.role }}>
@@ -46,6 +69,8 @@ const pageQs = (p: number) => `?page=${p}&q=${encodeURIComponent(search)}&v=${st
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <div style="display:flex;gap:10px;align-items:center">
       <form method="GET" style="display:flex;gap:8px">
+        <input type="hidden" name="sort" value={sort}/>
+        <input type="hidden" name="dir" value={dir}/>
         <input type="text" name="q" value={search} placeholder="Cari nama..." style="width:200px"/>
         <select name="v" style="width:150px" onchange="this.form.submit()">
           <option value="" selected={statusFilter === ''}>Semua Status</option>
@@ -55,6 +80,10 @@ const pageQs = (p: number) => `?page=${p}&q=${encodeURIComponent(search)}&v=${st
         <select name="a" style="width:140px" onchange="this.form.submit()">
           <option value="" selected={angkatanFilter === ''}>Semua Angkatan</option>
           {angkatanList.map((y) => <option value={String(y)} selected={angkatanFilter === String(y)}>{y}</option>)}
+        </select>
+        <select name="j" style="width:170px" onchange="this.form.submit()">
+          <option value="" selected={jurusanFilter === ''}>Semua Jurusan</option>
+          {jurusanList.map((j) => <option value={j} selected={jurusanFilter === j}>{j}</option>)}
         </select>
         <button type="submit" class="btn btn-outline" style="padding:10px 14px">Cari</button>
       </form>
@@ -66,11 +95,11 @@ const pageQs = (p: number) => `?page=${p}&q=${encodeURIComponent(search)}&v=${st
     <table>
       <thead>
         <tr>
-          <th style="width:24%">Nama</th>
-          <th>Angkatan</th>
-          <th>Jurusan</th>
-          <th>Pekerjaan</th>
-          <th>Status</th>
+          <th style="width:24%"><a href={sortLink('nama')} class="th-sort" data-active={sort === 'nama' || undefined}>Nama <span class="material-symbols-outlined">{sortIcon('nama')}</span></a></th>
+          <th><a href={sortLink('angkatan')} class="th-sort" data-active={sort === 'angkatan' || undefined}>Angkatan <span class="material-symbols-outlined">{sortIcon('angkatan')}</span></a></th>
+          <th><a href={sortLink('jurusan')} class="th-sort" data-active={sort === 'jurusan' || undefined}>Jurusan <span class="material-symbols-outlined">{sortIcon('jurusan')}</span></a></th>
+          <th><a href={sortLink('pekerjaan')} class="th-sort" data-active={sort === 'pekerjaan' || undefined}>Pekerjaan <span class="material-symbols-outlined">{sortIcon('pekerjaan')}</span></a></th>
+          <th><a href={sortLink('status')} class="th-sort" data-active={sort === 'status' || undefined}>Status <span class="material-symbols-outlined">{sortIcon('status')}</span></a></th>
           <th style="width:120px"></th>
         </tr>
       </thead>
@@ -113,10 +142,18 @@ const pageQs = (p: number) => `?page=${p}&q=${encodeURIComponent(search)}&v=${st
   {totalPages > 1 && (
     <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
       {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-        <a href={pageQs(p)} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
+        <a href={mkQs({ page: p })} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
       ))}
     </div>
   )}
 
   <p style="font-size:12px;color:#6f7a6e;margin-top:12px">Total: {total} alumni</p>
 </AdminLayout>
+
+<style>
+  .th-sort { display:inline-flex; align-items:center; gap:4px; color:inherit; text-decoration:none; cursor:pointer; user-select:none; white-space:nowrap; }
+  .th-sort:hover { color:#1B7A3D; }
+  .th-sort .material-symbols-outlined { font-size:15px; opacity:.35; }
+  .th-sort[data-active] { color:#1B7A3D; }
+  .th-sort[data-active] .material-symbols-outlined { opacity:1; }
+</style>
