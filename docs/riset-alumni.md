@@ -212,3 +212,34 @@ Model: Alumni → id, nama, angkatan, jurusan, pekerjaan, instansi, foto, cerita
 - Dashboard statistik alumni
 - Job board / BKK
 - Tracer study otomatis
+
+---
+
+## BAGIAN 8 — Keputusan & Roadmap (implementasi aktual)
+
+### 8.1 Yang sudah dibangun (Fase 1)
+
+- **Model `Alumni`**: nama, angkatan (Int, tahun lulus), jurusan, status (Bekerja/Kuliah/Wirausaha/Lainnya), pekerjaan, instansi, cerita, `wa` (privat, admin-only), photoUrl, `verified` gate.
+- **`/alumni/daftar`** — form publik pendaftaran mandiri. **Tanpa upload foto.** Honeypot + checkbox consent wajib. Jurusan dropdown (Department live + Multimedia + Lainnya). Angkatan dropdown 2010→tahun berjalan. Submit → `verified=false` → state "terima kasih, menunggu verifikasi".
+- **`/alumni`** — landing: CTA daftar + direktori (verified-only, filter jurusan/angkatan, **pagination 24/hal**) + statistik **auto-gated ≥30 verified** (hindari persen menyesatkan pada N kecil).
+- **`/admin/alumni`** — antrian verifikasi, approve 1-klik, edit (pasang foto/koreksi), hapus. WA tidak pernah tampil publik.
+- Long-form success story = **reuse `Article`** (kategori Alumni), bukan sistem baru.
+
+### 8.2 Ditunda ke Fase Lanjut (Level 3 — Login Alumni)
+
+**Keputusan:** upload foto oleh alumni + kontribusi mandiri **BUKAN** ditempel ke form publik. Rumahnya = **dashboard login alumni**.
+
+**Alasan** (concern upload publik anonim):
+- Endpoint upload tanpa auth = vektor abuse (bot/troll jejalkan file ke R2).
+- Konten tak pantas → beban moderasi admin per gambar.
+- Polusi Media Library + biaya storage junk.
+- EXIF/GPS privasi.
+
+**Login menyelesaikan semuanya**: hanya alumni terverifikasi bisa upload (auth), tiap aksi terikat akun (akuntabilitas), self-service (hilang bottleneck admin), kontribusi lain (update pekerjaan/cerita, share lowongan→BKK) natural di satu tempat.
+
+**Cakupan Fase Lanjut:**
+- Login alumni (kandidat: OTP WhatsApp — perlu gateway WA berbayar; atau magic-link email — banyak alumni tak punya email). **WA sudah dikumpulkan** di form sekarang → jangkar identitas + channel OTP, tak perlu ubah skema.
+- Upload foto self-service (authenticated → aman, semua concern di atas gugur).
+- Edit profil mandiri, dashboard, job board/BKK, tracer study otomatis.
+
+**Sementara (Fase 1):** foto dipasang admin saat approve (alumni kirim via WA). Nol permukaan abuse.
