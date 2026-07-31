@@ -12,6 +12,7 @@ if (!session) return Astro.redirect('/admin/login');
 const url = new URL(Astro.request.url);
 const search = url.searchParams.get('q') || '';
 const statusFilter = url.searchParams.get('v') || ''; // '' | pending | verified
+const angkatanFilter = url.searchParams.get('a') || '';
 const page = parseInt(url.searchParams.get('page') || '1');
 const limit = 15;
 
@@ -19,14 +20,18 @@ const where: any = {};
 if (search) where.nama = { contains: search };
 if (statusFilter === 'pending') where.verified = false;
 if (statusFilter === 'verified') where.verified = true;
+if (angkatanFilter) where.angkatan = parseInt(angkatanFilter) || undefined;
 
-const [alumni, total, pending] = await Promise.all([
+const [alumni, total, pending, angkatanRows] = await Promise.all([
   db.alumni.findMany({ where, orderBy: [{ verified: 'asc' }, { createdAt: 'desc' }], skip: (page - 1) * limit, take: limit }),
   db.alumni.count({ where }),
   db.alumni.count({ where: { verified: false } }),
+  db.alumni.findMany({ distinct: ['angkatan'], select: { angkatan: true }, orderBy: { angkatan: 'desc' } }),
 ]);
 
+const angkatanList = angkatanRows.map((r) => r.angkatan);
 const totalPages = Math.ceil(total / limit);
+const pageQs = (p: number) => `?page=${p}&q=${encodeURIComponent(search)}&v=${statusFilter}&a=${angkatanFilter}`;
 ---
 
 <AdminLayout title="Alumni" user={{ role: session.role }}>
@@ -46,6 +51,10 @@ const totalPages = Math.ceil(total / limit);
           <option value="" selected={statusFilter === ''}>Semua Status</option>
           <option value="pending" selected={statusFilter === 'pending'}>Menunggu Verifikasi</option>
           <option value="verified" selected={statusFilter === 'verified'}>Terverifikasi</option>
+        </select>
+        <select name="a" style="width:140px" onchange="this.form.submit()">
+          <option value="" selected={angkatanFilter === ''}>Semua Angkatan</option>
+          {angkatanList.map((y) => <option value={String(y)} selected={angkatanFilter === String(y)}>{y}</option>)}
         </select>
         <button type="submit" class="btn btn-outline" style="padding:10px 14px">Cari</button>
       </form>
@@ -104,7 +113,7 @@ const totalPages = Math.ceil(total / limit);
   {totalPages > 1 && (
     <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
       {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-        <a href={`?page=${p}&q=${search}&v=${statusFilter}`} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
+        <a href={pageQs(p)} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
       ))}
     </div>
   )}
