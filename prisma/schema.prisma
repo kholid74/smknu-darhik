@@ -132,6 +132,24 @@ model Announcement {
   expiresAt DateTime?
 }
 
+model Alumni {
+  id        String   @id @default(cuid())
+  nama      String
+  angkatan  Int // tahun lulus (2010 = angkatan pertama)
+  jurusan   String // Department live | Multimedia | Lainnya
+  status    String   @default("Bekerja") // Bekerja | Kuliah | Wirausaha | Lainnya
+  pekerjaan String?
+  instansi  String?
+  cerita    String? // pendek, 1 paragraf
+  wa        String? // PRIVAT — admin-only, tak pernah tampil publik
+  photoUrl  String? // admin isi saat verifikasi
+  verified  Boolean  @default(false) // gate moderasi
+  createdAt DateTime @default(now())
+
+  @@index([verified])
+  @@index([angkatan])
+}
+
 model Download {
   id        String   @id @default(cuid())
   title     String

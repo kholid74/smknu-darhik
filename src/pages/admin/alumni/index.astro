@@ -1,0 +1,113 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const url = new URL(Astro.request.url);
+const search = url.searchParams.get('q') || '';
+const statusFilter = url.searchParams.get('v') || ''; // '' | pending | verified
+const page = parseInt(url.searchParams.get('page') || '1');
+const limit = 15;
+
+const where: any = {};
+if (search) where.nama = { contains: search };
+if (statusFilter === 'pending') where.verified = false;
+if (statusFilter === 'verified') where.verified = true;
+
+const [alumni, total, pending] = await Promise.all([
+  db.alumni.findMany({ where, orderBy: [{ verified: 'asc' }, { createdAt: 'desc' }], skip: (page - 1) * limit, take: limit }),
+  db.alumni.count({ where }),
+  db.alumni.count({ where: { verified: false } }),
+]);
+
+const totalPages = Math.ceil(total / limit);
+---
+
+<AdminLayout title="Alumni" user={{ role: session.role }}>
+  {pending > 0 && (
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;font-size:13px">
+      <span class="material-symbols-outlined" style="font-size:18px;color:#a16207">notifications_active</span>
+      <span><strong>{pending}</strong> pendaftaran menunggu verifikasi.</span>
+      <a href="?v=pending" style="margin-left:auto;color:#a16207;font-weight:700">Lihat →</a>
+    </div>
+  )}
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div style="display:flex;gap:10px;align-items:center">
+      <form method="GET" style="display:flex;gap:8px">
+        <input type="text" name="q" value={search} placeholder="Cari nama..." style="width:200px"/>
+        <select name="v" style="width:150px" onchange="this.form.submit()">
+          <option value="" selected={statusFilter === ''}>Semua Status</option>
+          <option value="pending" selected={statusFilter === 'pending'}>Menunggu Verifikasi</option>
+          <option value="verified" selected={statusFilter === 'verified'}>Terverifikasi</option>
+        </select>
+        <button type="submit" class="btn btn-outline" style="padding:10px 14px">Cari</button>
+      </form>
+    </div>
+    <a href="/admin/alumni/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah Alumni</a>
+  </div>
+
+  <div class="card" style="padding:0">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:24%">Nama</th>
+          <th>Angkatan</th>
+          <th>Jurusan</th>
+          <th>Pekerjaan</th>
+          <th>Status</th>
+          <th style="width:120px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {alumni.length === 0 ? (
+          <tr><td colspan="6" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada alumni.</td></tr>
+        ) : alumni.map(a => (
+          <tr>
+            <td style="font-weight:600">{a.nama}</td>
+            <td style="font-size:13px">{a.angkatan}</td>
+            <td style="font-size:12px;color:#6f7a6e">{a.jurusan}</td>
+            <td style="font-size:12px;color:#6f7a6e">{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ') || '-'}</td>
+            <td>
+              {a.verified
+                ? <span class="badge badge-green">Terverifikasi</span>
+                : <span class="badge badge-gold">Menunggu</span>
+              }
+            </td>
+            <td>
+              <div style="display:flex;gap:4px">
+                {!a.verified && (
+                  <form method="POST" action="/admin/alumni/verify" style="display:inline">
+                    <input type="hidden" name="id" value={a.id}/>
+                    <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#16a34a" title="Setujui & tampilkan"><span class="material-symbols-outlined" style="font-size:16px">check_circle</span></button>
+                  </form>
+                )}
+                <a href={`/admin/alumni/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px" title="Edit"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
+                <form method="POST" action="/admin/alumni/delete" style="display:inline">
+                  <input type="hidden" name="id" value={a.id}/>
+                  <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626" title="Hapus"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  {totalPages > 1 && (
+    <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
+      {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
+        <a href={`?page=${p}&q=${search}&v=${statusFilter}`} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
+      ))}
+    </div>
+  )}
+
+  <p style="font-size:12px;color:#6f7a6e;margin-top:12px">Total: {total} alumni</p>
+</AdminLayout>

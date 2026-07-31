@@ -1,0 +1,162 @@
+---
+export const prerender = false;
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { site } from '../../data/site';
+import { db } from '../../lib/prisma';
+
+let done = false;
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  // Honeypot: bot mengisi field tersembunyi -> anggap sukses tanpa simpan
+  const trap = data.get('website')?.toString() || '';
+  const consent = data.get('consent') === '1';
+  const nama = data.get('nama')?.toString().trim() || '';
+  const angkatan = parseInt(data.get('angkatan')?.toString() || '') || 0;
+  let jurusan = data.get('jurusan')?.toString() || '';
+  const jurusanLain = data.get('jurusanLain')?.toString().trim() || '';
+  if (jurusan === 'Lainnya' && jurusanLain) jurusan = jurusanLain;
+
+  if (trap) {
+    done = true; // bot, buang diam-diam
+  } else if (!nama || !angkatan || !jurusan) {
+    error = 'Nama, angkatan, dan jurusan wajib diisi.';
+  } else if (!consent) {
+    error = 'Mohon centang persetujuan untuk melanjutkan.';
+  } else {
+    await db.alumni.create({
+      data: {
+        nama,
+        angkatan,
+        jurusan,
+        status: data.get('status')?.toString() || 'Bekerja',
+        pekerjaan: data.get('pekerjaan')?.toString().trim() || null,
+        instansi: data.get('instansi')?.toString().trim() || null,
+        cerita: data.get('cerita')?.toString().trim() || null,
+        wa: data.get('wa')?.toString().trim() || null,
+        verified: false,
+      },
+    });
+    done = true;
+  }
+}
+
+const departments = await db.department.findMany({ orderBy: { order: 'asc' }, select: { name: true } });
+const jurusanOptions = [...departments.map((d) => d.name), 'Multimedia'];
+const currentYear = new Date().getFullYear();
+const years = Array.from({ length: currentYear - 2010 + 1 }, (_, i) => currentYear - i);
+const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
+---
+
+<BaseLayout title="Daftar Alumni" description={`Daftarkan dirimu sebagai alumni ${site.name} — jadi inspirasi adik kelasmu.`}>
+
+<section class="max-w-2xl mx-auto px-4 md:px-6 py-14 md:py-20">
+  {done ? (
+    <div class="bg-white rounded-2xl border border-black/5 shadow-[0_8px_32px_rgba(27,122,61,0.08)] p-10 md:p-14 text-center">
+      <div class="w-20 h-20 rounded-full bg-[#f0f7f1] mx-auto mb-6 flex items-center justify-center">
+        <span class="material-symbols-outlined text-4xl text-[#1B7A3D]">check_circle</span>
+      </div>
+      <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-4">Terima kasih!</h1>
+      <p class="text-sm md:text-base text-[#3f493f] leading-relaxed mb-8 max-w-md mx-auto">Datamu sudah kami terima dan sedang menunggu verifikasi admin. Setelah disetujui, kamu akan tampil di direktori alumni.</p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/alumni" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors"><span class="material-symbols-outlined text-base">group</span> Lihat Direktori Alumni</a>
+        <a href="/" class="inline-flex items-center justify-center gap-2 border border-black/10 text-[#1c1b1b] font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-gray-50 transition-colors"><span class="material-symbols-outlined text-base">home</span> Beranda</a>
+      </div>
+    </div>
+  ) : (
+    <>
+      <div class="mb-8">
+        <a href="/alumni" class="inline-flex items-center gap-1 text-sm text-[#6f7a6e] hover:text-[#1B7A3D] mb-5"><span class="material-symbols-outlined text-base">arrow_back</span> Direktori Alumni</a>
+        <span class="rule-mark mb-5"></span>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Daftar sebagai Alumni</h1>
+        <p class="mt-3 text-sm md:text-base text-[#3f493f] leading-relaxed">Pernah belajar di {site.shortName}? Daftarkan dirimu, jadi inspirasi adik kelasmu. Cukup 1 menit.</p>
+      </div>
+
+      {error && (
+        <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-6">{error}</div>
+      )}
+
+      <form method="POST" class="bg-white rounded-2xl border border-black/5 shadow-[0_4px_16px_rgba(27,122,61,0.06)] p-6 md:p-8 flex flex-col gap-5">
+        <!-- honeypot -->
+        <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" aria-hidden="true"/>
+
+        <div>
+          <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Nama Lengkap *</label>
+          <input type="text" name="nama" required class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="Nama kamu"/>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Angkatan (tahun lulus) *</label>
+            <select name="angkatan" required class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm bg-white">
+              <option value="">Pilih tahun</option>
+              {years.map((y) => <option value={y}>{y}</option>)}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Jurusan *</label>
+            <select name="jurusan" id="jurusan" required class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm bg-white">
+              <option value="">Pilih jurusan</option>
+              {jurusanOptions.map((j) => <option value={j}>{j}</option>)}
+              <option value="Lainnya">Lainnya</option>
+            </select>
+            <input type="text" name="jurusanLain" id="jurusanLain" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm mt-2 hidden" placeholder="Tulis jurusanmu"/>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-3 gap-5">
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Status</label>
+            <select name="status" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm bg-white">
+              {statuses.map((s) => <option value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Pekerjaan</label>
+            <input type="text" name="pekerjaan" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="mis. Desainer Grafis"/>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Instansi</label>
+            <input type="text" name="instansi" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="mis. Bank Syariah Indonesia"/>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">No. WhatsApp <span class="font-medium text-[#6f7a6e]">(opsional, privat — tidak ditampilkan publik)</span></label>
+          <input type="text" name="wa" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="08xxxxxxxxxx"/>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Cerita Singkat <span class="font-medium text-[#6f7a6e]">(opsional)</span></label>
+          <textarea name="cerita" rows="3" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm resize-y" placeholder="Pengalaman atau pesan singkat untuk adik kelas..."></textarea>
+        </div>
+
+        <label class="flex items-start gap-2.5 text-xs text-[#3f493f] leading-relaxed cursor-pointer">
+          <input type="checkbox" name="consent" value="1" required class="mt-0.5"/>
+          <span>Saya setuju nama, angkatan, jurusan, dan pekerjaan saya <strong>ditampilkan publik</strong> di direktori alumni setelah diverifikasi. Nomor WhatsApp saya disimpan untuk keperluan sekolah dan <strong>tidak ditampilkan publik</strong>.</span>
+        </label>
+
+        <div class="pt-1">
+          <button type="submit" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors w-full sm:w-auto"><span class="material-symbols-outlined text-base">send</span> Kirim Pendaftaran</button>
+        </div>
+      </form>
+    </>
+  )}
+</section>
+
+<script>
+  const sel = document.getElementById('jurusan') as HTMLSelectElement | null;
+  const lain = document.getElementById('jurusanLain') as HTMLInputElement | null;
+  if (sel && lain) {
+    const sync = () => {
+      const show = sel.value === 'Lainnya';
+      lain.classList.toggle('hidden', !show);
+      lain.required = show;
+    };
+    sel.addEventListener('change', sync);
+    sync();
+  }
+</script>
+
+</BaseLayout>
