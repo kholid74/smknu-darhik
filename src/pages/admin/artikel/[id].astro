@@ -81,7 +81,7 @@ const initialImageUrl = article?.imageUrl || '';
           ))}
         </select>
       </div>
-      <MediaPicker field="imageUrl" value={initialImageUrl} label="Gambar Sampul" folder="artikel" />
+      <MediaPicker field="imageUrl" value={initialImageUrl} label="Gambar Sampul" folder="artikel" hint="Landscape 16:9 (mis. 1200×675px) · maks 10MB." />
       <div style="display:flex;align-items:flex-end;gap:16px;padding-bottom:4px">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
           <input type="checkbox" name="published" value="1" checked={initialPublished} style="width:auto"/> Publish

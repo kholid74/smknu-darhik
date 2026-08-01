@@ -1,0 +1,15 @@
+---
+// Header kolom tabel yang bisa diklik untuk sort. Dipasangkan dgn tableSort().
+// <SortTh label="Nama" href={s.sortLink('nama')} active={s.sort==='nama'} icon={s.sortIcon('nama')} width="24%" />
+interface Props {
+  label: string;
+  href: string;
+  active?: boolean;
+  icon: string;
+  width?: string;
+}
+const { label, href, active, icon, width } = Astro.props;
+---
+<th style={width ? `width:${width}` : undefined}>
+  <a href={href} class="th-sort" data-active={active || undefined}>{label} <span class="material-symbols-outlined">{icon}</span></a>
+</th>

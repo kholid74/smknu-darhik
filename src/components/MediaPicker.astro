@@ -13,8 +13,12 @@ interface Props {
   label?: string;
   folder?: string;
   required?: boolean;
+  hint?: string; // saran ukuran/rasio agar uploader menyesuaikan gambar
 }
-const { field, value = '', label = 'Gambar', folder = 'uploads', required = false } = Astro.props;
+const {
+  field, value = '', label = 'Gambar', folder = 'uploads', required = false,
+  hint = 'Format JPG/PNG/WebP · lebar ideal ≥ 1000px · maks 10MB.',
+} = Astro.props;
 const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
 ---
 
@@ -36,6 +40,8 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
     <input type="text" name={field} value={value} class="mp-input" placeholder="URL atau pilih dari pustaka" style="flex:1" required={required}/>
     <button type="button" class="btn btn-outline mp-open" style="white-space:nowrap"><span class="material-symbols-outlined" style="font-size:16px">photo_library</span> Pilih Gambar</button>
   </div>
+
+  {hint && <p style="font-size:11px;color:#6f7a6e;margin:6px 0 0;display:flex;align-items:center;gap:4px"><span class="material-symbols-outlined" style="font-size:14px">info</span>{hint}</p>}
 
   <!-- Modal -->
   <div class="mp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:130;align-items:center;justify-content:center;padding:16px">

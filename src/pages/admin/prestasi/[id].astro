@@ -84,7 +84,7 @@ if (Astro.request.method === 'POST') {
     </div>
 
     <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
-      <MediaPicker field="imageUrl" value={achievement?.imageUrl || ''} label="Gambar" folder="prestasi" />
+      <MediaPicker field="imageUrl" value={achievement?.imageUrl || ''} label="Gambar" folder="prestasi" hint="Landscape 4:3 · lebar ≥ 800px · maks 10MB." />
       <div>
         <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Urutan (Order)</label>
         <input type="number" name="order" value={achievement?.order ?? 0} min="0"/>

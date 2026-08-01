@@ -42,7 +42,7 @@ if (Astro.request.method === 'POST') {
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Deskripsi</label><textarea name="description" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.description||''}</textarea></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kompetensi (JSON)</label><textarea name="kompetensi" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.kompetensi||''}</textarea></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Karir (JSON)</label><textarea name="karir" rows="5" style="font-family:monospace;font-size:13px;resize:vertical">{item?.karir||''}</textarea></div>
-      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar Sampul" folder="jurusan" />
+      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar Sampul" folder="jurusan" hint="Landscape 4:3 · lebar ≥ 800px · maks 10MB." />
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Order</label><input type="number" name="order" value={item?.order??0} style="width:80px"/></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/jurusan" class="btn btn-outline">Batal</a></div>

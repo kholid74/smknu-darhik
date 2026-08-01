@@ -1,6 +1,8 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import SortTh from '../../../components/SortTh.astro';
+import { tableSort } from '../../../lib/tablesort';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -8,7 +10,8 @@ const token = Astro.cookies.get('smkdh_token')?.value;
 if (!token) return Astro.redirect('/admin/login');
 const session = await verifyToken(token);
 if (!session) return Astro.redirect('/admin/login');
-const items = await db.partner.findMany({ orderBy: { order: 'asc' } });
+const s = tableSort(Astro.url, { nama: 'name', tipe: 'type', urutan: 'order' }, [{ order: 'asc' }]);
+const items = await db.partner.findMany({ orderBy: s.orderBy });
 ---
 
 <AdminLayout title="Mitra Industri" user={{ role: session.role }}>
@@ -16,7 +19,7 @@ const items = await db.partner.findMany({ orderBy: { order: 'asc' } });
     <h2 style="font-size:18px;font-weight:800">Mitra Industri</h2>
     <a href="/admin/mitra/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah</a>
   </div>
-  <div class="card" style="padding:0"><table><thead><tr><th>Nama</th><th>Tipe</th><th>Urutan</th><th style="width:80px"></th></tr></thead>
+  <div class="card" style="padding:0"><table><thead><tr><SortTh label="Nama" href={s.sortLink('nama')} active={s.sort==='nama'} icon={s.sortIcon('nama')} /><SortTh label="Tipe" href={s.sortLink('tipe')} active={s.sort==='tipe'} icon={s.sortIcon('tipe')} /><SortTh label="Urutan" href={s.sortLink('urutan')} active={s.sort==='urutan'} icon={s.sortIcon('urutan')} /><th style="width:80px"></th></tr></thead>
     <tbody>{items.length===0?(<tr><td colspan="4" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada mitra.</td></tr>):items.map((p:any)=>(
       <tr><td style="font-weight:600">{p.name}</td><td><span class="badge badge-gray">{p.type||'-'}</span></td><td>{p.order}</td><td><div style="display:flex;gap:4px">
         <a href={`/admin/mitra/${p.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>

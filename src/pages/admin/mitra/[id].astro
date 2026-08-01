@@ -27,7 +27,7 @@ if (Astro.request.method === 'POST') {
   <form method="POST" style="max-width:600px">
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={item?.name||''} required/></div>
-      <MediaPicker field="logoUrl" value={item?.logoUrl||''} label="Logo" folder="mitra" />
+      <MediaPicker field="logoUrl" value={item?.logoUrl||''} label="Logo" folder="mitra" hint="Logo persegi (1:1), PNG background transparan lebih baik · maks 10MB." />
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Tipe</label><select name="type"><option value="">-</option><option value="Industri" selected={(item?.type==='Industri') || undefined}>Industri</option><option value="Institusi" selected={(item?.type==='Institusi') || undefined}>Institusi</option><option value="Pemerintah" selected={(item?.type==='Pemerintah') || undefined}>Pemerintah</option></select></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Urutan</label><input type="number" name="order" value={item?.order??0}/></div>
     </div>

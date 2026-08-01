@@ -58,7 +58,7 @@ if (Astro.request.method === 'POST') {
     </div>
 
     <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end">
-      <MediaPicker field="photoUrl" value={testimonial?.photoUrl || ''} label="Foto" folder="testimoni" />
+      <MediaPicker field="photoUrl" value={testimonial?.photoUrl || ''} label="Foto" folder="testimoni" hint="Foto potret/persegi, wajah jelas · maks 10MB." />
       <div style="padding-bottom:4px">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer">
           <input type="checkbox" name="verified" value="1" checked={testimonial?.verified ?? false} style="width:auto"/> Terverifikasi

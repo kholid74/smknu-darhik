@@ -1,6 +1,8 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import SortTh from '../../../components/SortTh.astro';
+import { tableSort } from '../../../lib/tablesort';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -17,14 +19,15 @@ const limit = 15;
 const where: any = {};
 if (jenisFilter) where.jenis = jenisFilter;
 
+const s = tableSort(url, { nama: 'nama', jenis: 'jenis', tanggal: 'createdAt' }, [{ createdAt: 'desc' }]);
+
 const [items, total, jenisRows] = await Promise.all([
-  db.alumniContribution.findMany({ where, orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+  db.alumniContribution.findMany({ where, orderBy: s.orderBy, skip: (page - 1) * limit, take: limit }),
   db.alumniContribution.count({ where }),
   db.alumniContribution.findMany({ distinct: ['jenis'], select: { jenis: true }, orderBy: { jenis: 'asc' } }),
 ]);
 const jenisList = jenisRows.map((r) => r.jenis);
 const totalPages = Math.ceil(total / limit);
-const pageQs = (p: number) => `?page=${p}&j=${encodeURIComponent(jenisFilter)}`;
 ---
 
 <AdminLayout title="Kontribusi Alumni" user={{ role: session.role }}>
@@ -42,11 +45,11 @@ const pageQs = (p: number) => `?page=${p}&j=${encodeURIComponent(jenisFilter)}`;
     <table>
       <thead>
         <tr>
-          <th style="width:18%">Nama</th>
-          <th>Jenis</th>
+          <SortTh label="Nama" href={s.sortLink('nama')} active={s.sort === 'nama'} icon={s.sortIcon('nama')} width="18%" />
+          <SortTh label="Jenis" href={s.sortLink('jenis')} active={s.sort === 'jenis'} icon={s.sortIcon('jenis')} />
           <th style="width:40%">Detail</th>
           <th>Kontak</th>
-          <th>Tanggal</th>
+          <SortTh label="Tanggal" href={s.sortLink('tanggal')} active={s.sort === 'tanggal'} icon={s.sortIcon('tanggal')} />
           <th style="width:60px"></th>
         </tr>
       </thead>
@@ -75,7 +78,7 @@ const pageQs = (p: number) => `?page=${p}&j=${encodeURIComponent(jenisFilter)}`;
   {totalPages > 1 && (
     <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
       {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-        <a href={pageQs(p)} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
+        <a href={s.mkQs({ page: p })} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
       ))}
     </div>
   )}

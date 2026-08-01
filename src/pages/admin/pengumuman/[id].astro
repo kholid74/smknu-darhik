@@ -37,7 +37,7 @@ function toDatetimeLocal(d: Date | null | undefined): string {
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul *</label><input type="text" name="title" value={item?.title||''} required/></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Isi</label><textarea name="body" rows="8" style="resize:vertical">{item?.body||''}</textarea></div>
-      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar Sorotan (opsional)" folder="pengumuman" />
+      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar Sorotan (opsional)" folder="pengumuman" hint="Potret 4:5 (mis. 800×1000px) untuk hero sorotan · maks 10MB." />
       <p style="font-size:12px;color:#64748b;margin-top:-6px">Isi gambar → tampil sebagai <strong>hero sorotan</strong> di beranda. Kosongkan → tampil sebagai <strong>ribbon teks</strong> tipis di atas beranda.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">URL Link</label><input type="url" name="linkUrl" value={item?.linkUrl||''} placeholder="https://..."/></div>

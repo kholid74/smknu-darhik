@@ -1,6 +1,8 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import SortTh from '../../../components/SortTh.astro';
+import { tableSort } from '../../../lib/tablesort';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -21,8 +23,10 @@ if (search) where.title = { contains: search };
 if (levelFilter) where.level = levelFilter;
 if (categoryFilter) where.category = categoryFilter;
 
+const s = tableSort(url, { judul: 'title', level: 'level', kategori: 'category', tahun: 'year', siswa: 'student' }, [{ order: 'asc' }]);
+
 const [achievements, total] = await Promise.all([
-  db.achievement.findMany({ where, orderBy: { order: 'asc' }, skip: (page - 1) * limit, take: limit }),
+  db.achievement.findMany({ where, orderBy: s.orderBy, skip: (page - 1) * limit, take: limit }),
   db.achievement.count({ where }),
 ]);
 
@@ -63,11 +67,11 @@ const levelBadge: Record<string, string> = {
     <table>
       <thead>
         <tr>
-          <th style="width:35%">Judul</th>
-          <th>Level</th>
-          <th>Kategori</th>
-          <th>Tahun</th>
-          <th>Siswa</th>
+          <SortTh label="Judul" href={s.sortLink('judul')} active={s.sort === 'judul'} icon={s.sortIcon('judul')} width="35%" />
+          <SortTh label="Level" href={s.sortLink('level')} active={s.sort === 'level'} icon={s.sortIcon('level')} />
+          <SortTh label="Kategori" href={s.sortLink('kategori')} active={s.sort === 'kategori'} icon={s.sortIcon('kategori')} />
+          <SortTh label="Tahun" href={s.sortLink('tahun')} active={s.sort === 'tahun'} icon={s.sortIcon('tahun')} />
+          <SortTh label="Siswa" href={s.sortLink('siswa')} active={s.sort === 'siswa'} icon={s.sortIcon('siswa')} />
           <th style="width:80px"></th>
         </tr>
       </thead>
@@ -101,7 +105,7 @@ const levelBadge: Record<string, string> = {
   {totalPages > 1 && (
     <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
       {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-        <a href={`?page=${p}&q=${search}&level=${levelFilter}&category=${categoryFilter}`} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
+        <a href={s.mkQs({ page: p })} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
       ))}
     </div>
   )}

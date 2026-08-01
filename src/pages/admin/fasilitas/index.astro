@@ -1,6 +1,8 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import SortTh from '../../../components/SortTh.astro';
+import { tableSort } from '../../../lib/tablesort';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
 
@@ -17,8 +19,10 @@ const limit = 15;
 const where: any = {};
 if (search) where.name = { contains: search };
 
+const s = tableSort(url, { nama: 'name', urutan: 'order' }, [{ order: 'asc' }]);
+
 const [facilities, total] = await Promise.all([
-  db.facility.findMany({ where, orderBy: { order: 'asc' }, skip: (page - 1) * limit, take: limit }),
+  db.facility.findMany({ where, orderBy: s.orderBy, skip: (page - 1) * limit, take: limit }),
   db.facility.count({ where }),
 ]);
 
@@ -40,8 +44,8 @@ const totalPages = Math.ceil(total / limit);
     <table>
       <thead>
         <tr>
-          <th style="width:5%">#</th>
-          <th style="width:30%">Nama</th>
+          <SortTh label="#" href={s.sortLink('urutan')} active={s.sort === 'urutan'} icon={s.sortIcon('urutan')} width="5%" />
+          <SortTh label="Nama" href={s.sortLink('nama')} active={s.sort === 'nama'} icon={s.sortIcon('nama')} width="30%" />
           <th>Deskripsi</th>
           <th>Icon</th>
           <th style="width:80px"></th>
@@ -76,7 +80,7 @@ const totalPages = Math.ceil(total / limit);
   {totalPages > 1 && (
     <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
       {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-        <a href={`?page=${p}&q=${search}`} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
+        <a href={s.mkQs({ page: p })} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
       ))}
     </div>
   )}
