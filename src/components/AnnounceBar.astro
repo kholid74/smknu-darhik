@@ -1,12 +1,92 @@
-<div class="bg-[#00602b] text-white" id="announce-bar">
+---
+// Top bar global. Diisi dari /api/announce (pengumuman teks aktif dari admin).
+// Bila >1 aktif, dirotasi. Tersembunyi sampai ada data -> aman di halaman statis maupun SSR.
+---
+<div class="bg-[#00602b] text-white" id="announce-bar" hidden>
   <div class="max-w-6xl mx-auto flex items-center gap-3 px-4 md:px-6 py-2.5 text-sm">
     <span class="material-symbols-outlined text-[#C8963E] text-lg flex-shrink-0">campaign</span>
-    <p class="flex-1 font-medium">
-      <span class="hidden sm:inline">PPDB 2026/2027 telah dibuka. </span>
-      <a class="underline underline-offset-2 font-bold hover:text-[#C8963E] transition-colors" href="/ppdb">Daftar sekarang &rarr;</a>
+    <p class="flex-1 font-medium min-w-0" id="announce-msg" style="transition:opacity .3s">
+      <span id="announce-text" class="[overflow-wrap:anywhere]"></span>
+      <a id="announce-link" class="underline underline-offset-2 font-bold hover:text-[#C8963E] transition-colors" href="#" hidden></a>
     </p>
-    <button class="p-1 hover:bg-white/15 rounded flex-shrink-0" onclick="this.closest('#announce-bar')?.remove()" aria-label="Tutup pengumuman">
+    <div id="announce-dots" class="flex gap-1.5 flex-shrink-0" hidden></div>
+    <button id="announce-close" class="p-1 hover:bg-white/15 rounded flex-shrink-0" aria-label="Tutup pengumuman">
       <span class="material-symbols-outlined text-lg">close</span>
     </button>
   </div>
 </div>
+
+<script>
+  (async () => {
+    const bar = document.getElementById('announce-bar');
+    if (!bar) return;
+    try {
+      const res = await fetch('/api/announce', { headers: { Accept: 'application/json' } });
+      const list = await res.json();
+      if (!Array.isArray(list) || list.length === 0) return;
+
+      // Dismiss per-kombinasi: kalau set pengumuman ini sudah ditutup, jangan tampilkan.
+      const sig = list.map((a: any) => a.id).join(',');
+      if (localStorage.getItem('smkdh_announce_dismissed') === sig) return;
+
+      const msg = document.getElementById('announce-msg');
+      const textEl = document.getElementById('announce-text');
+      const linkEl = document.getElementById('announce-link') as HTMLAnchorElement | null;
+      const dotsWrap = document.getElementById('announce-dots');
+
+      const render = (i: number) => {
+        const a = list[i];
+        if (textEl) textEl.textContent = a.text + ' ';
+        if (linkEl) {
+          if (a.linkUrl) {
+            linkEl.href = a.linkUrl;
+            linkEl.textContent = a.linkLabel + ' →';
+            linkEl.hidden = false;
+          } else {
+            linkEl.hidden = true;
+          }
+        }
+        if (dotsWrap) {
+          dotsWrap.querySelectorAll('span').forEach((d, di) => {
+            (d as HTMLElement).style.opacity = di === i ? '1' : '0.4';
+          });
+        }
+      };
+
+      let idx = 0;
+      render(0);
+      bar.hidden = false;
+
+      // Rotasi bila >1
+      if (list.length > 1 && msg && dotsWrap) {
+        dotsWrap.hidden = false;
+        list.forEach(() => {
+          const dot = document.createElement('span');
+          dot.style.cssText = 'width:6px;height:6px;border-radius:99px;background:#fff;opacity:0.4;transition:opacity .3s';
+          dotsWrap.appendChild(dot);
+        });
+        (dotsWrap.querySelector('span') as HTMLElement).style.opacity = '1';
+
+        let paused = false;
+        bar.addEventListener('mouseenter', () => (paused = true));
+        bar.addEventListener('mouseleave', () => (paused = false));
+        setInterval(() => {
+          if (paused) return;
+          msg.style.opacity = '0';
+          setTimeout(() => {
+            idx = (idx + 1) % list.length;
+            render(idx);
+            msg.style.opacity = '1';
+          }, 300);
+        }, 6000);
+      }
+
+      document.getElementById('announce-close')?.addEventListener('click', () => {
+        localStorage.setItem('smkdh_announce_dismissed', sig);
+        bar.remove();
+      });
+    } catch {
+      /* diam bila gagal */
+    }
+  })();
+</script>

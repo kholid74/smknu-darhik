@@ -10,7 +10,7 @@ const anns = await db.announcement.findMany({
   orderBy: { createdAt: 'desc' },
 });
 const spotlight = anns.find((a) => a.imageUrl);
-const ribbon = anns.find((a) => !a.imageUrl);
+// Pengumuman teks (tanpa gambar) ditangani top bar global (AnnounceBar), bukan di sini.
 
 // Berita/kegiatan terbaru
 const news = await db.article.findMany({
@@ -33,18 +33,6 @@ if (achievements.length < 3) {
 ---
 
 <BaseLayout title="Beranda" description="Sekolah kejuruan berbasis nilai Islam di Karanggeneng Lamongan — terampil, beriman, siap kerja.">
-
-{ribbon && (
-  <div class="bg-gold text-white">
-    <div class="max-w-6xl mx-auto px-4 md:px-6 py-2.5 flex items-center justify-center gap-2 text-sm font-medium text-center">
-      <span class="material-symbols-outlined text-base shrink-0">campaign</span>
-      <span class="[overflow-wrap:anywhere]">{ribbon.body || ribbon.title}</span>
-      {ribbon.linkUrl && (
-        <a href={ribbon.linkUrl} class="shrink-0 underline underline-offset-2 font-bold hover:no-underline">{ribbon.linkLabel || 'Selengkapnya'}</a>
-      )}
-    </div>
-  </div>
-)}
 
 <!-- ====== HERO — Modern Islamic Vocational ====== -->
 <!-- Arah: ambil energi & palet hijau-NU dari IG, layout bersih, luas, aspiratif -->
