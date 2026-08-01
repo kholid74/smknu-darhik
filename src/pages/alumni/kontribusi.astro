@@ -1,0 +1,105 @@
+---
+export const prerender = false;
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { site } from '../../data/site';
+import { db } from '../../lib/prisma';
+
+const JENIS = ['Usulan / Saran', 'Tawaran Workshop / Narasumber', 'Info Lowongan', 'Lainnya'];
+
+// PRG: sukses -> redirect ?ok=1 (cegah resubmit)
+const done = Astro.url.searchParams.get('ok') === '1';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const trap = data.get('website')?.toString() || ''; // honeypot
+  const nama = data.get('nama')?.toString().trim() || '';
+  const kontak = data.get('kontak')?.toString().trim() || '';
+  const jenis = data.get('jenis')?.toString() || '';
+  const detail = data.get('detail')?.toString().trim() || '';
+
+  if (trap) {
+    return Astro.redirect('/alumni/kontribusi?ok=1'); // bot, buang diam-diam
+  } else if (!nama || !kontak || !jenis || !detail) {
+    error = 'Semua kolom wajib diisi.';
+  } else {
+    await db.alumniContribution.create({ data: { nama, kontak, jenis, detail } });
+    return Astro.redirect('/alumni/kontribusi?ok=1');
+  }
+}
+---
+
+<BaseLayout title="Kontribusi Alumni" description={`Berkontribusi untuk ${site.name} — usulan, workshop, atau info lowongan dari alumni.`}>
+
+<section class="max-w-2xl mx-auto px-4 md:px-6 py-14 md:py-20">
+  {done ? (
+    <div class="bg-white rounded-2xl border border-black/5 shadow-[0_8px_32px_rgba(27,122,61,0.08)] p-10 md:p-14 text-center">
+      <div class="w-20 h-20 rounded-full bg-[#f0f7f1] mx-auto mb-6 flex items-center justify-center">
+        <span class="material-symbols-outlined text-4xl text-[#1B7A3D]">check_circle</span>
+      </div>
+      <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-4">Terima kasih!</h1>
+      <p class="text-sm md:text-base text-[#3f493f] leading-relaxed mb-8 max-w-md mx-auto">Kontribusimu sudah kami terima. Tim sekolah akan meninjau dan menghubungimu bila diperlukan.</p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/alumni" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors"><span class="material-symbols-outlined text-base">group</span> Halaman Alumni</a>
+        <a href="/" class="inline-flex items-center justify-center gap-2 border border-black/10 text-[#1c1b1b] font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-gray-50 transition-colors"><span class="material-symbols-outlined text-base">home</span> Beranda</a>
+      </div>
+    </div>
+  ) : (
+    <>
+      <div class="mb-8">
+        <a href="/alumni" class="inline-flex items-center gap-1 text-sm text-[#6f7a6e] hover:text-[#1B7A3D] mb-5"><span class="material-symbols-outlined text-base">arrow_back</span> Halaman Alumni</a>
+        <span class="rule-mark mb-5"></span>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Kontribusi Alumni</h1>
+        <p class="mt-3 text-sm md:text-base text-[#3f493f] leading-relaxed">Punya usulan untuk sekolah, ingin jadi narasumber workshop, atau mau berbagi info lowongan untuk adik kelas? Kirim di sini — masuk langsung ke tim sekolah.</p>
+      </div>
+
+      {error && (
+        <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-6">{error}</div>
+      )}
+
+      <form method="POST" class="bg-white rounded-2xl border border-black/5 shadow-[0_4px_16px_rgba(27,122,61,0.06)] p-6 md:p-8 flex flex-col gap-5">
+        <input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" aria-hidden="true"/>
+
+        <div class="grid sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Nama *</label>
+            <input type="text" name="nama" required class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="Nama kamu"/>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Kontak (WA / Email) *</label>
+            <input type="text" name="kontak" required class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm" placeholder="08xxx atau email"/>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Jenis Kontribusi *</label>
+          <select name="jenis" required class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm bg-white">
+            <option value="">Pilih jenis</option>
+            {JENIS.map((j) => <option value={j}>{j}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Detail *</label>
+          <textarea name="detail" rows="5" required class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm resize-y" placeholder="Jelaskan usulan / tawaran / info lowongan kamu..."></textarea>
+        </div>
+
+        <p class="text-xs text-[#6f7a6e] leading-relaxed">Data ini masuk ke tim sekolah dan <strong>tidak ditampilkan publik</strong>.</p>
+
+        <div class="pt-1">
+          <button type="submit" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors w-full sm:w-auto"><span class="material-symbols-outlined text-base">send</span> Kirim Kontribusi</button>
+        </div>
+      </form>
+    </>
+  )}
+</section>
+
+<script>
+  const form = document.querySelector('form');
+  form?.addEventListener('submit', () => {
+    const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  });
+</script>
+
+</BaseLayout>

@@ -155,6 +155,17 @@ model Alumni {
   @@index([featured])
 }
 
+model AlumniContribution {
+  id        String   @id @default(cuid())
+  nama      String
+  kontak    String // WA atau email — untuk admin follow up (privat)
+  jenis     String // Usulan/Saran | Tawaran Workshop/Narasumber | Info Lowongan | Lainnya
+  detail    String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
 model Download {
   id        String   @id @default(cuid())
   title     String
