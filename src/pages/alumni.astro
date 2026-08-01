@@ -132,9 +132,9 @@ const statTiles = showStats ? [
 
 <style>
   .al-carousel { position: relative; }
-  .al-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; gap: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .al-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; gap: 20px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .al-track::-webkit-scrollbar { display: none; }
-  .al-slide { flex: 0 0 100%; scroll-snap-align: center; display: grid; grid-template-columns: minmax(240px, 34%) 1fr; gap: 0; background: #fff; border: 1px solid rgba(0,0,0,.05); border-radius: 20px; overflow: hidden; box-shadow: 0 6px 24px rgba(27,122,61,.07); min-height: 320px; }
+  .al-slide { flex: 0 0 88%; scroll-snap-align: center; display: grid; grid-template-columns: minmax(240px, 34%) 1fr; gap: 0; background: #fff; border: 1px solid rgba(0,0,0,.05); border-radius: 20px; overflow: hidden; box-shadow: 0 6px 24px rgba(27,122,61,.07); min-height: 320px; }
   .al-photo { background: #f0f7f1; position: relative; }
   .al-photo img { width: 100%; height: 100%; object-fit: cover; }
   .al-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -168,10 +168,22 @@ const statTiles = showStats ? [
     const dots = Array.from(document.querySelectorAll('.al-dot')) as HTMLElement[];
     const prev = document.getElementById('al-prev') as HTMLButtonElement | null;
     const next = document.getElementById('al-next') as HTMLButtonElement | null;
-    const current = () => Math.round(track.scrollLeft / track.clientWidth);
+    // Index = slide yang pusatnya paling dekat pusat viewport (robust utk peek + gap)
+    const current = () => {
+      const c = track.scrollLeft + track.clientWidth / 2;
+      let best = 0, bd = Infinity;
+      slides.forEach((s, i) => {
+        const sc = s.offsetLeft + s.clientWidth / 2;
+        const d = Math.abs(sc - c);
+        if (d < bd) { bd = d; best = i; }
+      });
+      return best;
+    };
     const goTo = (i: number) => {
       const idx = Math.max(0, Math.min(slides.length - 1, i));
-      track.scrollTo({ left: idx * track.clientWidth, behavior: 'smooth' });
+      const s = slides[idx];
+      const left = s.offsetLeft - (track.clientWidth - s.clientWidth) / 2;
+      track.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
     };
     const sync = () => {
       const i = current();
