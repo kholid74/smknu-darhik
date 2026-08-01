@@ -122,7 +122,7 @@ const ringkasan = [
       {alByDomisili.length > 0 && (
         <ChartCard title="Persebaran Domisili" subtitle={`Top kota · tersebar di ${kotaCount} kota`} type="bar"
           series={[{ name: 'Alumni', data: alByDomisili.map(r => r._count._all) }]}
-          categories={alByDomisili.map(r => r.domisili as string)} height={280} />
+          categories={alByDomisili.map(r => (r.domisili as string).replace(/^Kabupaten\s+/i, 'Kab. ').replace(/^Kota\s+/i, ''))} height={280} />
       )}
     </div>
   )}
