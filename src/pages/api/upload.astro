@@ -16,8 +16,8 @@ if (Astro.request.method === 'POST') {
     if (!file || file.size === 0) {
       return new Response(JSON.stringify({ error: 'No file' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
-    if (file.size > 10 * 1024 * 1024) {
-      return new Response(JSON.stringify({ error: 'Max 10MB' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (file.size > 5 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: 'Maks 5MB' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
     const folder = formData.get('folder')?.toString() || 'uploads';
     const url = await uploadToR2(file, folder);

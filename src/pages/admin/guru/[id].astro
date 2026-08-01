@@ -41,7 +41,7 @@ if (Astro.request.method === 'POST') {
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Jabatan *</label><input type="text" name="position" value={item?.position||''} placeholder="Kepala Sekolah" required/></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Mata Pelajaran</label><input type="text" name="subject" value={item?.subject||''} placeholder="Matematika"/></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Level</label><select name="level" style="width:100%">{levels.map(l=>(<option value={l} selected={item?.level===l}>{l}</option>))}</select></div>
-      <MediaPicker field="photoUrl" value={item?.photoUrl||''} label="Foto" folder="guru" hint="Foto potret (rasio 4:5), wajah terlihat jelas · lebar ≥ 600px · maks 10MB." />
+      <MediaPicker field="photoUrl" value={item?.photoUrl||''} label="Foto" folder="guru" hint="Foto potret (rasio 4:5), wajah terlihat jelas · lebar ≥ 600px · maks 5MB." />
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Order</label><input type="number" name="order" value={item?.order??0} style="width:80px"/></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/guru" class="btn btn-outline">Batal</a></div>

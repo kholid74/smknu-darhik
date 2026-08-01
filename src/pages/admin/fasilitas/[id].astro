@@ -56,7 +56,7 @@ if (Astro.request.method === 'POST') {
 
     <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <IconPicker field="icon" value={facility?.icon || ''} label="Icon" />
-      <MediaPicker field="imageUrl" value={facility?.imageUrl || ''} label="Gambar" folder="fasilitas" hint="Landscape 4:3 · lebar ≥ 800px · maks 10MB." />
+      <MediaPicker field="imageUrl" value={facility?.imageUrl || ''} label="Gambar" folder="fasilitas" hint="Landscape 4:3 · lebar ≥ 800px · maks 5MB." />
     </div>
 
     <div style="display:flex;gap:10px">

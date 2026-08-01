@@ -27,7 +27,7 @@ if (Astro.request.method === 'POST') {
   <form method="POST" style="max-width:600px">
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul</label><input type="text" name="title" value={item?.title||''} placeholder="Opsional"/></div>
-      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar *" folder="galeri" required hint="Landscape/potret, lebar ≥ 1000px · maks 10MB." />
+      <MediaPicker field="imageUrl" value={item?.imageUrl||''} label="Gambar *" folder="galeri" required hint="Landscape/potret, lebar ≥ 1000px · maks 5MB." />
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Album</label><input type="text" name="album" value={item?.album||''} placeholder="Kegiatan 2026"/></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/galeri" class="btn btn-outline">Batal</a></div>

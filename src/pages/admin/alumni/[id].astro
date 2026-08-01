@@ -106,7 +106,7 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
         </div>
       </div>
 
-      <MediaPicker field="photoUrl" value={form?.photoUrl || ''} label="Foto (opsional)" folder="alumni" hint="Foto potret/landscape, wajah jelas · lebar ≥ 600px · maks 10MB." />
+      <MediaPicker field="photoUrl" value={form?.photoUrl || ''} label="Foto (opsional)" folder="alumni" hint="Foto potret/landscape, wajah jelas · lebar ≥ 600px · maks 5MB." />
 
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="verified" value="1" checked={form?.verified ?? false} style="width:auto"/> Terverifikasi (tampil publik)</label>
     </div>

@@ -17,7 +17,7 @@ interface Props {
 }
 const {
   field, value = '', label = 'Gambar', folder = 'uploads', required = false,
-  hint = 'Format JPG/PNG/WebP · lebar ideal ≥ 1000px · maks 10MB.',
+  hint = 'Format JPG/PNG/WebP · lebar ideal ≥ 1000px · maks 5MB.',
 } = Astro.props;
 const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
 ---
@@ -67,7 +67,7 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
           <div class="mp-dropzone" style="border:2px dashed #d1d5db;border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s">
             <span class="material-symbols-outlined" style="font-size:36px;color:#9ca3af">cloud_upload</span>
             <p style="font-size:13px;color:#6f7a6e;margin:8px 0 0">Drag & drop atau <label style="color:#1B7A3D;font-weight:700;cursor:pointer">pilih file<input type="file" accept="image/*" class="mp-file" style="display:none"/></label></p>
-            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Max 10MB · JPG, PNG, WebP</p>
+            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Maks 5MB · JPG, PNG, WebP</p>
           </div>
           <p class="mp-upload-status" style="display:none;text-align:center;font-size:13px;color:#6f7a6e;margin-top:12px"></p>
         </div>
@@ -169,7 +169,7 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
       });
 
       async function uploadFile(file: File) {
-        if (file.size > 10 * 1024 * 1024) { alert('File terlalu besar. Max 10MB.'); return; }
+        if (file.size > 5 * 1024 * 1024) { alert('File terlalu besar. Maks 5MB.'); return; }
         uploadStatus.style.display = 'block';
         uploadStatus.textContent = 'Mengupload…';
         const fd = new FormData();

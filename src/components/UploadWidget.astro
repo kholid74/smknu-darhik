@@ -7,7 +7,7 @@
       pilih file
       <input type="file" accept="image/*" style="display:none" id="upload-input"/>
     </label>
-    <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Max 10MB · JPG, PNG, WebP</p>
+    <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Maks 5MB · JPG, PNG, WebP</p>
   </div>
   <div id="upload-progress" style="display:none;padding:12px;text-align:center;font-size:13px;color:#6f7a6e">
     <span style="display:inline-block;width:20px;height:20px;border:2px solid #1B7A3D;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle;margin-right:8px"></span> Mengupload...
@@ -48,7 +48,7 @@
   });
 
   async function uploadFile(file: File) {
-    if (file.size > 10 * 1024 * 1024) { alert('File terlalu besar. Max 10MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) { alert('File terlalu besar. Maks 5MB.'); return; }
     dropzone.style.display = 'none';
     progress.style.display = 'block';
     result.style.display = 'none';
