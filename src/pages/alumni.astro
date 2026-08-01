@@ -55,46 +55,123 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
   </section>
 )}
 
-<!-- SHOWCASE ALUMNI PILIHAN -->
+<!-- SHOWCASE ALUMNI PILIHAN — carousel horizontal 20/80 -->
 {showcase.length > 0 && (
-  <section class="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
-    <div class="max-w-2xl mb-12">
+  <section class="max-w-5xl mx-auto px-4 md:px-6 py-14 md:py-20">
+    <div class="max-w-2xl mb-10">
       <span class="rule-mark mb-5"></span>
       <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Kisah Alumni Pilihan</h2>
       <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Beberapa lulusan {site.shortName} yang berbagi jejak dan inspirasinya.</p>
     </div>
 
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {showcase.map((a) => (
-        <div class="bg-white rounded-2xl border border-black/5 shadow-[0_4px_16px_rgba(27,122,61,0.06)] overflow-hidden hover:shadow-[0_10px_30px_rgba(27,122,61,0.12)] transition-shadow flex flex-col">
-          <div class="aspect-[4/3] bg-[#f0f7f1] overflow-hidden relative">
-            {a.photoUrl ? (
-              <img class="w-full h-full object-cover" src={thumb(a.photoUrl, 500)} alt={a.nama} loading="lazy" onerror="this.style.display='none'"/>
-            ) : (
-              <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-5xl text-[#1B7A3D]/40">person</span></div>
-            )}
-            <span class="absolute top-3 left-3 inline-flex items-center gap-1 bg-gold text-white text-[11px] font-bold px-2.5 py-1 rounded-full"><span class="material-symbols-outlined text-sm">star</span> Alumni Pilihan</span>
+    <div class="al-carousel" data-total={showcase.length}>
+      <div class="al-track" id="al-track">
+        {showcase.map((a) => (
+          <article class="al-slide">
+            <div class="al-photo">
+              {a.photoUrl ? (
+                <img src={thumb(a.photoUrl, 500)} alt={a.nama} loading="lazy" onerror="this.style.display='none'"/>
+              ) : (
+                <div class="al-photo-ph"><span class="material-symbols-outlined">person</span></div>
+              )}
+            </div>
+            <div class="al-body">
+              <span class="al-badge"><span class="material-symbols-outlined">star</span> Alumni Pilihan</span>
+              <h3>{a.nama}</h3>
+              <p class="al-meta">Angkatan {a.angkatan} · {a.jurusan}</p>
+              {(a.pekerjaan || a.instansi) && (
+                <p class="al-job"><span class="material-symbols-outlined">work</span>{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ')}</p>
+              )}
+              {a.cerita && <blockquote class="al-story">{a.cerita}</blockquote>}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      {showcase.length > 1 && (
+        <div class="al-nav">
+          <button type="button" class="al-btn" id="al-prev" aria-label="Sebelumnya"><span class="material-symbols-outlined">chevron_left</span></button>
+          <div class="al-dots" id="al-dots">
+            {showcase.map((_, i) => <button type="button" class="al-dot" data-i={i} aria-label={`Slide ${i + 1}`}></button>)}
           </div>
-          <div class="p-5 flex flex-col flex-1">
-            <h3 class="font-extrabold text-[#1c1b1b] text-base [overflow-wrap:anywhere]">{a.nama}</h3>
-            <p class="text-xs text-[#6f7a6e] mb-2">Angkatan {a.angkatan} · {a.jurusan}</p>
-            {(a.pekerjaan || a.instansi) && (
-              <p class="text-sm text-[#1B7A3D] font-semibold mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-base">work</span>{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ')}</p>
-            )}
-            {a.cerita && <p class="text-sm text-[#6f7a6e] leading-relaxed">{a.cerita}</p>}
-          </div>
+          <button type="button" class="al-btn" id="al-next" aria-label="Berikutnya"><span class="material-symbols-outlined">chevron_right</span></button>
         </div>
-      ))}
+      )}
     </div>
   </section>
 )}
 
-<!-- AJAKAN DAFTAR (selalu tampil) -->
-<section class="max-w-3xl mx-auto px-4 md:px-6 py-14 md:py-16 text-center">
-  <span class="rule-mark mb-5 mx-auto"></span>
-  <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-4">Kamu alumni {site.shortName}?</h2>
-  <p class="text-sm md:text-base text-[#3f493f] leading-relaxed mb-8 max-w-xl mx-auto">Daftarkan dirimu untuk terhubung kembali dengan sekolah. Datamu masuk basis data alumni — kamu bisa memilih untuk ditampilkan sebagai alumni pilihan atau tidak.</p>
-  <a href="/alumni/daftar" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-8 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors"><span class="material-symbols-outlined text-lg">person_add</span> Daftar sebagai Alumni</a>
+<style>
+  .al-carousel { position: relative; }
+  .al-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; gap: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .al-track::-webkit-scrollbar { display: none; }
+  .al-slide { flex: 0 0 100%; scroll-snap-align: center; display: grid; grid-template-columns: minmax(240px, 34%) 1fr; gap: 0; background: #fff; border: 1px solid rgba(0,0,0,.05); border-radius: 20px; overflow: hidden; box-shadow: 0 6px 24px rgba(27,122,61,.07); min-height: 320px; }
+  .al-photo { background: #f0f7f1; position: relative; }
+  .al-photo img { width: 100%; height: 100%; object-fit: cover; }
+  .al-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .al-photo-ph .material-symbols-outlined { font-size: 56px; color: rgba(27,122,61,.4); }
+  .al-body { padding: 28px 32px; display: flex; flex-direction: column; justify-content: center; }
+  .al-badge { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; background: #C8963E; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 99px; margin-bottom: 12px; }
+  .al-badge .material-symbols-outlined { font-size: 14px; }
+  .al-body h3 { font-size: 22px; font-weight: 800; color: #1c1b1b; line-height: 1.2; }
+  .al-meta { font-size: 13px; color: #6f7a6e; margin-top: 2px; }
+  .al-job { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #1B7A3D; margin-top: 10px; }
+  .al-job .material-symbols-outlined { font-size: 18px; }
+  .al-story { font-size: 15px; line-height: 1.65; color: #3f493f; margin-top: 16px; padding-left: 16px; border-left: 3px solid #C8963E; font-style: italic; }
+  .al-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 22px; }
+  .al-btn { width: 40px; height: 40px; border-radius: 99px; border: 1px solid rgba(0,0,0,.1); background: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s, opacity .15s; }
+  .al-btn:hover { background: #f0f7f1; }
+  .al-btn:disabled { opacity: .35; cursor: default; }
+  .al-dots { display: flex; gap: 8px; }
+  .al-dot { width: 9px; height: 9px; border-radius: 99px; border: none; background: rgba(0,0,0,.15); cursor: pointer; padding: 0; transition: background .15s, width .15s; }
+  .al-dot[data-active] { background: #1B7A3D; width: 22px; }
+  @media (max-width: 640px) {
+    .al-slide { grid-template-columns: 1fr; }
+    .al-photo { aspect-ratio: 16 / 10; }
+    .al-body { padding: 20px; }
+    .al-body h3 { font-size: 19px; }
+  }
+</style>
+
+<script>
+  const track = document.getElementById('al-track');
+  if (track) {
+    const slides = Array.from(track.children) as HTMLElement[];
+    const dots = Array.from(document.querySelectorAll('.al-dot')) as HTMLElement[];
+    const prev = document.getElementById('al-prev') as HTMLButtonElement | null;
+    const next = document.getElementById('al-next') as HTMLButtonElement | null;
+    const current = () => Math.round(track.scrollLeft / track.clientWidth);
+    const goTo = (i: number) => {
+      const idx = Math.max(0, Math.min(slides.length - 1, i));
+      track.scrollTo({ left: idx * track.clientWidth, behavior: 'smooth' });
+    };
+    const sync = () => {
+      const i = current();
+      dots.forEach((d, di) => (di === i ? d.setAttribute('data-active', '') : d.removeAttribute('data-active')));
+      if (prev) prev.disabled = i === 0;
+      if (next) next.disabled = i === slides.length - 1;
+    };
+    prev?.addEventListener('click', () => goTo(current() - 1));
+    next?.addEventListener('click', () => goTo(current() + 1));
+    dots.forEach((d) => d.addEventListener('click', () => goTo(Number(d.getAttribute('data-i')))));
+    track.addEventListener('scroll', () => { window.requestAnimationFrame(sync); });
+    window.addEventListener('resize', sync);
+    sync();
+  }
+</script>
+
+<!-- AJAKAN DAFTAR (band asimetris — beda ritme dari hero) -->
+<section class="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-16">
+  <div class="relative overflow-hidden rounded-3xl bg-[#145a2d] px-6 py-10 md:px-12 md:py-11 flex flex-col md:flex-row md:items-center gap-6 md:gap-10 text-white">
+    <svg class="absolute -top-8 -right-10 w-56 h-56 text-white/[0.06] pointer-events-none" viewBox="0 0 100 100" fill="none" aria-hidden="true">
+      <path d="M50 5 L61 39 L95 39 L67 60 L78 95 L50 74 L22 95 L33 60 L5 39 L39 39 Z" stroke="currentColor" stroke-width="0.7"/>
+    </svg>
+    <div class="relative flex-1 min-w-0">
+      <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight mb-2 [overflow-wrap:anywhere]">Kamu alumni {site.shortName}?</h2>
+      <p class="text-sm md:text-base text-white/80 leading-relaxed max-w-lg">Daftarkan dirimu untuk terhubung kembali. Datamu masuk basis data alumni — tampil sebagai alumni pilihan sepenuhnya pilihanmu.</p>
+    </div>
+    <a href="/alumni/daftar" class="relative shrink-0 inline-flex items-center justify-center gap-2 bg-gold text-white font-bold px-7 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-gold-deep transition-colors shadow-lg shadow-black/20"><span class="material-symbols-outlined text-lg">person_add</span> Daftar Sekarang</a>
+  </div>
 </section>
 
 </BaseLayout>
