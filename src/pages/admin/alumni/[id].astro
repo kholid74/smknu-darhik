@@ -15,6 +15,8 @@ const isEdit = id && id !== 'new';
 const item = isEdit ? await db.alumni.findUnique({ where: { id } }) : null;
 if (id && id !== 'new' && !item) return Astro.redirect('/admin/alumni?saved=1');
 
+let error = '';
+let form: any = item;
 if (Astro.request.method === 'POST') {
   const data = await Astro.request.formData();
   const record: any = {
@@ -24,19 +26,29 @@ if (Astro.request.method === 'POST') {
     status: data.get('status')?.toString() || 'Bekerja',
     pekerjaan: data.get('pekerjaan')?.toString() || null,
     instansi: data.get('instansi')?.toString() || null,
+    domisili: data.get('domisili')?.toString() || null,
     cerita: data.get('cerita')?.toString() || null,
-    email: data.get('email')?.toString() || null,
-    wa: data.get('wa')?.toString() || null,
+    email: data.get('email')?.toString().trim() || null,
+    wa: data.get('wa')?.toString().trim() || null,
     photoUrl: data.get('photoUrl')?.toString() || null,
     verified: data.get('verified') === '1',
   };
-  if (isEdit) await db.alumni.update({ where: { id: id! }, data: record });
-  else await db.alumni.create({ data: record });
-  return Astro.redirect('/admin/alumni?saved=1');
+  try {
+    if (isEdit) await db.alumni.update({ where: { id: id! }, data: record });
+    else await db.alumni.create({ data: record });
+    return Astro.redirect('/admin/alumni?saved=1');
+  } catch (e: any) {
+    if (e?.code === 'P2002') {
+      const f = Array.isArray(e?.meta?.target) ? e.meta.target.join(', ') : 'email/WA';
+      error = `Gagal simpan: ${f} sudah dipakai alumni lain.`;
+      form = { ...record }; // pertahankan input
+    } else throw e;
+  }
 }
 
 const departments = await db.department.findMany({ orderBy: { order: 'asc' }, select: { name: true } });
 const jurusanOptions = [...departments.map((d) => d.name), 'Multimedia'];
+const regencies = await db.regency.findMany({ orderBy: { name: 'asc' }, select: { name: true } });
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: currentYear - 2010 + 1 }, (_, i) => currentYear - i);
 const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
@@ -44,19 +56,20 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
 
 <AdminLayout title={isEdit ? 'Edit Alumni' : 'Tambah Alumni'} user={{ role: session.role }}>
   <form method="POST" style="max-width:640px">
+    {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
-      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="nama" value={item?.nama || ''} required/></div>
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="nama" value={form?.nama || ''} required/></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div>
           <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Angkatan (tahun lulus) *</label>
           <select name="angkatan" required>
-            {years.map((y) => <option value={y} selected={item?.angkatan === y}>{y}</option>)}
+            {years.map((y) => <option value={y} selected={form?.angkatan === y}>{y}</option>)}
           </select>
         </div>
         <div>
           <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Jurusan *</label>
-          <input type="text" name="jurusan" value={item?.jurusan || ''} list="jurusan-list" required placeholder="Pilih atau ketik..."/>
+          <input type="text" name="jurusan" value={form?.jurusan || ''} list="jurusan-list" required placeholder="Pilih atau ketik..."/>
           <datalist id="jurusan-list">
             {jurusanOptions.map((j) => <option value={j}></option>)}
           </datalist>
@@ -67,29 +80,35 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
         <div>
           <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Status</label>
           <select name="status">
-            {statuses.map((s) => <option value={s} selected={(item?.status || 'Bekerja') === s}>{s}</option>)}
+            {statuses.map((s) => <option value={s} selected={(form?.status || 'Bekerja') === s}>{s}</option>)}
           </select>
         </div>
-        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Pekerjaan</label><input type="text" name="pekerjaan" value={item?.pekerjaan || ''}/></div>
-        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Instansi</label><input type="text" name="instansi" value={item?.instansi || ''}/></div>
+        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Pekerjaan</label><input type="text" name="pekerjaan" value={form?.pekerjaan || ''}/></div>
+        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Instansi</label><input type="text" name="instansi" value={form?.instansi || ''}/></div>
       </div>
 
-      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Cerita singkat</label><textarea name="cerita" rows="4" style="resize:vertical" placeholder="1 paragraf...">{item?.cerita || ''}</textarea></div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Domisili <span style="font-weight:500;color:#6f7a6e">(kota/kabupaten)</span></label>
+        <input type="text" name="domisili" value={form?.domisili || ''} list="kota-list" placeholder="mis. Kabupaten Lamongan"/>
+        <datalist id="kota-list">{regencies.map((r) => <option value={r.name}></option>)}</datalist>
+      </div>
+
+      <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Cerita singkat</label><textarea name="cerita" rows="4" style="resize:vertical" placeholder="1 paragraf...">{form?.cerita || ''}</textarea></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
         <div>
           <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Email <span style="font-weight:500;color:#6f7a6e">(privat — login alumni)</span></label>
-          <input type="email" name="email" value={item?.email || ''} placeholder="nama@email.com"/>
+          <input type="email" name="email" value={form?.email || ''} placeholder="nama@email.com"/>
         </div>
         <div>
           <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">No. WA <span style="font-weight:500;color:#6f7a6e">(privat)</span></label>
-          <input type="text" name="wa" value={item?.wa || ''} placeholder="08xxxx"/>
+          <input type="text" name="wa" value={form?.wa || ''} placeholder="08xxxx"/>
         </div>
       </div>
 
-      <MediaPicker field="photoUrl" value={item?.photoUrl || ''} label="Foto (opsional)" folder="alumni" />
+      <MediaPicker field="photoUrl" value={form?.photoUrl || ''} label="Foto (opsional)" folder="alumni" />
 
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="verified" value="1" checked={item?.verified ?? false} style="width:auto"/> Terverifikasi (tampil publik)</label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="verified" value="1" checked={form?.verified ?? false} style="width:auto"/> Terverifikasi (tampil publik)</label>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/alumni" class="btn btn-outline">Batal</a></div>
   </form>

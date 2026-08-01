@@ -125,6 +125,9 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
           {(a.pekerjaan || a.instansi) && (
             <p class="text-xs text-[#1B7A3D] font-semibold mb-1.5 flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">work</span>{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ')}</p>
           )}
+          {a.domisili && (
+            <p class="text-xs text-[#6f7a6e] mb-1.5 flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">location_on</span>{a.domisili}</p>
+          )}
           {a.cerita && <p class="text-xs text-[#6f7a6e] leading-relaxed line-clamp-3">{a.cerita}</p>}
         </div>
       ))}

@@ -140,9 +140,10 @@ model Alumni {
   status    String   @default("Bekerja") // Bekerja | Kuliah | Wirausaha | Lainnya
   pekerjaan String?
   instansi  String?
+  domisili  String? // kota/kabupaten saat ini — untuk stat persebaran (publik)
   cerita    String? // pendek, 1 paragraf
-  email     String? // PRIVAT — jangkar login alumni (magic-link) fase lanjut; tak tampil publik
-  wa        String? // PRIVAT — kontak/recovery, admin-only, tak pernah tampil publik
+  email     String? @unique // PRIVAT — jangkar login (magic-link); unik cegah dup (NULL boleh banyak di Postgres)
+  wa        String? @unique // PRIVAT — kontak/recovery; unik cegah dup (NULL boleh banyak)
   photoUrl  String? // admin isi saat verifikasi
   verified  Boolean  @default(false) // gate moderasi
   createdAt DateTime @default(now())
@@ -185,6 +186,21 @@ model Setting {
   youtube          String?
   metaDefaultTitle String?
   metaDefaultDesc  String?
+}
+
+// ──── MASTER WILAYAH (untuk dropdown domisili — konsistensi data) ────
+
+model Province {
+  id   String @id // kode BPS, mis. "35"
+  name String
+}
+
+model Regency {
+  id         String @id // kode BPS, mis. "3524"
+  provinceId String
+  name       String // "Kabupaten Lamongan" | "Kota Surabaya"
+
+  @@index([provinceId])
 }
 
 // ──── MEDIA LIBRARY ────

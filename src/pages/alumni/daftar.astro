@@ -4,7 +4,8 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { site } from '../../data/site';
 import { db } from '../../lib/prisma';
 
-let done = false;
+// PRG: sukses -> redirect ?ok=1 (cegah resubmit saat refresh)
+const done = Astro.url.searchParams.get('ok') === '1';
 let error = '';
 
 if (Astro.request.method === 'POST') {
@@ -17,29 +18,48 @@ if (Astro.request.method === 'POST') {
   let jurusan = data.get('jurusan')?.toString() || '';
   const jurusanLain = data.get('jurusanLain')?.toString().trim() || '';
   if (jurusan === 'Lainnya' && jurusanLain) jurusan = jurusanLain;
+  const email = data.get('email')?.toString().trim() || null;
+  const wa = data.get('wa')?.toString().trim() || null;
 
   if (trap) {
-    done = true; // bot, buang diam-diam
+    return Astro.redirect('/alumni/daftar?ok=1'); // bot, buang diam-diam
   } else if (!nama || !angkatan || !jurusan) {
     error = 'Nama, angkatan, dan jurusan wajib diisi.';
   } else if (!consent) {
     error = 'Mohon centang persetujuan untuk melanjutkan.';
   } else {
-    await db.alumni.create({
-      data: {
-        nama,
-        angkatan,
-        jurusan,
-        status: data.get('status')?.toString() || 'Bekerja',
-        pekerjaan: data.get('pekerjaan')?.toString().trim() || null,
-        instansi: data.get('instansi')?.toString().trim() || null,
-        cerita: data.get('cerita')?.toString().trim() || null,
-        email: data.get('email')?.toString().trim() || null,
-        wa: data.get('wa')?.toString().trim() || null,
-        verified: false,
-      },
-    });
-    done = true;
+    // Cek duplikat kontak sebelum simpan (pesan lebih ramah)
+    const dup = email || wa
+      ? await db.alumni.findFirst({ where: { OR: [...(email ? [{ email }] : []), ...(wa ? [{ wa }] : [])] }, select: { email: true, wa: true } })
+      : null;
+    if (dup) {
+      error = dup.email === email
+        ? 'Email ini sudah terdaftar. Jika ini kamu, hubungi admin sekolah.'
+        : 'Nomor WhatsApp ini sudah terdaftar. Jika ini kamu, hubungi admin sekolah.';
+    } else {
+      try {
+        await db.alumni.create({
+          data: {
+            nama,
+            angkatan,
+            jurusan,
+            status: data.get('status')?.toString() || 'Bekerja',
+            pekerjaan: data.get('pekerjaan')?.toString().trim() || null,
+            instansi: data.get('instansi')?.toString().trim() || null,
+            domisili: data.get('domisili')?.toString().trim() || null,
+            cerita: data.get('cerita')?.toString().trim() || null,
+            email,
+            wa,
+            verified: false,
+          },
+        });
+        return Astro.redirect('/alumni/daftar?ok=1');
+      } catch (e: any) {
+        // Backstop kalau race lolos pre-check (unique violation P2002)
+        if (e?.code === 'P2002') error = 'Email atau WhatsApp ini sudah terdaftar.';
+        else throw e;
+      }
+    }
   }
 }
 
@@ -48,6 +68,14 @@ const jurusanOptions = [...departments.map((d) => d.name), 'Multimedia'];
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: currentYear - 2010 + 1 }, (_, i) => currentYear - i);
 const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
+
+// Master wilayah untuk cascade domisili (konsistensi data)
+const [provinces, regencies] = await Promise.all([
+  db.province.findMany({ orderBy: { name: 'asc' } }),
+  db.regency.findMany({ orderBy: { name: 'asc' }, select: { provinceId: true, name: true } }),
+]);
+const regByProv: Record<string, string[]> = {};
+for (const r of regencies) (regByProv[r.provinceId] ||= []).push(r.name);
 ---
 
 <BaseLayout title="Daftar Alumni" description={`Daftarkan dirimu sebagai alumni ${site.name} — jadi inspirasi adik kelasmu.`}>
@@ -123,6 +151,19 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
           </div>
         </div>
 
+        <div>
+          <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Domisili Saat Ini <span class="font-medium text-[#6f7a6e]">(opsional)</span></label>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <select id="prov" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm bg-white">
+              <option value="">Pilih provinsi</option>
+              {provinces.map((p) => <option value={p.id}>{p.name}</option>)}
+            </select>
+            <select id="kota" name="domisili" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm bg-white" disabled>
+              <option value="">Pilih kota/kabupaten</option>
+            </select>
+          </div>
+        </div>
+
         <div class="grid sm:grid-cols-2 gap-5">
           <div>
             <label class="block text-sm font-bold text-[#1c1b1b] mb-1.5">Email <span class="font-medium text-[#6f7a6e]">(opsional, privat)</span></label>
@@ -142,7 +183,7 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
 
         <label class="flex items-start gap-2.5 text-xs text-[#3f493f] leading-relaxed cursor-pointer">
           <input type="checkbox" name="consent" value="1" required class="mt-0.5"/>
-          <span>Saya setuju nama, angkatan, jurusan, dan pekerjaan saya <strong>ditampilkan publik</strong> di direktori alumni setelah diverifikasi. Email dan nomor WhatsApp saya disimpan untuk keperluan sekolah, notifikasi, dan akses akun alumni — <strong>tidak ditampilkan publik</strong>.</span>
+          <span>Saya setuju nama, angkatan, jurusan, pekerjaan, dan domisili (kota) saya <strong>ditampilkan publik</strong> di direktori alumni setelah diverifikasi. Email dan nomor WhatsApp saya disimpan untuk keperluan sekolah, notifikasi, dan akses akun alumni — <strong>tidak ditampilkan publik</strong>.</span>
         </label>
 
         <div class="pt-1">
@@ -165,6 +206,32 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
     sel.addEventListener('change', sync);
     sync();
   }
+
+  // Cegah double-submit: nonaktifkan tombol saat form dikirim
+  const form = document.querySelector('form');
+  form?.addEventListener('submit', () => {
+    const btn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  });
+</script>
+
+<script is:inline define:vars={{ regByProv }}>
+  (function () {
+    var prov = document.getElementById('prov');
+    var kota = document.getElementById('kota');
+    if (!prov || !kota) return;
+    prov.addEventListener('change', function () {
+      var list = regByProv[prov.value] || [];
+      kota.innerHTML = '<option value="">Pilih kota/kabupaten</option>';
+      for (var i = 0; i < list.length; i++) {
+        var o = document.createElement('option');
+        o.value = list[i];
+        o.textContent = list[i];
+        kota.appendChild(o);
+      }
+      kota.disabled = list.length === 0;
+    });
+  })();
 </script>
 
 </BaseLayout>

@@ -23,11 +23,18 @@ const [
 const alumniPending = alumniTotal - alumniVerified;
 
 // ─── Alumni ───
-const [alByAngkatan, alByStatus, alByJurusan] = await Promise.all([
+const [alByAngkatan, alByStatus, alByJurusan, alByDomisiliRaw] = await Promise.all([
   db.alumni.groupBy({ by: ['angkatan'], _count: { _all: true }, orderBy: { angkatan: 'asc' } }),
   db.alumni.groupBy({ by: ['status'], _count: { _all: true } }),
   db.alumni.groupBy({ by: ['jurusan'], _count: { _all: true } }),
+  db.alumni.groupBy({ by: ['domisili'], _count: { _all: true }, where: { domisili: { not: null } } }),
 ]);
+// Persebaran domisili: buang null, urut terbanyak, ambil top 8
+const alByDomisili = alByDomisiliRaw
+  .filter((r) => r.domisili)
+  .sort((a, b) => b._count._all - a._count._all)
+  .slice(0, 8);
+const kotaCount = alByDomisiliRaw.filter((r) => r.domisili).length;
 
 // ─── Artikel ───
 const now = new Date();
@@ -97,7 +104,7 @@ const ringkasan = [
   <div class="dash-section">
     <span class="material-symbols-outlined">diversity_3</span>
     <h2>Statistik Alumni</h2>
-    <span class="dash-meta">{alumniVerified} terverifikasi · {alumniPending} menunggu</span>
+    <span class="dash-meta">{alumniVerified} terverifikasi · {alumniPending} menunggu{kotaCount > 0 ? ` · tersebar di ${kotaCount} kota` : ''}</span>
   </div>
   {alumniTotal === 0 ? (
     <div class="card dash-empty">Belum ada data alumni.</div>
@@ -112,6 +119,11 @@ const ringkasan = [
         series={alByJurusan.map(r => r._count._all)} labels={alByJurusan.map(r => r.jurusan)} height={280} />
       <ChartCard title="Status Verifikasi" subtitle="Publik vs antrian" type="donut"
         series={[alumniVerified, alumniPending]} labels={['Terverifikasi', 'Menunggu']} height={280} />
+      {alByDomisili.length > 0 && (
+        <ChartCard title="Persebaran Domisili" subtitle={`Top kota · tersebar di ${kotaCount} kota`} type="bar"
+          series={[{ name: 'Alumni', data: alByDomisili.map(r => r._count._all) }]}
+          categories={alByDomisili.map(r => r.domisili as string)} height={280} />
+      )}
     </div>
   )}
 
