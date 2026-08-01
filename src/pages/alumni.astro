@@ -12,7 +12,7 @@ const [showcase, verifiedAll] = await Promise.all([
     where: { verified: true, publicOptIn: true, featured: true },
     orderBy: [{ angkatan: 'desc' }, { nama: 'asc' }],
   }),
-  db.alumni.findMany({ where: { verified: true }, select: { status: true } }),
+  db.alumni.findMany({ where: { verified: true }, select: { status: true, domisili: true } }),
 ]);
 
 // Statistik agregat (anonim) — dari semua verified, gated bila cukup bermakna
@@ -21,7 +21,15 @@ const STAT_THRESHOLD = 30;
 const showStats = totalVerified >= STAT_THRESHOLD;
 const statCounts = { Bekerja: 0, Kuliah: 0, Wirausaha: 0, Lainnya: 0 } as Record<string, number>;
 if (showStats) for (const a of verifiedAll) statCounts[a.status] = (statCounts[a.status] || 0) + 1;
+const kotaCount = new Set(verifiedAll.map((a) => a.domisili).filter(Boolean)).size;
 const pct = (n: number) => Math.round((n / totalVerified) * 100);
+const statTiles = showStats ? [
+  { icon: 'diversity_3', value: String(totalVerified), label: 'Alumni Terdata' },
+  { icon: 'work', value: `${pct(statCounts.Bekerja)}%`, label: 'Bekerja' },
+  { icon: 'school', value: `${pct(statCounts.Kuliah)}%`, label: 'Kuliah' },
+  { icon: 'storefront', value: `${pct(statCounts.Wirausaha)}%`, label: 'Wirausaha' },
+  ...(kotaCount > 0 ? [{ icon: 'location_on', value: String(kotaCount), label: 'Kota' }] : []),
+] : [];
 ---
 
 <BaseLayout title="Alumni" description={`Alumni ${site.name} — kisah lulusan yang siap kerja dan berprestasi.`}>
@@ -43,13 +51,16 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
 
 <!-- STATISTIK AGREGAT (anonim, gated >= 30) -->
 {showStats && (
-  <section class="bg-white border-b border-black/5">
+  <section class="bg-[#f0f7f1] border-b border-[#1B7A3D]/10">
     <div class="max-w-5xl mx-auto px-4 md:px-6 py-12">
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
-        <div><div class="text-3xl font-extrabold text-[#1B7A3D]">{totalVerified}</div><div class="text-xs text-[#6f7a6e] mt-1 font-medium">Alumni Terdata</div></div>
-        <div><div class="text-3xl font-extrabold text-[#1B7A3D]">{pct(statCounts.Bekerja)}%</div><div class="text-xs text-[#6f7a6e] mt-1 font-medium">Bekerja</div></div>
-        <div><div class="text-3xl font-extrabold text-[#1B7A3D]">{pct(statCounts.Kuliah)}%</div><div class="text-xs text-[#6f7a6e] mt-1 font-medium">Kuliah</div></div>
-        <div><div class="text-3xl font-extrabold text-[#1B7A3D]">{pct(statCounts.Wirausaha)}%</div><div class="text-xs text-[#6f7a6e] mt-1 font-medium">Wirausaha</div></div>
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-4 gap-y-8">
+        {statTiles.map((s) => (
+          <div class="flex flex-col items-center text-center">
+            <span class="material-symbols-outlined text-[#1B7A3D] mb-2" style="font-size:26px">{s.icon}</span>
+            <div class="text-3xl md:text-4xl font-extrabold text-[#145a2d] leading-none">{s.value}</div>
+            <div class="text-xs text-[#3f493f] mt-1.5 font-semibold">{s.label}</div>
+          </div>
+        ))}
       </div>
     </div>
   </section>
@@ -74,11 +85,11 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
               ) : (
                 <div class="al-photo-ph"><span class="material-symbols-outlined">person</span></div>
               )}
+              <span class="al-year">Lulus {a.angkatan}</span>
             </div>
             <div class="al-body">
-              <span class="al-badge"><span class="material-symbols-outlined">star</span> Alumni Pilihan</span>
               <h3>{a.nama}</h3>
-              <p class="al-meta">Angkatan {a.angkatan} · {a.jurusan}</p>
+              <p class="al-meta">{a.jurusan}</p>
               {(a.pekerjaan || a.instansi) && (
                 <p class="al-job"><span class="material-symbols-outlined">work</span>{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ')}</p>
               )}
@@ -101,6 +112,24 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
   </section>
 )}
 
+<!-- SHOWCASE EMPTY-STATE (belum ada alumni pilihan) -->
+{showcase.length === 0 && (
+  <section class="max-w-5xl mx-auto px-4 md:px-6 py-14 md:py-20">
+    <div class="max-w-2xl mb-10">
+      <span class="rule-mark mb-5"></span>
+      <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Kisah Alumni Pilihan</h2>
+      <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Cerita para lulusan {site.shortName} yang menginspirasi — segera hadir di sini.</p>
+    </div>
+    <div class="rounded-2xl border-2 border-dashed border-[#1B7A3D]/20 bg-[#f0f7f1]/60 px-6 py-14 text-center">
+      <div class="w-16 h-16 rounded-full bg-white mx-auto mb-5 flex items-center justify-center shadow-sm">
+        <span class="material-symbols-outlined text-3xl text-[#1B7A3D]/60">auto_stories</span>
+      </div>
+      <h3 class="text-lg font-extrabold text-[#1c1b1b] mb-2">Showcase segera hadir</h3>
+      <p class="text-sm text-[#3f493f] leading-relaxed max-w-md mx-auto">Belum ada alumni pilihan yang ditampilkan. Kamu alumni {site.shortName} dan bersedia berbagi kisah? Daftar di bawah — ceritamu bisa jadi yang pertama.</p>
+    </div>
+  </section>
+)}
+
 <style>
   .al-carousel { position: relative; }
   .al-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; gap: 0; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -110,9 +139,8 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
   .al-photo img { width: 100%; height: 100%; object-fit: cover; }
   .al-photo-ph { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
   .al-photo-ph .material-symbols-outlined { font-size: 56px; color: rgba(27,122,61,.4); }
+  .al-year { position: absolute; bottom: 12px; left: 12px; background: rgba(20,90,45,.9); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .02em; padding: 4px 10px; border-radius: 99px; backdrop-filter: blur(2px); }
   .al-body { padding: 28px 32px; display: flex; flex-direction: column; justify-content: center; }
-  .al-badge { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; background: #C8963E; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 99px; margin-bottom: 12px; }
-  .al-badge .material-symbols-outlined { font-size: 14px; }
   .al-body h3 { font-size: 22px; font-weight: 800; color: #1c1b1b; line-height: 1.2; }
   .al-meta { font-size: 13px; color: #6f7a6e; margin-top: 2px; }
   .al-job { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #1B7A3D; margin-top: 10px; }
