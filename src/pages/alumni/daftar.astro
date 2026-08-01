@@ -13,6 +13,7 @@ if (Astro.request.method === 'POST') {
   // Honeypot: bot mengisi field tersembunyi -> anggap sukses tanpa simpan
   const trap = data.get('website')?.toString() || '';
   const consent = data.get('consent') === '1';
+  const publicOptIn = data.get('publicOptIn') === '1';
   const nama = data.get('nama')?.toString().trim() || '';
   const angkatan = parseInt(data.get('angkatan')?.toString() || '') || 0;
   let jurusan = data.get('jurusan')?.toString() || '';
@@ -51,6 +52,7 @@ if (Astro.request.method === 'POST') {
             email,
             wa,
             verified: false,
+            publicOptIn,
           },
         });
         return Astro.redirect('/alumni/daftar?ok=1');
@@ -181,10 +183,16 @@ for (const r of regencies) (regByProv[r.provinceId] ||= []).push(r.name);
           <textarea name="cerita" rows="3" class="w-full border border-black/10 rounded-lg px-3.5 py-2.5 text-sm resize-y" placeholder="Pengalaman atau pesan singkat untuk adik kelas..."></textarea>
         </div>
 
-        <label class="flex items-start gap-2.5 text-xs text-[#3f493f] leading-relaxed cursor-pointer">
-          <input type="checkbox" name="consent" value="1" required class="mt-0.5"/>
-          <span>Saya setuju nama, angkatan, jurusan, pekerjaan, dan domisili (kota) saya <strong>ditampilkan publik</strong> di direktori alumni setelah diverifikasi. Email dan nomor WhatsApp saya disimpan untuk keperluan sekolah, notifikasi, dan akses akun alumni — <strong>tidak ditampilkan publik</strong>.</span>
-        </label>
+        <div class="flex flex-col gap-3 bg-[#f0f7f1] rounded-lg p-4">
+          <label class="flex items-start gap-2.5 text-xs text-[#3f493f] leading-relaxed cursor-pointer">
+            <input type="checkbox" name="consent" value="1" required class="mt-0.5"/>
+            <span><strong>(Wajib)</strong> Saya setuju data saya <strong>disimpan oleh sekolah</strong> untuk keperluan pendataan alumni, tracer study, dan kontak. Email & WhatsApp <strong>tidak ditampilkan publik</strong>.</span>
+          </label>
+          <label class="flex items-start gap-2.5 text-xs text-[#3f493f] leading-relaxed cursor-pointer">
+            <input type="checkbox" name="publicOptIn" value="1" class="mt-0.5"/>
+            <span><strong>(Opsional)</strong> Saya <strong>bersedia ditampilkan sebagai alumni pilihan</strong> di website (nama, angkatan, jurusan, pekerjaan, cerita). Mendaftar tidak otomatis menampilkan profil — hanya bila kamu setuju di sini dan dipilih admin.</span>
+          </label>
+        </div>
 
         <div class="pt-1">
           <button type="submit" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors w-full sm:w-auto"><span class="material-symbols-outlined text-base">send</span> Kirim Pendaftaran</button>

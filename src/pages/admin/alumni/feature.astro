@@ -1,0 +1,25 @@
+---
+export const prerender = false;
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const id = data.get('id')?.toString();
+  if (id) {
+    const a = await db.alumni.findUnique({ where: { id }, select: { verified: true, publicOptIn: true, featured: true } });
+    // Hanya boleh di-showcase kalau terverifikasi DAN alumni opt-in
+    if (a && a.verified && a.publicOptIn) {
+      await db.alumni.update({ where: { id }, data: { featured: !a.featured } });
+    }
+  }
+}
+
+return Astro.redirect('/admin/alumni');
+---
+<html></html>

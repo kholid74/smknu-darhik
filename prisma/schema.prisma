@@ -144,12 +144,15 @@ model Alumni {
   cerita    String? // pendek, 1 paragraf
   email     String? @unique // PRIVAT — jangkar login (magic-link); unik cegah dup (NULL boleh banyak di Postgres)
   wa        String? @unique // PRIVAT — kontak/recovery; unik cegah dup (NULL boleh banyak)
-  photoUrl  String? // admin isi saat verifikasi
-  verified  Boolean  @default(false) // gate moderasi
-  createdAt DateTime @default(now())
+  photoUrl    String? // admin isi saat verifikasi
+  verified    Boolean  @default(false) // gate moderasi (data valid, masuk DB)
+  publicOptIn Boolean  @default(false) // alumni setuju tampil publik
+  featured    Boolean  @default(false) // admin pilih tampil di showcase; hanya boleh bila publicOptIn
+  createdAt   DateTime @default(now())
 
   @@index([verified])
   @@index([angkatan])
+  @@index([featured])
 }
 
 model Download {

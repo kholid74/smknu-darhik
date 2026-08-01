@@ -221,9 +221,25 @@ Model: Alumni → id, nama, angkatan, jurusan, pekerjaan, instansi, foto, cerita
 
 - **Model `Alumni`**: nama, angkatan (Int, tahun lulus), jurusan, status (Bekerja/Kuliah/Wirausaha/Lainnya), pekerjaan, instansi, cerita, `wa` (privat, admin-only), photoUrl, `verified` gate.
 - **`/alumni/daftar`** — form publik pendaftaran mandiri. **Tanpa upload foto.** Honeypot + checkbox consent wajib. Jurusan dropdown (Department live + Multimedia + Lainnya). Angkatan dropdown 2010→tahun berjalan. Submit → `verified=false` → state "terima kasih, menunggu verifikasi".
-- **`/alumni`** — landing: CTA daftar + direktori (verified-only, filter jurusan/angkatan, **pagination 24/hal**) + statistik **auto-gated ≥30 verified** (hindari persen menyesatkan pada N kecil).
-- **`/admin/alumni`** — antrian verifikasi, approve 1-klik, edit (pasang foto/koreksi), hapus. WA tidak pernah tampil publik.
+- **`/alumni`** (revisi privasi) — landing: CTA daftar + statistik agregat anonim (**auto-gated ≥30 verified**) + **showcase alumni pilihan** (bukan direktori penuh).
+- **`/admin/alumni`** — antrian verifikasi, approve 1-klik (modal konfirmasi), filter (nama/status/angkatan/jurusan) + sort kolom, toggle featured (bintang), edit, hapus. WA & email tidak pernah tampil publik.
 - Long-form success story = **reuse `Article`** (kategori Alumni), bukan sistem baru.
+
+**Keputusan privasi (grilling):** publik TIDAK menampilkan semua alumni. Norma sekolah = showcase terkurasi + statistik agregat, bukan direktori penuh yang browsable (permukaan panen data). Model:
+- `verified` = data valid masuk DB (moderasi).
+- `publicOptIn` = alumni **setuju** tampil publik (checkbox opsional saat daftar; wajib-consent hanya untuk penyimpanan data).
+- `featured` = admin pilih tampil di showcase; **hanya boleh bila `publicOptIn`** (dijaga di server).
+- Publik showcase = `verified && publicOptIn && featured`. Default semua `false` → nol paparan otomatis.
+- Kartu showcase: foto, nama, angkatan, jurusan, pekerjaan@instansi, cerita. **Tanpa domisili/WA/email.** Statistik agregat (persen status) anonim, dari semua verified.
+- Dedup: `email`/`wa` `@unique` (NULL boleh banyak) + PRG anti-resubmit.
+- Master wilayah (Province/Regency, BPS) untuk dropdown domisili konsisten; domisili → statistik persebaran kota (agregat, di dashboard admin).
+
+### 8.1b Fase 2 — Kontribusi Alumni (belum dibangun)
+
+Intake inbox admin-only (bukan job board publik):
+- Model `AlumniContribution`: nama, kontak, **jenis** (Usulan/Saran · Tawaran Workshop/Narasumber · Info Lowongan · Lainnya), detail, status.
+- `/alumni/kontribusi` (form publik + honeypot) → antrian → `/admin/kontribusi` (inbox). **Tidak tampil publik** → nol paparan. Admin tindak lanjut manual (loker bisa nanti jadi pengumuman/Download).
+- Section CTA "Ingin berkontribusi?" di `/alumni` menuju form.
 
 ### 8.2 Ditunda ke Fase Lanjut (Level 3 — Login Alumni)
 

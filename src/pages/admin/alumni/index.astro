@@ -100,12 +100,13 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
           <th><a href={sortLink('jurusan')} class="th-sort" data-active={sort === 'jurusan' || undefined}>Jurusan <span class="material-symbols-outlined">{sortIcon('jurusan')}</span></a></th>
           <th><a href={sortLink('pekerjaan')} class="th-sort" data-active={sort === 'pekerjaan' || undefined}>Pekerjaan <span class="material-symbols-outlined">{sortIcon('pekerjaan')}</span></a></th>
           <th><a href={sortLink('status')} class="th-sort" data-active={sort === 'status' || undefined}>Status <span class="material-symbols-outlined">{sortIcon('status')}</span></a></th>
-          <th style="width:120px"></th>
+          <th>Publik</th>
+          <th style="width:150px"></th>
         </tr>
       </thead>
       <tbody>
         {alumni.length === 0 ? (
-          <tr><td colspan="6" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada alumni.</td></tr>
+          <tr><td colspan="7" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada alumni.</td></tr>
         ) : alumni.map(a => (
           <tr>
             <td style="font-weight:600">{a.nama}</td>
@@ -119,9 +120,26 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
               }
             </td>
             <td>
+              {a.featured
+                ? <span class="badge badge-green" title="Tampil di showcase publik">Tampil</span>
+                : a.publicOptIn
+                  ? <span class="badge badge-gray" title="Opt-in, belum di-showcase">Opt-in</span>
+                  : <span style="font-size:11px;color:#94a3b8" title="Alumni tidak bersedia tampil publik">— privat</span>
+              }
+            </td>
+            <td>
               <div style="display:flex;gap:4px">
                 {!a.verified && (
                   <button type="button" class="btn btn-outline js-approve" data-id={a.id} data-nama={a.nama} style="padding:6px 10px;font-size:11px;color:#16a34a" title="Setujui & tampilkan"><span class="material-symbols-outlined" style="font-size:16px">check_circle</span></button>
+                )}
+                {a.verified && a.publicOptIn && (
+                  <form method="POST" action="/admin/alumni/feature" style="display:inline">
+                    <input type="hidden" name="id" value={a.id}/>
+                    <button type="submit" class="btn btn-outline" style={`padding:6px 10px;font-size:11px;${a.featured ? 'color:#C8963E' : 'color:#94a3b8'}`} title={a.featured ? 'Hentikan tampil di showcase' : 'Tampilkan di showcase publik'}><span class="material-symbols-outlined" style="font-size:16px">{a.featured ? 'star' : 'star_outline'}</span></button>
+                  </form>
+                )}
+                {a.verified && !a.publicOptIn && (
+                  <span class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#cbd5e1;cursor:not-allowed" title="Alumni tidak opt-in tampil publik"><span class="material-symbols-outlined" style="font-size:16px">star_outline</span></span>
                 )}
                 <a href={`/admin/alumni/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px" title="Edit"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
                 <form method="POST" action="/admin/alumni/delete" style="display:inline">

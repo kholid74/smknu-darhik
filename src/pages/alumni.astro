@@ -6,36 +6,17 @@ import { db } from '../lib/prisma';
 
 const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${url}?w=${w}` : url);
 
-const url = new URL(Astro.request.url);
-const fJurusan = url.searchParams.get('jurusan') || '';
-const fAngkatan = url.searchParams.get('angkatan') || '';
-const page = Math.max(1, parseInt(url.searchParams.get('page') || '1') || 1);
-const limit = 24;
-
-const where: any = { verified: true };
-if (fJurusan) where.jurusan = fJurusan;
-if (fAngkatan) where.angkatan = parseInt(fAngkatan) || undefined;
-
-const [alumni, matchCount, totalVerified] = await Promise.all([
-  db.alumni.findMany({ where, orderBy: [{ angkatan: 'desc' }, { nama: 'asc' }], skip: (page - 1) * limit, take: limit }),
-  db.alumni.count({ where }),
-  db.alumni.count({ where: { verified: true } }),
+// Showcase publik = terverifikasi + opt-in + dipilih admin
+const [showcase, verifiedAll] = await Promise.all([
+  db.alumni.findMany({
+    where: { verified: true, publicOptIn: true, featured: true },
+    orderBy: [{ angkatan: 'desc' }, { nama: 'asc' }],
+  }),
+  db.alumni.findMany({ where: { verified: true }, select: { status: true } }),
 ]);
-const totalPages = Math.ceil(matchCount / limit);
-const qs = (p: number) => {
-  const s = new URLSearchParams();
-  if (fJurusan) s.set('jurusan', fJurusan);
-  if (fAngkatan) s.set('angkatan', fAngkatan);
-  s.set('page', String(p));
-  return `?${s.toString()}`;
-};
 
-// Pilihan filter dari data terverifikasi
-const verifiedAll = await db.alumni.findMany({ where: { verified: true }, select: { jurusan: true, angkatan: true, status: true } });
-const jurusanList = [...new Set(verifiedAll.map((a) => a.jurusan))].sort();
-const angkatanList = [...new Set(verifiedAll.map((a) => a.angkatan))].sort((a, b) => b - a);
-
-// Statistik: hanya tampil bila data cukup bermakna
+// Statistik agregat (anonim) — dari semua verified, gated bila cukup bermakna
+const totalVerified = verifiedAll.length;
 const STAT_THRESHOLD = 30;
 const showStats = totalVerified >= STAT_THRESHOLD;
 const statCounts = { Bekerja: 0, Kuliah: 0, Wirausaha: 0, Lainnya: 0 } as Record<string, number>;
@@ -43,7 +24,7 @@ if (showStats) for (const a of verifiedAll) statCounts[a.status] = (statCounts[a
 const pct = (n: number) => Math.round((n / totalVerified) * 100);
 ---
 
-<BaseLayout title="Alumni" description={`Direktori alumni ${site.name} — bukti nyata lulusan yang siap kerja dan berprestasi.`}>
+<BaseLayout title="Alumni" description={`Alumni ${site.name} — kisah lulusan yang siap kerja dan berprestasi.`}>
 
 <!-- HERO -->
 <section class="relative bg-[#145a2d] overflow-hidden">
@@ -60,7 +41,7 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
   </div>
 </section>
 
-<!-- STATISTIK (gated >= 30) -->
+<!-- STATISTIK AGREGAT (anonim, gated >= 30) -->
 {showStats && (
   <section class="bg-white border-b border-black/5">
     <div class="max-w-5xl mx-auto px-4 md:px-6 py-12">
@@ -74,83 +55,46 @@ const pct = (n: number) => Math.round((n / totalVerified) * 100);
   </section>
 )}
 
-<!-- DIREKTORI -->
-<section class="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
-  <div class="flex flex-wrap items-end justify-between gap-4 mb-8">
-    <div>
+<!-- SHOWCASE ALUMNI PILIHAN -->
+{showcase.length > 0 && (
+  <section class="max-w-6xl mx-auto px-4 md:px-6 py-14 md:py-20">
+    <div class="max-w-2xl mb-12">
       <span class="rule-mark mb-5"></span>
-      <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Direktori Alumni</h2>
+      <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b]">Kisah Alumni Pilihan</h2>
+      <p class="mt-4 text-sm md:text-base text-[#3f493f] leading-relaxed">Beberapa lulusan {site.shortName} yang berbagi jejak dan inspirasinya.</p>
     </div>
-    {(jurusanList.length > 0 || angkatanList.length > 0) && (
-      <form method="GET" class="flex flex-wrap gap-2">
-        <select name="jurusan" onchange="this.form.submit()" class="border border-black/10 rounded-lg px-3 py-2 text-sm bg-white">
-          <option value="">Semua Jurusan</option>
-          {jurusanList.map((j) => <option value={j} selected={fJurusan === j}>{j}</option>)}
-        </select>
-        <select name="angkatan" onchange="this.form.submit()" class="border border-black/10 rounded-lg px-3 py-2 text-sm bg-white">
-          <option value="">Semua Angkatan</option>
-          {angkatanList.map((y) => <option value={String(y)} selected={fAngkatan === String(y)}>{y}</option>)}
-        </select>
-        {(fJurusan || fAngkatan) && <a href="/alumni" class="inline-flex items-center px-3 py-2 text-sm text-[#6f7a6e] hover:text-[#1B7A3D]">Reset</a>}
-      </form>
-    )}
-  </div>
 
-  {alumni.length === 0 ? (
-    <div class="bg-white rounded-2xl border border-black/5 shadow-[0_4px_16px_rgba(27,122,61,0.06)] p-10 md:p-14 text-center">
-      <div class="w-16 h-16 rounded-full bg-[#f0f7f1] mx-auto mb-5 flex items-center justify-center">
-        <span class="material-symbols-outlined text-3xl text-[#1B7A3D]">group</span>
-      </div>
-      <h3 class="text-lg font-extrabold text-[#1c1b1b] mb-2">{fJurusan || fAngkatan ? 'Tidak ada alumni untuk filter ini' : 'Jadilah alumni pertama yang terdata'}</h3>
-      <p class="text-sm text-[#3f493f] leading-relaxed mb-6 max-w-md mx-auto">{fJurusan || fAngkatan ? 'Coba ubah atau reset filter.' : 'Direktori ini akan terisi seiring alumni mendaftarkan diri. Mulai dari kamu.'}</p>
-      <a href="/alumni/daftar" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-6 py-3 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors"><span class="material-symbols-outlined text-base">person_add</span> Daftar Sekarang</a>
-    </div>
-  ) : (
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-      {alumni.map((a) => (
-        <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] p-5 hover:shadow-[0_8px_24px_rgba(27,122,61,0.1)] transition-shadow">
-          <div class="flex items-center gap-4 mb-3">
-            <div class="w-14 h-14 rounded-full bg-[#f0f7f1] flex items-center justify-center flex-shrink-0 overflow-hidden">
-              {a.photoUrl ? (
-                <img class="w-full h-full object-cover" src={thumb(a.photoUrl, 120)} alt={a.nama} loading="lazy" onerror="this.style.display='none'"/>
-              ) : (
-                <span class="material-symbols-outlined text-2xl text-[#1B7A3D]/50">person</span>
-              )}
-            </div>
-            <div class="min-w-0">
-              <h3 class="font-bold text-[#1c1b1b] text-sm [overflow-wrap:anywhere]">{a.nama}</h3>
-              <p class="text-xs text-[#6f7a6e]">Angkatan {a.angkatan} · {a.jurusan}</p>
-            </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {showcase.map((a) => (
+        <div class="bg-white rounded-2xl border border-black/5 shadow-[0_4px_16px_rgba(27,122,61,0.06)] overflow-hidden hover:shadow-[0_10px_30px_rgba(27,122,61,0.12)] transition-shadow flex flex-col">
+          <div class="aspect-[4/3] bg-[#f0f7f1] overflow-hidden relative">
+            {a.photoUrl ? (
+              <img class="w-full h-full object-cover" src={thumb(a.photoUrl, 500)} alt={a.nama} loading="lazy" onerror="this.style.display='none'"/>
+            ) : (
+              <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-5xl text-[#1B7A3D]/40">person</span></div>
+            )}
+            <span class="absolute top-3 left-3 inline-flex items-center gap-1 bg-gold text-white text-[11px] font-bold px-2.5 py-1 rounded-full"><span class="material-symbols-outlined text-sm">star</span> Alumni Pilihan</span>
           </div>
-          {(a.pekerjaan || a.instansi) && (
-            <p class="text-xs text-[#1B7A3D] font-semibold mb-1.5 flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">work</span>{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ')}</p>
-          )}
-          {a.domisili && (
-            <p class="text-xs text-[#6f7a6e] mb-1.5 flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">location_on</span>{a.domisili}</p>
-          )}
-          {a.cerita && <p class="text-xs text-[#6f7a6e] leading-relaxed line-clamp-3">{a.cerita}</p>}
+          <div class="p-5 flex flex-col flex-1">
+            <h3 class="font-extrabold text-[#1c1b1b] text-base [overflow-wrap:anywhere]">{a.nama}</h3>
+            <p class="text-xs text-[#6f7a6e] mb-2">Angkatan {a.angkatan} · {a.jurusan}</p>
+            {(a.pekerjaan || a.instansi) && (
+              <p class="text-sm text-[#1B7A3D] font-semibold mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-base">work</span>{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ')}</p>
+            )}
+            {a.cerita && <p class="text-sm text-[#6f7a6e] leading-relaxed">{a.cerita}</p>}
+          </div>
         </div>
       ))}
     </div>
-  )}
+  </section>
+)}
 
-  {totalPages > 1 && (
-    <nav class="flex justify-center items-center gap-1.5 mt-10" aria-label="Navigasi halaman">
-      {page > 1 && (
-        <a href={qs(page - 1)} class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-black/10 text-[#1c1b1b] hover:bg-[#f0f7f1] transition-colors" aria-label="Sebelumnya"><span class="material-symbols-outlined text-lg">chevron_left</span></a>
-      )}
-      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-        <a href={qs(p)} class={`inline-flex items-center justify-center min-w-10 h-10 px-3 rounded-lg text-sm font-semibold transition-colors ${p === page ? 'bg-[#1B7A3D] text-white' : 'border border-black/10 text-[#1c1b1b] hover:bg-[#f0f7f1]'}`}>{p}</a>
-      ))}
-      {page < totalPages && (
-        <a href={qs(page + 1)} class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-black/10 text-[#1c1b1b] hover:bg-[#f0f7f1] transition-colors" aria-label="Berikutnya"><span class="material-symbols-outlined text-lg">chevron_right</span></a>
-      )}
-    </nav>
-  )}
-
-  {matchCount > 0 && (
-    <p class="text-center text-xs text-[#6f7a6e] mt-5">Menampilkan {(page - 1) * limit + 1}–{Math.min(page * limit, matchCount)} dari {matchCount} alumni</p>
-  )}
+<!-- AJAKAN DAFTAR (selalu tampil) -->
+<section class="max-w-3xl mx-auto px-4 md:px-6 py-14 md:py-16 text-center">
+  <span class="rule-mark mb-5 mx-auto"></span>
+  <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight text-[#1c1b1b] mb-4">Kamu alumni {site.shortName}?</h2>
+  <p class="text-sm md:text-base text-[#3f493f] leading-relaxed mb-8 max-w-xl mx-auto">Daftarkan dirimu untuk terhubung kembali dengan sekolah. Datamu masuk basis data alumni — kamu bisa memilih untuk ditampilkan sebagai alumni pilihan atau tidak.</p>
+  <a href="/alumni/daftar" class="inline-flex items-center justify-center gap-2 bg-[#1B7A3D] text-white font-bold px-8 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-[#145a2d] transition-colors"><span class="material-symbols-outlined text-lg">person_add</span> Daftar sebagai Alumni</a>
 </section>
 
 </BaseLayout>
