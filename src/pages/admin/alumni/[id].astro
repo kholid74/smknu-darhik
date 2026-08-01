@@ -32,6 +32,9 @@ if (Astro.request.method === 'POST') {
     wa: data.get('wa')?.toString().trim() || null,
     photoUrl: data.get('photoUrl')?.toString() || null,
     verified: data.get('verified') === '1',
+    publicOptIn: data.get('publicOptIn') === '1',
+    // featured hanya berlaku kalau opt-in; kalau tidak, paksa false
+    featured: data.get('publicOptIn') === '1' && data.get('featured') === '1',
   };
   try {
     if (isEdit) await db.alumni.update({ where: { id: id! }, data: record });
@@ -55,7 +58,7 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
 ---
 
 <AdminLayout title={isEdit ? 'Edit Alumni' : 'Tambah Alumni'} user={{ role: session.role }}>
-  <form method="POST" style="max-width:640px">
+  <form method="POST" style="max-width:640px" id="alumni-form" data-was-optin={form?.publicOptIn ? '1' : '0'} data-was-featured={form?.featured ? '1' : '0'}>
     {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="nama" value={form?.nama || ''} required/></div>
@@ -108,8 +111,61 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
 
       <MediaPicker field="photoUrl" value={form?.photoUrl || ''} label="Foto (opsional)" folder="alumni" hint="Foto potret/landscape, wajah jelas · lebar ≥ 600px · maks 5MB." />
 
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="verified" value="1" checked={form?.verified ?? false} style="width:auto"/> Terverifikasi (tampil publik)</label>
+      <div style="display:flex;flex-direction:column;gap:10px;background:#f0f7f1;border-radius:10px;padding:14px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="verified" value="1" checked={form?.verified ?? false} style="width:auto"/> Terverifikasi (data valid, masuk direktori internal)</label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="publicOptIn" value="1" checked={form?.publicOptIn ?? false} style="width:auto;margin-top:3px"/> <span>Bersedia tampil publik <span style="font-weight:500;color:#6f7a6e">— centang hanya bila alumni sudah menyetujui (mis. konfirmasi via WA)</span></span></label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="featured" value="1" checked={form?.featured ?? false} style="width:auto"/> Tampilkan di showcase beranda <span style="font-weight:500;color:#6f7a6e">— butuh "Bersedia tampil publik"</span></label>
+      </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/alumni" class="btn btn-outline">Batal</a></div>
   </form>
+
+  <div id="pub-modal" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pub-title">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span class="material-symbols-outlined" style="color:#C8963E;font-size:24px">public</span>
+        <h3 id="pub-title" style="font-size:16px;font-weight:800;margin:0">Tampilkan ke Publik?</h3>
+      </div>
+      <p id="pub-msg" style="font-size:13px;color:#5a6459;line-height:1.5;margin-bottom:18px"></p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button type="button" class="btn btn-outline" id="pub-cancel">Batal</button>
+        <button type="button" class="btn btn-primary" id="pub-confirm"><span class="material-symbols-outlined" style="font-size:16px">check</span> Ya, tampilkan</button>
+      </div>
+    </div>
+  </div>
 </AdminLayout>
+
+<style>
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px; }
+  .modal-overlay[hidden] { display:none; }
+  .modal-card { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+</style>
+
+<script>
+  const form = document.getElementById('alumni-form') as HTMLFormElement | null;
+  const modal = document.getElementById('pub-modal');
+  if (form && modal) {
+    const optin = form.querySelector('input[name="publicOptIn"]') as HTMLInputElement;
+    const featured = form.querySelector('input[name="featured"]') as HTMLInputElement;
+    const namaEl = form.querySelector('input[name="nama"]') as HTMLInputElement;
+    const msg = document.getElementById('pub-msg');
+    const wasOptin = form.dataset.wasOptin === '1';
+    const wasFeatured = form.dataset.wasFeatured === '1';
+    let confirmed = false;
+
+    form.addEventListener('submit', (e) => {
+      if (confirmed) return;
+      // Konfirmasi hanya saat MENGAKTIFKAN paparan publik baru
+      const newlyPublic = (optin?.checked && !wasOptin) || (featured?.checked && optin?.checked && !wasFeatured);
+      if (!newlyPublic) return;
+      e.preventDefault();
+      const nama = namaEl?.value || 'Alumni ini';
+      if (msg) msg.innerHTML = `<strong style="color:#1c1b1b">${nama}</strong> akan ditampilkan publik${featured?.checked ? ' di showcase beranda' : ' (opt-in)'}. Pastikan alumni sudah menyetujui. Lanjutkan?`;
+      modal.hidden = false;
+    });
+
+    document.getElementById('pub-cancel')?.addEventListener('click', () => { modal.hidden = true; });
+    modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.hidden = true; });
+    document.getElementById('pub-confirm')?.addEventListener('click', () => { confirmed = true; modal.hidden = true; form.submit(); });
+  }
+</script>
