@@ -145,6 +145,7 @@ model Alumni {
   email     String? @unique // PRIVAT — jangkar login (magic-link); unik cegah dup (NULL boleh banyak di Postgres)
   wa        String? @unique // PRIVAT — kontak/recovery; unik cegah dup (NULL boleh banyak)
   photoUrl    String? // admin isi saat verifikasi
+  alumniId    String?  @unique // ID kartu alumni (SMKSDH-0001), diberi saat approve; permanen
   verified    Boolean  @default(false) // gate moderasi (data valid, masuk DB)
   publicOptIn Boolean  @default(false) // alumni setuju tampil publik
   featured    Boolean  @default(false) // admin pilih tampil di showcase; hanya boleh bila publicOptIn

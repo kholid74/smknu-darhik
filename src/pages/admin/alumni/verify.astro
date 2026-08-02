@@ -2,6 +2,7 @@
 export const prerender = false;
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
+import { assignAlumniIdIfNeeded } from '../../../lib/alumni-id';
 
 const token = Astro.cookies.get('smkdh_token')?.value;
 if (!token) return Astro.redirect('/admin/login');
@@ -11,7 +12,10 @@ if (!session) return Astro.redirect('/admin/login');
 if (Astro.request.method === 'POST') {
   const data = await Astro.request.formData();
   const id = data.get('id')?.toString();
-  if (id) await db.alumni.update({ where: { id }, data: { verified: true } }).catch(() => {});
+  if (id) {
+    await db.alumni.update({ where: { id }, data: { verified: true } }).catch(() => {});
+    await assignAlumniIdIfNeeded(id); // approve -> beri ID kartu permanen
+  }
 }
 
 return Astro.redirect('/admin/alumni');

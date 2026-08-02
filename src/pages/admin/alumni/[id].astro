@@ -4,6 +4,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import MediaPicker from '../../../components/MediaPicker.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
+import { assignAlumniIdIfNeeded } from '../../../lib/alumni-id';
 
 const token = Astro.cookies.get('smkdh_token')?.value;
 if (!token) return Astro.redirect('/admin/login');
@@ -37,8 +38,10 @@ if (Astro.request.method === 'POST') {
     featured: data.get('publicOptIn') === '1' && data.get('featured') === '1',
   };
   try {
-    if (isEdit) await db.alumni.update({ where: { id: id! }, data: record });
-    else await db.alumni.create({ data: record });
+    const saved = isEdit
+      ? await db.alumni.update({ where: { id: id! }, data: record })
+      : await db.alumni.create({ data: record });
+    await assignAlumniIdIfNeeded(saved.id); // beri ID kartu bila verified & belum ada
     return Astro.redirect('/admin/alumni?saved=1');
   } catch (e: any) {
     if (e?.code === 'P2002') {
@@ -61,6 +64,13 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
   <form method="POST" style="max-width:640px" id="alumni-form" data-was-optin={form?.publicOptIn ? '1' : '0'} data-was-featured={form?.featured ? '1' : '0'}>
     {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      {form?.alumniId && (
+        <div style="display:flex;align-items:center;gap:8px;background:#f0f7f1;border-radius:8px;padding:8px 12px;font-size:13px">
+          <span class="material-symbols-outlined" style="font-size:18px;color:#1B7A3D">badge</span>
+          <span>ID Alumni: <strong style="font-family:monospace">{form.alumniId}</strong></span>
+          <span style="color:#6f7a6e;font-size:12px">— permanen, otomatis saat verifikasi</span>
+        </div>
+      )}
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="nama" value={form?.nama || ''} required/></div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">

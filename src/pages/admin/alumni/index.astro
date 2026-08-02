@@ -109,7 +109,9 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
           <tr><td colspan="7" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada alumni.</td></tr>
         ) : alumni.map(a => (
           <tr>
-            <td style="font-weight:600">{a.nama}</td>
+            <td style="font-weight:600">{a.nama}
+              {a.alumniId && <div style="font-size:11px;color:#6f7a6e;font-weight:600;font-family:monospace;margin-top:2px">{a.alumniId}</div>}
+            </td>
             <td style="font-size:13px">{a.angkatan}</td>
             <td style="font-size:12px;color:#6f7a6e">{a.jurusan}</td>
             <td style="font-size:12px;color:#6f7a6e">{[a.pekerjaan, a.instansi].filter(Boolean).join(' · ') || '-'}</td>
