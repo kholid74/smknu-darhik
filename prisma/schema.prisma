@@ -175,13 +175,38 @@ model Download {
   createdAt DateTime @default(now())
 }
 
-// ──── ADMIN ────
+// ──── RBAC (realm Internal) ────
 
-model Admin {
-  id       String @id @default(cuid())
-  username String @unique
-  password String // bcrypt hash
-  role     String @default("editor") // superadmin | editor
+model Account {
+  id           String            @id @default(cuid())
+  email        String            @unique
+  username     String?           @unique
+  passwordHash String
+  active       Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  roles        AccountRole[]
+  overrides    AccountOverride[]
+}
+
+model AccountRole {
+  id        String  @id @default(cuid())
+  accountId String
+  role      String // superadmin | staf | guru | siswa
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, role])
+  @@index([role])
+}
+
+model AccountOverride {
+  id         String  @id @default(cuid())
+  accountId  String
+  capability String
+  effect     String // grant | revoke
+  account    Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, capability, effect])
+  @@index([accountId])
 }
 
 // ──── SETTINGS ────

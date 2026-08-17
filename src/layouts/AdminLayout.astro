@@ -1,5 +1,6 @@
 ---
 import { site } from '../data/site';
+import { can } from '../lib/rbac';
 
 interface Props {
   title: string;
@@ -9,56 +10,67 @@ interface Props {
 const { title, user } = Astro.props;
 const currentPath = Astro.url.pathname;
 
-const groups = [
+// Izin efektif disuplai middleware (locals.principal). Menu disaring per kapabilitas.
+const principal = Astro.locals.principal;
+const allow = (cap: string) => (principal ? can(principal, cap) : false);
+
+const allGroups = [
   {
     label: 'Konten',
     icon: 'edit_note',
     items: [
-      { label: 'Artikel', href: '/admin/artikel' },
-      { label: 'Halaman Statis', href: '/admin/halaman' },
-      { label: 'Pengumuman', href: '/admin/pengumuman' },
+      { label: 'Artikel', href: '/admin/artikel', cap: 'artikel.kelola' },
+      { label: 'Halaman Statis', href: '/admin/halaman', cap: 'halaman.kelola' },
+      { label: 'Pengumuman', href: '/admin/pengumuman', cap: 'pengumuman.kelola' },
     ],
   },
   {
     label: 'Sekolah',
     icon: 'school',
     items: [
-      { label: 'Jurusan', href: '/admin/jurusan' },
-      { label: 'Guru & Staf', href: '/admin/guru' },
-      { label: 'Fasilitas', href: '/admin/fasilitas' },
-      { label: 'Ekstrakurikuler', href: '/admin/ekskul' },
-      { label: 'Mitra Industri', href: '/admin/mitra' },
+      { label: 'Jurusan', href: '/admin/jurusan', cap: 'jurusan.kelola' },
+      { label: 'Guru & Staf', href: '/admin/guru', cap: 'guru.kelola' },
+      { label: 'Fasilitas', href: '/admin/fasilitas', cap: 'fasilitas.kelola' },
+      { label: 'Ekstrakurikuler', href: '/admin/ekskul', cap: 'ekskul.kelola' },
+      { label: 'Mitra Industri', href: '/admin/mitra', cap: 'mitra.kelola' },
     ],
   },
   {
     label: 'Prestasi & Bukti',
     icon: 'emoji_events',
     items: [
-      { label: 'Prestasi', href: '/admin/prestasi' },
-      { label: 'Testimoni', href: '/admin/testimoni' },
-      { label: 'Alumni', href: '/admin/alumni' },
-      { label: 'Kontribusi Alumni', href: '/admin/kontribusi' },
-      { label: 'FAQ', href: '/admin/faq' },
+      { label: 'Prestasi', href: '/admin/prestasi', cap: 'prestasi.kelola' },
+      { label: 'Testimoni', href: '/admin/testimoni', cap: 'testimoni.kelola' },
+      { label: 'Alumni', href: '/admin/alumni', cap: 'alumni.moderasi' },
+      { label: 'Kontribusi Alumni', href: '/admin/kontribusi', cap: 'kontribusi.kelola' },
+      { label: 'FAQ', href: '/admin/faq', cap: 'faq.kelola' },
     ],
   },
   {
     label: 'Media',
     icon: 'perm_media',
     items: [
-      { label: 'Pustaka Media', href: '/admin/media' },
-      { label: 'Galeri Foto', href: '/admin/galeri' },
-      { label: 'Download', href: '/admin/download' },
+      { label: 'Pustaka Media', href: '/admin/media', cap: 'media.kelola' },
+      { label: 'Galeri Foto', href: '/admin/galeri', cap: 'galeri.kelola' },
+      { label: 'Download', href: '/admin/download', cap: 'download.kelola' },
     ],
   },
   {
     label: 'Pengaturan',
     icon: 'settings',
     items: [
-      { label: 'Informasi Sekolah', href: '/admin/pengaturan' },
-      ...(user?.role === 'superadmin' ? [{ label: 'Pengguna', href: '/admin/pengguna' }] : []),
+      { label: 'Informasi Sekolah', href: '/admin/pengaturan', cap: 'setting.kelola' },
+      { label: 'Pengguna', href: '/admin/pengguna', cap: 'account.kelola' },
     ],
   },
 ];
+
+// Sisakan hanya item yang diizinkan; buang grup yang jadi kosong.
+const groups = allGroups
+  .map((g) => ({ ...g, items: g.items.filter((i) => allow(i.cap)) }))
+  .filter((g) => g.items.length > 0);
+
+const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'Staf', guru: 'Guru', siswa: 'Siswa' };
 ---
 
 <!DOCTYPE html>
@@ -237,7 +249,7 @@ const groups = [
       </div>
       <div style="font-size:12px;color:#6f7a6e;display:flex;align-items:center;gap:12px">
         <span>{new Date().toLocaleDateString('id', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
-        <span style="background:#e8f5e9;color:#1B7A3D;padding:2px 10px;border-radius:100px;font-weight:600">{user?.role === 'superadmin' ? 'Super Admin' : 'Editor'}</span>
+        <span style="background:#e8f5e9;color:#1B7A3D;padding:2px 10px;border-radius:100px;font-weight:600">{roleLabel[user?.role || ''] || user?.role || 'Pengguna'}</span>
       </div>
     </div>
     <div class="page-body">

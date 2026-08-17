@@ -12,14 +12,14 @@ let error = '';
 
 if (Astro.request.method === 'POST') {
   const data = await Astro.request.formData();
-  const username = data.get('username')?.toString() || '';
+  const email = data.get('email')?.toString() || '';
   const password = data.get('password')?.toString() || '';
-  const token = await login(username, password);
+  const token = await login(email, password);
   if (token) {
     Astro.cookies.set('smkdh_token', token, { httpOnly: true, path: '/', maxAge: 86400, sameSite: 'lax' });
     return Astro.redirect('/admin');
   }
-  error = 'Username atau password salah';
+  error = 'Email atau password salah';
 }
 ---
 
@@ -63,8 +63,8 @@ if (Astro.request.method === 'POST') {
     <p class="sub">SMKS NU Darul Hikam</p>
     {error && <div class="error">{error}</div>}
     <form method="POST">
-      <label for="username">Username</label>
-      <input type="text" id="username" name="username" required autofocus/>
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required autofocus autocomplete="username" placeholder="nama@email.com"/>
       <label for="password">Password</label>
       <div class="pw-field">
         <div class="pw-wrap">

@@ -4,6 +4,7 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import SortTh from '../../../components/SortTh.astro';
 import { tableSort } from '../../../lib/tablesort';
 import { verifyToken } from '../../../lib/auth';
+import { primaryRole } from '../../../lib/rbac';
 import { db } from '../../../lib/prisma';
 
 const token = Astro.cookies.get('smkdh_token')?.value;
@@ -12,14 +13,76 @@ const session = await verifyToken(token);
 if (!session) return Astro.redirect('/admin/login');
 if (session.role !== 'superadmin') return Astro.redirect('/admin');
 
-const s = tableSort(Astro.url, { username: 'username', role: 'role' }, [{ username: 'asc' }]);
-const admins = await db.admin.findMany({ orderBy: s.orderBy });
+const url = new URL(Astro.request.url);
+const search = url.searchParams.get('q') || '';
+const where: any = {};
+if (search) where.OR = [{ email: { contains: search } }, { username: { contains: search } }];
+
+const s = tableSort(url, { email: 'email', dibuat: 'createdAt' }, [{ email: 'asc' }]);
+const accounts = await db.account.findMany({ where, orderBy: s.orderBy, include: { roles: true, overrides: true } });
+
+const roleBadge: Record<string, string> = { superadmin: 'badge-green', staf: 'badge-gold' };
+const saved = url.searchParams.get('saved');
 ---
 
 <AdminLayout title="Pengguna" user={{ role: session.role }}>
-  <div class="card" style="padding:0"><table><thead><tr><SortTh label="Username" href={s.sortLink('username')} active={s.sort==='username'} icon={s.sortIcon('username')} /><SortTh label="Role" href={s.sortLink('role')} active={s.sort==='role'} icon={s.sortIcon('role')} /><th style="width:80px"></th></tr></thead>
-    <tbody>{admins.map((a:any)=>(<tr><td style="font-weight:600">{a.username}</td><td><span class={`badge ${a.role==='superadmin'?'badge-green':'badge-gold'}`}>{a.role}</span></td><td>
-      {a.username!=='admin' && <form method="POST" action="/admin/pengguna/delete"><input type="hidden" name="id" value={a.id}/><button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button></form>}
-    </td></tr>))}</tbody></table></div>
-  <p style="font-size:12px;color:#6f7a6e;margin-top:8px">Superadmin tidak bisa dihapus.</p>
+  {saved && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">Perubahan tersimpan.</div>}
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <form method="GET" style="display:flex;gap:8px">
+      <input type="text" name="q" value={search} placeholder="Cari email/username..." style="width:280px"/>
+      <button type="submit" class="btn btn-outline" style="padding:10px 14px">Cari</button>
+    </form>
+    <a href="/admin/pengguna/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah Akun</a>
+  </div>
+
+  <div class="card" style="padding:0">
+    <table>
+      <thead>
+        <tr>
+          <SortTh label="Email" href={s.sortLink('email')} active={s.sort === 'email'} icon={s.sortIcon('email')} width="30%" />
+          <th>Peran</th>
+          <th style="width:90px">Status</th>
+          <SortTh label="Dibuat" href={s.sortLink('dibuat')} active={s.sort === 'dibuat'} icon={s.sortIcon('dibuat')} width="120px" />
+          <th style="width:110px"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {accounts.length === 0 ? (
+          <tr><td colspan="5" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada akun.</td></tr>
+        ) : accounts.map((a: any) => (
+          <tr>
+            <td>
+              <div style="font-weight:600">{a.email}</div>
+              {a.username && <div style="font-size:12px;color:#6f7a6e">@{a.username}</div>}
+            </td>
+            <td>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                {a.roles.length === 0 ? <span style="color:#9aa39a;font-size:12px">—</span> :
+                  a.roles.map((r: any) => <span class={`badge ${roleBadge[r.role] || 'badge-gray'}`}>{r.role}</span>)}
+                {a.overrides.length > 0 && <span class="badge badge-gray" title="override izin">±{a.overrides.length}</span>}
+              </div>
+            </td>
+            <td>
+              {a.active
+                ? <span class="badge badge-green">aktif</span>
+                : <span class="badge badge-gray">nonaktif</span>}
+            </td>
+            <td style="font-size:12px;color:#6f7a6e">{new Date(a.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+            <td>
+              <div style="display:flex;gap:4px">
+                <a href={`/admin/pengguna/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
+                {!(primaryRole(a.roles.map((r: any) => r.role)) === 'superadmin') && (
+                  <form method="POST" action="/admin/pengguna/delete" style="display:inline" onsubmit="return confirm('Hapus akun ini?')">
+                    <input type="hidden" name="id" value={a.id}/>
+                    <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button>
+                  </form>
+                )}
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12px;color:#6f7a6e;margin-top:8px">Akun dengan peran superadmin tidak bisa dihapus dari sini.</p>
 </AdminLayout>

@@ -10,7 +10,8 @@
     "build": "astro build",
     "postinstall": "prisma generate",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "test": "npx tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@astrojs/node": "^11.0.2",

@@ -1,0 +1,170 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken, hashPassword } from '../../../lib/auth';
+import { ROLES, CAPS } from '../../../lib/rbac';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+if (session.role !== 'superadmin') return Astro.redirect('/admin');
+
+const { id } = Astro.params as { id: string };
+const isEdit = id !== 'new';
+
+let error = '';
+
+// Cek: apakah akun ini satu-satunya superadmin (mencegah lockout).
+async function isOnlySuperadmin(accountId: string): Promise<boolean> {
+  const supers = await db.accountRole.findMany({ where: { role: 'superadmin' }, select: { accountId: true } });
+  const ids = new Set(supers.map((r) => r.accountId));
+  return ids.has(accountId) && ids.size === 1;
+}
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const action = data.get('_action')?.toString() || 'save';
+
+  if (action === 'addOverride' && isEdit) {
+    const capability = data.get('capability')?.toString().trim();
+    const effect = data.get('effect')?.toString();
+    if (capability && (effect === 'grant' || effect === 'revoke')) {
+      await db.accountOverride.upsert({
+        where: { accountId_capability_effect: { accountId: id, capability, effect } },
+        update: {},
+        create: { accountId: id, capability, effect },
+      }).catch(() => {}); // id tak valid / balapan -> abaikan
+
+    }
+    return Astro.redirect(`/admin/pengguna/${id}`);
+  }
+
+  if (action === 'removeOverride' && isEdit) {
+    const ovId = data.get('overrideId')?.toString();
+    if (ovId) await db.accountOverride.delete({ where: { id: ovId } }).catch(() => {});
+    return Astro.redirect(`/admin/pengguna/${id}`);
+  }
+
+  // action === 'save'
+  const email = data.get('email')?.toString().trim() || '';
+  const username = data.get('username')?.toString().trim() || null;
+  const active = data.get('active') === '1';
+  const password = data.get('password')?.toString() || '';
+  const roles = ROLES.filter((r) => data.get(`role_${r}`) === '1');
+
+  if (!email) error = 'Email wajib diisi.';
+  else if (!isEdit && !password) error = 'Password wajib diisi saat membuat akun baru.';
+  else if (roles.length === 0) error = 'Pilih minimal satu peran.';
+  // Cegah lockout: jangan lepas superadmin dari satu-satunya superadmin; jangan nonaktifkan diri sendiri.
+  else if (isEdit && !roles.includes('superadmin') && (await isOnlySuperadmin(id))) error = 'Tidak bisa melepas peran superadmin dari satu-satunya superadmin.';
+  else if (isEdit && id === session.sub && !active) error = 'Tidak bisa menonaktifkan akun Anda sendiri.';
+
+  if (!error) {
+    try {
+      const base: any = { email, username, active };
+      if (password) base.passwordHash = await hashPassword(password);
+      let accountId = id;
+      if (isEdit) {
+        await db.account.update({ where: { id }, data: base });
+        await db.accountRole.deleteMany({ where: { accountId: id } });
+      } else {
+        const created = await db.account.create({ data: { ...base, passwordHash: base.passwordHash } });
+        accountId = created.id;
+      }
+      await db.accountRole.createMany({ data: roles.map((role) => ({ accountId, role })) });
+      return Astro.redirect('/admin/pengguna?saved=1');
+    } catch (e: any) {
+      if (e?.code === 'P2002') {
+        const f = Array.isArray(e?.meta?.target) ? e.meta.target.join(', ') : 'email/username';
+        error = `Gagal: ${f} sudah dipakai akun lain.`;
+      } else throw e;
+    }
+  }
+}
+
+const item = isEdit
+  ? await db.account.findUnique({ where: { id }, include: { roles: true, overrides: true } })
+  : null;
+if (isEdit && !item) return Astro.redirect('/admin/pengguna');
+
+const currentRoles = new Set((item?.roles || []).map((r) => r.role));
+// Saran kapabilitas untuk override (pola unik dari semua role).
+const capHints = [...new Set(Object.values(CAPS).flat())].sort();
+---
+
+<AdminLayout title={isEdit ? 'Edit Akun' : 'Tambah Akun'} user={{ role: session.role }}>
+  <form method="POST" style="max-width:640px">
+    <input type="hidden" name="_action" value="save"/>
+    {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
+    <div class="card" style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Email * <span style="font-weight:500;color:#6f7a6e">(untuk login)</span></label>
+          <input type="email" name="email" value={item?.email || ''} required placeholder="nama@email.com"/>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Username <span style="font-weight:500;color:#6f7a6e">(opsional)</span></label>
+          <input type="text" name="username" value={item?.username || ''} placeholder="opsional"/>
+        </div>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Password {isEdit ? <span style="font-weight:500;color:#6f7a6e">(isi untuk reset — kosongkan bila tak diubah)</span> : '*'}</label>
+        <input type="password" name="password" autocomplete="new-password" placeholder={isEdit ? 'Kosongkan bila tak diubah' : 'Minimal 6 karakter'} required={!isEdit} minlength="6"/>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px">Peran * <span style="font-weight:500;color:#6f7a6e">(boleh lebih dari satu)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:14px;background:#f0f7f1;border-radius:10px;padding:12px 14px">
+          {ROLES.map((r) => (
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><input type="checkbox" name={`role_${r}`} value="1" checked={currentRoles.has(r)} style="width:auto"/> {r}</label>
+          ))}
+        </div>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600"><input type="checkbox" name="active" value="1" checked={item ? item.active : true} style="width:auto"/> Akun aktif</label>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/pengguna" class="btn btn-outline">Batal</a></div>
+  </form>
+
+  {isEdit && (
+    <div class="card" style="max-width:640px;margin-top:20px;display:flex;flex-direction:column;gap:12px">
+      <div>
+        <h3 style="font-size:15px;font-weight:800;margin:0 0 2px">Override izin</h3>
+        <p style="font-size:12px;color:#6f7a6e;margin:0">Tambah (grant) atau cabut (revoke) izin di luar peran dasar. Revoke mengalahkan grant &amp; peran.</p>
+      </div>
+
+      {item!.overrides.length > 0 && (
+        <div style="display:flex;flex-direction:column;gap:6px">
+          {item!.overrides.map((o: any) => (
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;background:#f7f9f7;border-radius:8px;padding:6px 10px">
+              <span class={`badge ${o.effect === 'grant' ? 'badge-green' : 'badge-gold'}`}>{o.effect}</span>
+              <span style="font-family:monospace;flex:1">{o.capability}</span>
+              <form method="POST" style="margin:0">
+                <input type="hidden" name="_action" value="removeOverride"/>
+                <input type="hidden" name="overrideId" value={o.id}/>
+                <button type="submit" class="btn btn-outline" style="padding:4px 8px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:14px">close</span></button>
+              </form>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form method="POST" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <input type="hidden" name="_action" value="addOverride"/>
+        <div style="flex:1;min-width:200px">
+          <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Kapabilitas</label>
+          <input type="text" name="capability" list="cap-hints" placeholder="mis. ppdb.kelola" required/>
+          <datalist id="cap-hints">{capHints.map((c) => <option value={c}></option>)}</datalist>
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:700;margin-bottom:4px">Efek</label>
+          <select name="effect"><option value="grant">grant</option><option value="revoke">revoke</option></select>
+        </div>
+        <button type="submit" class="btn btn-outline"><span class="material-symbols-outlined" style="font-size:16px">add</span> Tambah</button>
+      </form>
+    </div>
+  )}
+</AdminLayout>
