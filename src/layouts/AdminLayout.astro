@@ -13,8 +13,20 @@ const currentPath = Astro.url.pathname;
 // Izin efektif disuplai middleware (locals.principal). Menu disaring per kapabilitas.
 const principal = Astro.locals.principal;
 const allow = (cap: string) => (principal ? can(principal, cap) : false);
+// Menu guru muncul bila benar-benar ber-role guru (bukan lewat wildcard superadmin).
+const isGuru = principal?.roles.includes('guru') ?? false;
 
 const allGroups = [
+  ...(isGuru
+    ? [{
+        label: 'Guru',
+        icon: 'badge',
+        items: [
+          { label: 'Profil Saya', href: '/admin/profil-saya', cap: 'profil.edit-sendiri' },
+          { label: 'Usulan Saya', href: '/admin/usulan', cap: 'konten.usul' },
+        ],
+      }]
+    : []),
   {
     label: 'Konten',
     icon: 'edit_note',

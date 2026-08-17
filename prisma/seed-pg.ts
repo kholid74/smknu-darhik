@@ -24,6 +24,24 @@ async function main() {
       },
     });
   }
+
+  // Akun guru contoh, ditautkan ke profil Teacher (untuk demo alur usulan konten).
+  const guruEmail = 'guru@smksnudarhik.local';
+  const existingGuru = await db.account.findUnique({ where: { email: guruEmail } });
+  if (!existingGuru) {
+    const guruAcc = await db.account.create({
+      data: {
+        email: guruEmail,
+        username: 'guru',
+        passwordHash: await bcrypt.hash('guru123', 10),
+        active: true,
+        roles: { create: [{ role: 'guru' }] },
+      },
+    });
+    // Tautkan ke profil Teacher pertama yang belum tertaut (bila ada).
+    const freeTeacher = await db.teacher.findFirst({ where: { accountId: null, level: 'Guru' } });
+    if (freeTeacher) await db.teacher.update({ where: { id: freeTeacher.id }, data: { accountId: guruAcc.id } });
+  }
   await db.department.createMany({ data: [
     { slug: 'perbankan-syariah', name: 'Perbankan Syariah', icon: 'account_balance', description: 'Belajar dasar-dasar perbankan sesuai prinsip syariah.', kompetensi: JSON.stringify(['Akad keuangan syariah','Produk perbankan syariah','Akuntansi dasar','Layanan nasabah']), karir: JSON.stringify(['Staf Bank Syariah','BMT/Koperasi','Admin Keuangan','Wirausaha']), order: 1 },
     { slug: 'dkv', name: 'DKV (Desain Komunikasi Visual)', icon: 'palette', description: 'Belajar desain grafis, ilustrasi, fotografi, videografi, dan animasi.', kompetensi: JSON.stringify(['Desain grafis','Ilustrasi digital','Fotografi & videografi','Motion graphic']), karir: JSON.stringify(['Desainer Grafis','Illustrator','Content Creator','Fotografer/Videografer']), order: 2 }

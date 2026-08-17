@@ -1,0 +1,145 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import TiptapEditor from '../../../components/TiptapEditor.astro';
+import MediaPicker from '../../../components/MediaPicker.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+const { id } = Astro.params as { id: string };
+const isEdit = id && id !== 'new';
+
+let article = isEdit ? await db.article.findUnique({ where: { id } }) : null;
+// Guru hanya boleh menyentuh usulan miliknya sendiri.
+if (isEdit && (!article || article.authorId !== session.sub)) return Astro.redirect('/admin/usulan');
+// Yang sudah disetujui/tayang terkunci dari editor usulan.
+if (article && (article.reviewStatus === 'approved' || (article.published && !article.reviewStatus))) return Astro.redirect('/admin/usulan');
+
+let error = '';
+
+// Slug unik: bila bentrok, tambah sufiks angka.
+async function uniqueSlug(base: string, selfId?: string): Promise<string> {
+  const clean = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'usulan';
+  let slug = clean;
+  for (let i = 2; i < 100; i++) {
+    const hit = await db.article.findUnique({ where: { slug }, select: { id: true } });
+    if (!hit || hit.id === selfId) return slug;
+    slug = `${clean}-${i}`;
+  }
+  return `${clean}-${Date.now()}`;
+}
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const action = data.get('_action')?.toString() || 'draft'; // draft | submit
+  const title = data.get('title')?.toString().trim() || '';
+  const body = data.get('body')?.toString() || '';
+  const excerpt = data.get('excerpt')?.toString() || body.replace(/<[^>]*>/g, '').substring(0, 160);
+  const category = data.get('category')?.toString() || 'Akademik';
+  const imageUrl = data.get('imageUrl')?.toString() || null;
+
+  if (!title) error = 'Judul wajib diisi.';
+  else {
+    const slug = await uniqueSlug(data.get('slug')?.toString() || title, article?.id);
+    // Tetap belum tayang (published=false) — hanya staf yang menerbitkan.
+    const base: any = { title, slug, body, excerpt, category, imageUrl, published: false };
+    if (action === 'submit') {
+      base.reviewStatus = 'pending';
+      base.reviewNote = null; // ajuan ulang membersihkan catatan penolakan
+    } else if (article?.reviewStatus === 'rejected') {
+      base.reviewStatus = 'rejected'; // draf revisi tetap "ditolak" sampai diajukan lagi
+    } else {
+      base.reviewStatus = null; // draf biasa
+    }
+
+    if (isEdit) {
+      await db.article.update({ where: { id: id! }, data: base });
+    } else {
+      await db.article.create({ data: { ...base, authorId: session.sub } });
+    }
+    return Astro.redirect(action === 'submit' ? '/admin/usulan?submitted=1' : '/admin/usulan?saved=1');
+  }
+}
+
+const it = article;
+const rejected = it?.reviewStatus === 'rejected';
+---
+
+<AdminLayout title={isEdit ? 'Edit Usulan' : 'Tulis Usulan'} user={{ role: session.role }}>
+  {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
+  {rejected && it?.reviewNote && (
+    <div style="background:#fdf6e8;border:1px solid #f5d9a8;color:#7e5700;font-size:13px;border-radius:10px;padding:12px 14px;margin-bottom:16px">
+      <strong>Usulan ini ditolak.</strong> Catatan staf: {it.reviewNote}<br/>Perbaiki lalu ajukan ulang.
+    </div>
+  )}
+
+  <form method="POST" id="usulan-form">
+    <input type="hidden" name="_action" id="action-field" value="draft"/>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Judul</label>
+          <input type="text" name="title" id="title" value={it?.title || ''} required placeholder="Judul berita..."/>
+        </div>
+        <div>
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Slug <span style="font-weight:500;color:var(--color-muted)">(otomatis)</span></label>
+          <input type="text" name="slug" id="slug-input" value={it?.slug || ''} placeholder="auto-dari-judul"/>
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kutipan (excerpt)</label>
+        <textarea name="excerpt" rows="2" style="resize:vertical" placeholder="Ringkasan singkat...">{it?.excerpt || ''}</textarea>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <label style="display:block;font-size:13px;font-weight:700;margin-bottom:8px">Isi Berita</label>
+      <input type="hidden" name="body" value={it?.body || ''}/>
+      <TiptapEditor content={it?.body || ''} client:load />
+    </div>
+
+    <div class="card" style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Kategori</label>
+        <select name="category">
+          {['Akademik','Keagamaan','Prestasi','Ekstrakurikuler','PPDB'].map(c => (
+            <option value={c} selected={(it?.category || 'Akademik') === c}>{c}</option>
+          ))}
+        </select>
+      </div>
+      <MediaPicker field="imageUrl" value={it?.imageUrl || ''} label="Gambar Sampul" folder="artikel" hint="Landscape 16:9 (mis. 1200×675px) · maks 5MB." />
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center">
+      <button type="submit" class="btn btn-outline" data-action="draft"><span class="material-symbols-outlined">save</span> Simpan Draf</button>
+      <button type="submit" class="btn btn-primary" data-action="submit"><span class="material-symbols-outlined">send</span> Ajukan untuk Tinjauan</button>
+      <a href="/admin/usulan" class="btn btn-outline">Batal</a>
+    </div>
+    <p style="font-size:12px;color:var(--color-muted);margin-top:8px">Setelah diajukan, usulan menunggu tinjauan staf sebelum tayang di website.</p>
+  </form>
+</AdminLayout>
+
+<script>
+  // Tombol mana yang diklik menentukan _action (draft vs submit).
+  document.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const f = document.getElementById('action-field') as HTMLInputElement;
+      f.value = btn.dataset.action || 'draft';
+    });
+  });
+  // Auto slug dari judul (kecuali user mengetik slug manual).
+  document.getElementById('title')!.addEventListener('input', function (this: HTMLInputElement) {
+    const slugInput = document.getElementById('slug-input') as HTMLInputElement;
+    if (!slugInput.dataset.manual) {
+      slugInput.value = this.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    }
+  });
+  document.getElementById('slug-input')!.addEventListener('input', function (this: HTMLInputElement) {
+    this.dataset.manual = 'true';
+  });
+</script>

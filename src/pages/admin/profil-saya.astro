@@ -1,0 +1,62 @@
+---
+export const prerender = false;
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import MediaPicker from '../../components/MediaPicker.astro';
+import { verifyToken } from '../../lib/auth';
+import { db } from '../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+// Profil Teacher milik akun ini (tautan accountId). Guru hanya kelola profilnya sendiri.
+let teacher = await db.teacher.findFirst({ where: { accountId: session.sub } });
+
+let saved = false;
+if (Astro.request.method === 'POST' && teacher) {
+  const data = await Astro.request.formData();
+  // Guru hanya boleh ubah data pribadi; position/level/order/tautan dikelola staf.
+  await db.teacher.update({
+    where: { id: teacher.id },
+    data: {
+      name: data.get('name')?.toString() || teacher.name,
+      title: data.get('title')?.toString() || null,
+      subject: data.get('subject')?.toString() || null,
+      photoUrl: data.get('photoUrl')?.toString() || null,
+    },
+  });
+  return Astro.redirect('/admin/profil-saya?saved=1');
+}
+saved = Astro.url.searchParams.get('saved') === '1';
+---
+
+<AdminLayout title="Profil Saya" user={{ role: session.role }}>
+  {saved && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">Profil tersimpan.</div>}
+
+  {!teacher ? (
+    <div class="card" style="border:1px solid #f5d9a8;background:#fdf6e8;color:#7e5700;display:flex;align-items:center;gap:12px;max-width:600px">
+      <span class="material-symbols-outlined" style="font-size:28px">info</span>
+      <div style="font-size:13px">
+        <strong>Akun Anda belum ditautkan ke profil guru.</strong><br/>
+        Hubungi admin untuk menautkan akun ini ke data guru agar Anda bisa mengelola profil sendiri.
+      </div>
+    </div>
+  ) : (
+    <form method="POST" style="max-width:600px">
+      <div class="card" style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;gap:14px;padding:12px 14px;background:#f7f9f7;border-radius:10px;font-size:13px">
+          <div><span style="color:var(--color-muted)">Jabatan</span><br/><strong>{teacher.position}</strong></div>
+          <div><span style="color:var(--color-muted)">Level</span><br/><strong>{teacher.level}</strong></div>
+          <div style="margin-left:auto;align-self:center;color:var(--color-muted);font-size:12px">Jabatan &amp; level dikelola admin</div>
+        </div>
+
+        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={teacher.name} required/></div>
+        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Gelar</label><input type="text" name="title" value={teacher.title || ''} placeholder="S.E.,M.Pd."/></div>
+        <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Mata Pelajaran</label><input type="text" name="subject" value={teacher.subject || ''} placeholder="Matematika"/></div>
+        <MediaPicker field="photoUrl" value={teacher.photoUrl || ''} label="Foto" folder="guru" hint="Foto potret (rasio 4:5), wajah terlihat jelas · lebar ≥ 600px · maks 5MB." />
+      </div>
+      <div style="margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button></div>
+    </form>
+  )}
+</AdminLayout>

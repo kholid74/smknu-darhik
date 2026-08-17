@@ -23,6 +23,8 @@ const ROUTE_CAP: Record<string, string> = {
   galeri: 'galeri.kelola',
   kontribusi: 'kontribusi.kelola',
   media: 'media.kelola',
+  'profil-saya': 'profil.edit-sendiri',
+  usulan: 'konten.usul',
   alumni: 'alumni.moderasi',
   pengaturan: 'setting.kelola', // superadmin (*) saja
   pengguna: 'account.kelola', // superadmin (*) saja

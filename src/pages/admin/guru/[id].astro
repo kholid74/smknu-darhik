@@ -16,6 +16,8 @@ if (id && id !== 'new' && !item) return Astro.redirect('/admin/guru?saved=1');
 
 const levels = ['Yayasan', 'Kepala Sekolah', 'Waka', 'Kaprog', 'Guru', 'Staf'];
 
+let error = '';
+
 if (Astro.request.method === 'POST') {
   const data = await Astro.request.formData();
   const record: any = {
@@ -26,15 +28,30 @@ if (Astro.request.method === 'POST') {
     level: data.get('level')?.toString() || 'Guru',
     photoUrl: data.get('photoUrl')?.toString() || null,
     order: parseInt(data.get('order')?.toString() || '0'),
+    accountId: data.get('accountId')?.toString() || null,
   };
-  if (isEdit) await db.teacher.update({ where: { id: id! }, data: record });
-  else await db.teacher.create({ data: record });
-  return Astro.redirect('/admin/guru?saved=1');
+  try {
+    if (isEdit) await db.teacher.update({ where: { id: id! }, data: record });
+    else await db.teacher.create({ data: record });
+    return Astro.redirect('/admin/guru?saved=1');
+  } catch (e: any) {
+    if (e?.code === 'P2002') error = 'Akun itu sudah ditautkan ke profil guru lain.';
+    else throw e;
+  }
 }
+
+// Kandidat akun untuk ditautkan: ber-role guru, belum tertaut ke Teacher lain.
+const guruAccounts = await db.account.findMany({
+  where: { roles: { some: { role: 'guru' } } },
+  include: { teacher: { select: { id: true } } },
+  orderBy: { email: 'asc' },
+});
+const linkable = guruAccounts.filter((a) => !a.teacher || a.teacher.id === (item?.id || ''));
 ---
 
 <AdminLayout title={isEdit ? 'Edit Guru/Staf' : 'Tambah Guru/Staf'} user={{ role: session.role }}>
   <form method="POST" style="max-width:600px">
+    {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="name" value={item?.name||''} required/></div>
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Gelar</label><input type="text" name="title" value={item?.title||''} placeholder="S.E.,M.Pd."/></div>
@@ -43,6 +60,14 @@ if (Astro.request.method === 'POST') {
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Level</label><select name="level" style="width:100%">{levels.map(l=>(<option value={l} selected={item?.level===l}>{l}</option>))}</select></div>
       <MediaPicker field="photoUrl" value={item?.photoUrl||''} label="Foto" folder="guru" hint="Foto potret (rasio 4:5), wajah terlihat jelas · lebar ≥ 600px · maks 5MB." />
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Order</label><input type="number" name="order" value={item?.order??0} style="width:80px"/></div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Tautkan akun guru <span style="font-weight:500;color:#6f7a6e">(opsional — agar guru bisa kelola profil ini sendiri)</span></label>
+        <select name="accountId" style="width:100%">
+          <option value="">— tidak ditautkan —</option>
+          {linkable.map((a) => <option value={a.id} selected={item?.accountId === a.id}>{a.email}{a.username ? ` (@${a.username})` : ''}</option>)}
+        </select>
+        {linkable.length === 0 && <p style="font-size:12px;color:#6f7a6e;margin-top:4px">Belum ada akun ber-role guru yang tersedia. Buat di menu Pengguna.</p>}
+      </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/guru" class="btn btn-outline">Batal</a></div>
   </form>

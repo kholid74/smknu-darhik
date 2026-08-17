@@ -1,0 +1,75 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+
+// Hanya usulan milik akun ini.
+const articles = await db.article.findMany({
+  where: { authorId: session.sub },
+  orderBy: { updatedAt: 'desc' },
+  select: { id: true, title: true, category: true, reviewStatus: true, reviewNote: true, published: true, updatedAt: true },
+});
+
+const saved = Astro.url.searchParams.get('saved');
+const submitted = Astro.url.searchParams.get('submitted');
+
+// Label + warna badge per status tinjau.
+function statusBadge(a: { reviewStatus: string | null; published: boolean }) {
+  if (a.reviewStatus === 'approved' || (a.published && !a.reviewStatus)) return { cls: 'badge-green', label: 'Disetujui' };
+  if (a.reviewStatus === 'rejected') return { cls: 'badge-gold', label: 'Ditolak' };
+  if (a.reviewStatus === 'pending') return { cls: 'badge-gray', label: 'Menunggu tinjauan' };
+  return { cls: 'badge-gray', label: 'Draf' };
+}
+---
+
+<AdminLayout title="Usulan Saya" user={{ role: session.role }}>
+  {saved && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">Draf tersimpan.</div>}
+  {submitted && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">Usulan diajukan. Menunggu tinjauan staf.</div>}
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div>
+      <h2 style="font-size:17px;font-weight:800;margin:0">Usulan Berita</h2>
+      <p style="font-size:13px;color:var(--color-muted);margin:2px 0 0">Tulis berita, lalu ajukan untuk ditinjau staf sebelum tayang.</p>
+    </div>
+    <a href="/admin/usulan/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tulis Usulan</a>
+  </div>
+
+  <div class="card" style="padding:0">
+    <table>
+      <thead><tr><th>Judul</th><th style="width:120px">Kategori</th><th style="width:150px">Status</th><th style="width:130px">Diperbarui</th><th style="width:60px"></th></tr></thead>
+      <tbody>
+        {articles.length === 0 ? (
+          <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--color-muted)">Belum ada usulan. Klik "Tulis Usulan" untuk memulai.</td></tr>
+        ) : articles.map((a) => {
+          const b = statusBadge(a);
+          return (
+            <tr>
+              <td style="font-weight:600">{a.title}</td>
+              <td><span class="badge badge-gray">{a.category}</span></td>
+              <td>
+                <span class={`badge ${b.cls}`}>{b.label}</span>
+                {a.reviewStatus === 'rejected' && a.reviewNote && (
+                  <div style="font-size:11px;color:#7e5700;margin-top:4px" title={a.reviewNote}>Catatan: {a.reviewNote}</div>
+                )}
+              </td>
+              <td style="font-size:12px;color:var(--color-muted)">{new Date(a.updatedAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+              <td>
+                {(a.reviewStatus === 'approved' || (a.published && !a.reviewStatus)) ? (
+                  <span style="font-size:11px;color:var(--color-muted)">terkunci</span>
+                ) : (
+                  <a href={`/admin/usulan/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</AdminLayout>

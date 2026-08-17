@@ -21,8 +21,15 @@ model Article {
   imageUrl  String?
   published Boolean  @default(false)
   featured  Boolean  @default(false) // tampil di homepage
+  authorId  String? // akun pengusul (guru); null = dibuat staf langsung
+  reviewStatus String? // null = konten staf; pending | approved | rejected untuk usulan guru
+  reviewNote   String? // alasan penolakan (diisi staf)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  author    Account? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([authorId])
+  @@index([reviewStatus])
 }
 
 model Department {
@@ -61,14 +68,16 @@ model Achievement {
 }
 
 model Teacher {
-  id       String  @id @default(cuid())
-  name     String
-  title    String? // "S.E.,M.Pd."
-  position String // Kepala Sekolah | Waka Kurikulum | Guru Mapel
-  subject  String?
-  photoUrl String?
-  level    String  @default("Guru") // Yayasan | Kepala Sekolah | Waka | Kaprog | Guru | Staf
-  order    Int     @default(0)
+  id        String   @id @default(cuid())
+  name      String
+  title     String? // "S.E.,M.Pd."
+  position  String // Kepala Sekolah | Waka Kurikulum | Guru Mapel
+  subject   String?
+  photoUrl  String?
+  level     String   @default("Guru") // Yayasan | Kepala Sekolah | Waka | Kaprog | Guru | Staf
+  order     Int      @default(0)
+  accountId String?  @unique // tautan ke akun guru (realm Internal), opsional
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
 }
 
 model Extracurricular {
@@ -186,6 +195,8 @@ model Account {
   createdAt    DateTime          @default(now())
   roles        AccountRole[]
   overrides    AccountOverride[]
+  teacher      Teacher?
+  articles     Article[]
 }
 
 model AccountRole {

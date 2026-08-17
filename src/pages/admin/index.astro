@@ -10,6 +10,12 @@ if (!token) return Astro.redirect('/admin/login');
 const session = await verifyToken(token);
 if (!session) return Astro.redirect('/admin/login');
 
+// Dashboard sadar-peran: guru (tanpa staf/superadmin) lihat versi ringan.
+const isStaffLevel = session.roles.includes('superadmin') || session.roles.includes('staf');
+const guruTeacher = !isStaffLevel
+  ? await db.teacher.findFirst({ where: { accountId: session.sub }, select: { id: true, name: true, position: true } })
+  : null;
+
 // ─── Counts (KPI + ringkasan) ───
 const [
   alumniTotal, alumniVerified, articleCount, achievementCount, teacherCount, deptCount,
@@ -87,6 +93,8 @@ const ringkasan = [
 ---
 
 <AdminLayout title="Dashboard" user={{ role: session.role }}>
+  {isStaffLevel ? (
+  <Fragment>
   <!-- Ringkasan KPI -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
     {kpis.map(s => (
@@ -241,6 +249,43 @@ const ringkasan = [
       </div>
     </div>
   </div>
+  </Fragment>
+  ) : (
+  <Fragment>
+    <!-- Dashboard guru (ringan) -->
+    <div class="card" style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+      <span class="material-symbols-outlined" style="font-size:34px;color:#1B7A3D;background:#e8f5e9;padding:14px;border-radius:14px">waving_hand</span>
+      <div>
+        <div style="font-size:18px;font-weight:800">Selamat datang{guruTeacher ? `, ${guruTeacher.name}` : ''}</div>
+        <div style="font-size:13px;color:var(--color-muted)">Kelola profil Anda dan ajukan berita untuk ditinjau staf.</div>
+      </div>
+    </div>
+
+    {!guruTeacher && (
+      <div class="card" style="border:1px solid #f5d9a8;background:#fdf6e8;margin-bottom:20px;font-size:13px;color:#7e5700;display:flex;align-items:center;gap:10px">
+        <span class="material-symbols-outlined">info</span>
+        <span>Akun Anda belum ditautkan ke profil guru. Hubungi admin agar profil Anda bisa dikelola sendiri.</span>
+      </div>
+    )}
+
+    <div class="dash-grid-2">
+      <a href="/admin/profil-saya" class="card" style="display:flex;align-items:center;gap:14px;color:inherit;text-decoration:none">
+        <span class="material-symbols-outlined" style="font-size:30px;color:#1B7A3D;background:#e8f5e9;padding:12px;border-radius:12px">badge</span>
+        <div>
+          <div style="font-size:16px;font-weight:800">Profil Saya</div>
+          <div style="font-size:13px;color:var(--color-muted)">{guruTeacher ? `${guruTeacher.position}` : 'Perbarui data & foto'}</div>
+        </div>
+      </a>
+      <a href="/admin/usulan" class="card" style="display:flex;align-items:center;gap:14px;color:inherit;text-decoration:none">
+        <span class="material-symbols-outlined" style="font-size:30px;color:#1B7A3D;background:#e8f5e9;padding:12px;border-radius:12px">post_add</span>
+        <div>
+          <div style="font-size:16px;font-weight:800">Usulan Saya</div>
+          <div style="font-size:13px;color:var(--color-muted)">Tulis & ajukan berita</div>
+        </div>
+      </a>
+    </div>
+  </Fragment>
+  )}
 </AdminLayout>
 
 <style>

@@ -1,0 +1,35 @@
+---
+export const prerender = false;
+import { verifyToken } from '../../../lib/auth';
+import { db } from '../../../lib/prisma';
+
+const token = Astro.cookies.get('smkdh_token')?.value;
+if (!token) return Astro.redirect('/admin/login');
+const session = await verifyToken(token);
+if (!session) return Astro.redirect('/admin/login');
+// Guard kapabilitas ada di middleware (/admin/artikel/* -> artikel.kelola).
+
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const id = data.get('id')?.toString();
+  const action = data.get('action')?.toString();
+  if (id) {
+    const article = await db.article.findUnique({ where: { id }, select: { reviewStatus: true } });
+    // Hanya usulan yang benar-benar pending yang bisa ditinjau.
+    if (article?.reviewStatus === 'pending') {
+      if (action === 'approve') {
+        await db.article.update({ where: { id }, data: { reviewStatus: 'approved', published: true, reviewNote: null } });
+        return Astro.redirect('/admin/artikel?reviewed=approved');
+      }
+      if (action === 'reject') {
+        const note = data.get('note')?.toString().trim() || 'Perlu perbaikan.';
+        await db.article.update({ where: { id }, data: { reviewStatus: 'rejected', published: false, reviewNote: note } });
+        return Astro.redirect('/admin/artikel?reviewed=rejected');
+      }
+    }
+  }
+}
+
+return Astro.redirect('/admin/artikel');
+---
+<html></html>
