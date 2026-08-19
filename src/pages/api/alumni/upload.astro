@@ -1,0 +1,38 @@
+---
+export const prerender = false;
+import { getAlumniSession } from '../../../lib/alumni-auth';
+import { uploadToR2 } from '../../../lib/r2';
+import { db } from '../../../lib/prisma';
+
+// Upload foto oleh alumni (realm terpisah). Gated sesi alumni, folder dipaksa 'alumni'.
+// Terpisah dari /api/upload (yang butuh kapabilitas internal media.kelola).
+const sess = await getAlumniSession(Astro.cookies);
+if (!sess) return new Response('Unauthorized', { status: 401 });
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const file = formData.get('file') as File;
+    if (!file || file.size === 0) {
+      return new Response(JSON.stringify({ error: 'No file' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: 'Maks 5MB' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (!(file.type || '').startsWith('image/')) {
+      return new Response(JSON.stringify({ error: 'Harus berupa gambar' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    }
+    const url = await uploadToR2(file, 'alumni');
+    try {
+      await db.media.create({ data: { url, filename: file.name, mimeType: file.type || null, size: file.size, folder: 'alumni', kind: 'image' } });
+    } catch (e) {
+      console.error('[alumni/upload] media index failed', e);
+    }
+    return new Response(JSON.stringify({ url }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+}
+
+return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+---

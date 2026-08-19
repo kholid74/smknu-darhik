@@ -1,5 +1,6 @@
 import { defineMiddleware } from 'astro:middleware';
 import { verifyToken, getPrincipal } from './lib/auth';
+import { getAlumniSession } from './lib/alumni-auth';
 import { can } from './lib/rbac';
 
 // Gerbang otorisasi terpusat untuk realm Internal (/admin + API tulis).
@@ -38,6 +39,14 @@ const API_CAP: Record<string, string> = {
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const path = context.url.pathname;
+
+  // Realm ALUMNI: gerbang portal (sesi terpisah, bukan RBAC internal).
+  if (path.startsWith('/alumni/portal')) {
+    const alumni = await getAlumniSession(context.cookies);
+    if (!alumni) return context.redirect('/alumni/masuk');
+    context.locals.alumniId = alumni.sub;
+    return next();
+  }
 
   const isAdmin = path.startsWith('/admin');
   const apiCap = API_CAP[path];

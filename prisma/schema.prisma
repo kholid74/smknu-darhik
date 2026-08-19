@@ -161,9 +161,23 @@ model Alumni {
   featured    Boolean  @default(false) // admin pilih tampil di showcase; hanya boleh bila publicOptIn
   createdAt   DateTime @default(now())
 
+  loginTokens AlumniLoginToken[]
+
   @@index([verified])
   @@index([angkatan])
   @@index([featured])
+}
+model AlumniLoginToken {
+  id        String    @id @default(cuid())
+  alumniId  String
+  tokenHash String    @unique // sha256 dari token acak (token mentah hanya di email, tak disimpan)
+  expiresAt DateTime // TTL 15 menit
+  usedAt    DateTime? // sekali pakai; terisi saat dikonsumsi
+  createdAt DateTime  @default(now())
+  alumni    Alumni    @relation(fields: [alumniId], references: [id], onDelete: Cascade)
+
+  @@index([alumniId])
+  @@index([expiresAt])
 }
 
 model AlumniContribution {

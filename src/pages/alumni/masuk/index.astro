@@ -1,0 +1,84 @@
+---
+export const prerender = false;
+import { requestMagicLink } from '../../../lib/alumni-auth';
+
+// Halaman minta link masuk (magic-link). Publik. Anti user-enumeration:
+// apa pun hasilnya, tampilkan pesan sukses yang sama.
+let sent = false;
+let emailVal = '';
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  emailVal = data.get('email')?.toString() || '';
+  const origin = import.meta.env.PUBLIC_SITE_URL || Astro.url.origin;
+  try {
+    await requestMagicLink(emailVal, origin);
+  } catch (e) {
+    // Jangan bocorkan kegagalan (mis. SMTP) ke pengunjung — cukup catat.
+    console.error('requestMagicLink error:', (e as Error).message);
+  }
+  sent = true; // pesan sama, terdaftar atau tidak
+}
+---
+
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Masuk Portal Alumni — SMKS NU Darul Hikam</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <style>
+      :root { --green: #1B7A3D; --ink: #1c1b1b; --muted: #6f7a6e; }
+      * { box-sizing: border-box; margin: 0; }
+      body { font-family: 'Plus Jakarta Sans', sans-serif; background: #fcf9f8; color: var(--ink); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+      .wrap { width: 100%; max-width: 400px; }
+      .brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 18px; }
+      .brand img { width: 34px; height: 34px; }
+      .brand span { font-size: 13px; font-weight: 700; color: var(--muted); }
+      .card { background: #fff; border: 1px solid rgba(0,0,0,.07); border-radius: 18px; box-shadow: 0 18px 44px rgba(0,0,0,.08); padding: 28px 24px; }
+      h1 { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+      .lead { font-size: 13.5px; color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+      label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+      input[type=email] { width: 100%; border: 1px solid #d9ddd7; border-radius: 10px; padding: 11px 13px; font-size: 14px; font-family: inherit; }
+      input[type=email]:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(27,122,61,.12); }
+      button { width: 100%; margin-top: 16px; background: var(--green); color: #fff; border: 0; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+      button:hover { background: #146030; }
+      .ok { text-align: center; padding: 8px 0; }
+      .ok .material-symbols-outlined { font-size: 54px; color: var(--green); }
+      .ok h2 { font-size: 18px; font-weight: 800; margin: 10px 0 8px; }
+      .ok p { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+      .foot { font-size: 12px; color: var(--muted); text-align: center; margin-top: 16px; line-height: 1.6; }
+      .foot a { color: var(--green); font-weight: 700; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="brand"><img src="/assets/logo.png" alt="Logo" /><span>SMKS NU Darul Hikam</span></div>
+      <div class="card">
+        {sent ? (
+          <div class="ok">
+            <span class="material-symbols-outlined">mark_email_read</span>
+            <h2>Cek email Anda</h2>
+            <p>Bila <strong>{emailVal}</strong> terdaftar sebagai alumni terverifikasi, kami sudah mengirim tautan masuk. Tautan berlaku 15 menit dan hanya bisa dipakai sekali.</p>
+          </div>
+        ) : (
+          <>
+            <h1>Masuk Portal Alumni</h1>
+            <p class="lead">Masukkan email yang terdaftar di sekolah. Kami kirim tautan masuk ke email Anda — tanpa password.</p>
+            <form method="POST">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" required autofocus placeholder="nama@email.com" autocomplete="email" />
+              <button type="submit"><span class="material-symbols-outlined" style="font-size:18px">send</span> Kirim tautan masuk</button>
+            </form>
+          </>
+        )}
+      </div>
+      <p class="foot">Bukan alumni? <a href="/alumni">Lihat direktori alumni</a><br />Email belum terdaftar? Hubungi admin sekolah.</p>
+    </div>
+  </body>
+</html>

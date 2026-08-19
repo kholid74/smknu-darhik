@@ -1,0 +1,45 @@
+---
+export const prerender = false;
+import { consumeMagicLink, signAlumniSession, ALUMNI_COOKIE, alumniCookieOpts } from '../../../lib/alumni-auth';
+
+// Konsumsi magic-link: valid & belum dipakai & belum kedaluwarsa -> sesi alumni -> portal.
+const { token } = Astro.params;
+const alumniId = token ? await consumeMagicLink(token) : null;
+
+if (alumniId) {
+  const jwt = await signAlumniSession(alumniId);
+  Astro.cookies.set(ALUMNI_COOKIE, jwt, alumniCookieOpts(30 * 24 * 60 * 60)); // 30 hari
+  return Astro.redirect('/alumni/portal');
+}
+// Gagal: tampilkan pesan + minta ulang.
+---
+
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Tautan Tidak Berlaku — SMKS NU Darul Hikam</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <style>
+      * { box-sizing: border-box; margin: 0; }
+      body { font-family: 'Plus Jakarta Sans', sans-serif; background: #fcf9f8; color: #1c1b1b; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+      .card { background: #fff; border: 1px solid rgba(0,0,0,.07); border-radius: 18px; box-shadow: 0 18px 44px rgba(0,0,0,.08); padding: 34px 26px; max-width: 400px; text-align: center; }
+      .material-symbols-outlined { font-size: 54px; color: #C8963E; }
+      h1 { font-size: 19px; font-weight: 800; margin: 12px 0 8px; }
+      p { font-size: 13.5px; color: #6f7a6e; line-height: 1.6; margin-bottom: 20px; }
+      a.btn { display: inline-flex; align-items: center; gap: 6px; background: #1B7A3D; color: #fff; text-decoration: none; padding: 11px 20px; border-radius: 10px; font-size: 14px; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <span class="material-symbols-outlined">link_off</span>
+      <h1>Tautan tidak berlaku</h1>
+      <p>Tautan masuk sudah kedaluwarsa, sudah dipakai, atau tidak dikenali. Tautan hanya berlaku 15 menit dan sekali pakai.</p>
+      <a class="btn" href="/alumni/masuk"><span class="material-symbols-outlined" style="font-size:18px">refresh</span> Minta tautan baru</a>
+    </div>
+  </body>
+</html>

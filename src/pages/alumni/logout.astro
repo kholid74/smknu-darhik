@@ -1,0 +1,8 @@
+---
+export const prerender = false;
+import { ALUMNI_COOKIE, alumniCookieOpts } from '../../lib/alumni-auth';
+
+// Keluar dari portal alumni: hapus cookie sesi. POST (dari tombol Keluar).
+Astro.cookies.set(ALUMNI_COOKIE, '', alumniCookieOpts(0));
+return Astro.redirect('/alumni/masuk');
+---

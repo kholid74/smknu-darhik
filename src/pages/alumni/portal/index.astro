@@ -1,0 +1,48 @@
+---
+export const prerender = false;
+import AlumniPortalLayout from '../../../layouts/AlumniPortalLayout.astro';
+import { getAlumniSession, ALUMNI_COOKIE, alumniCookieOpts } from '../../../lib/alumni-auth';
+import { db } from '../../../lib/prisma';
+
+// Guard inline (defense-in-depth; middleware juga menjaga /alumni/portal/*).
+const sess = await getAlumniSession(Astro.cookies);
+if (!sess) return Astro.redirect('/alumni/masuk');
+const alumni = await db.alumni.findUnique({
+  where: { id: sess.sub },
+  select: { nama: true, alumniId: true, jurusan: true, angkatan: true, verified: true, photoUrl: true, publicOptIn: true },
+});
+// Akun hilang / dicabut verifikasinya -> bersihkan sesi.
+if (!alumni || !alumni.verified) {
+  Astro.cookies.set(ALUMNI_COOKIE, '', alumniCookieOpts(0));
+  return Astro.redirect('/alumni/masuk');
+}
+
+const cards = [
+  { href: '/alumni/portal/kartu', icon: 'badge', title: 'Kartu Alumni', desc: 'Lihat & unduh kartu digital ber-QR.' },
+  { href: '/alumni/portal/profil', icon: 'person', title: 'Profil Saya', desc: 'Perbarui pekerjaan, kontak, foto, & privasi.' },
+  { href: '/alumni/portal/kontribusi', icon: 'volunteer_activism', title: 'Kontribusi', desc: 'Kirim usulan, info lowongan, atau tawaran narasumber.' },
+];
+---
+
+<AlumniPortalLayout title="Beranda" active="beranda" nama={alumni.nama} alumniId={alumni.alumniId}>
+  <section style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:16px;padding:22px;margin-bottom:18px">
+    <div style="font-size:13px;color:#6f7a6e;font-weight:600">Assalamualaikum,</div>
+    <h1 style="font-size:22px;font-weight:800;margin:2px 0 4px">{alumni.nama}</h1>
+    <div style="font-size:14px;color:#6f7a6e">{alumni.jurusan} · Angkatan {alumni.angkatan}</div>
+    {!alumni.publicOptIn && (
+      <div style="margin-top:14px;background:#fffaf0;border:1px solid #f5d9a8;border-radius:10px;padding:10px 14px;font-size:12.5px;color:#8a6d3b;line-height:1.5">
+        Profil Anda belum tampil di direktori publik. Ingin ditampilkan? Atur di <a href="/alumni/portal/profil" style="color:#1B7A3D;font-weight:700">Profil Saya</a>.
+      </div>
+    )}
+  </section>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+    {cards.map((c) => (
+      <a href={c.href} style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:18px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:8px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 8px 24px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+        <span class="material-symbols-outlined" style="font-size:30px;color:#1B7A3D">{c.icon}</span>
+        <div style="font-size:15px;font-weight:800">{c.title}</div>
+        <div style="font-size:12.5px;color:#6f7a6e;line-height:1.5">{c.desc}</div>
+      </a>
+    ))}
+  </div>
+</AlumniPortalLayout>

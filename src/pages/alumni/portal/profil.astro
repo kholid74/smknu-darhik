@@ -1,0 +1,158 @@
+---
+export const prerender = false;
+import AlumniPortalLayout from '../../../layouts/AlumniPortalLayout.astro';
+import { getAlumniSession, ALUMNI_COOKIE, alumniCookieOpts } from '../../../lib/alumni-auth';
+import { db } from '../../../lib/prisma';
+
+const sess = await getAlumniSession(Astro.cookies);
+if (!sess) return Astro.redirect('/alumni/masuk');
+
+let item = await db.alumni.findUnique({ where: { id: sess.sub } });
+if (!item || !item.verified) {
+  Astro.cookies.set(ALUMNI_COOKIE, '', alumniCookieOpts(0));
+  return Astro.redirect('/alumni/masuk');
+}
+
+let error = '';
+let saved = false;
+let form: any = item;
+if (Astro.request.method === 'POST') {
+  const data = await Astro.request.formData();
+  const optIn = data.get('publicOptIn') === '1';
+  // Field yang boleh alumni ubah sendiri. Identity (nama/angkatan/jurusan/alumniId/verified) TIDAK.
+  const record: any = {
+    status: data.get('status')?.toString() || 'Bekerja',
+    pekerjaan: data.get('pekerjaan')?.toString().trim() || null,
+    instansi: data.get('instansi')?.toString().trim() || null,
+    domisili: data.get('domisili')?.toString().trim() || null,
+    cerita: data.get('cerita')?.toString().trim() || null,
+    photoUrl: data.get('photoUrl')?.toString() || null,
+    email: data.get('email')?.toString().trim().toLowerCase() || null,
+    wa: data.get('wa')?.toString().trim() || null,
+    publicOptIn: optIn,
+    // Opt-out publik -> tak boleh tetap di-showcase; featured (kendali admin) dipaksa lepas.
+    ...(optIn ? {} : { featured: false }),
+  };
+  try {
+    item = await db.alumni.update({ where: { id: sess.sub }, data: record });
+    form = item;
+    saved = true;
+  } catch (e: any) {
+    if (e?.code === 'P2002') {
+      const f = Array.isArray(e?.meta?.target) ? e.meta.target.join(', ') : 'email/WA';
+      error = `Gagal simpan: ${f} sudah dipakai alumni lain.`;
+      form = { ...item, ...record };
+    } else throw e;
+  }
+}
+
+const regencies = await db.regency.findMany({ orderBy: { name: 'asc' }, select: { name: true } });
+const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
+const thumb = (url: string) => (url.startsWith('/api/image/') ? `${url}?w=300` : url);
+---
+
+<AlumniPortalLayout title="Profil" active="profil" nama={item.nama} alumniId={item.alumniId}>
+  <h1 style="font-size:18px;font-weight:800;margin-bottom:4px">Profil Saya</h1>
+  <p style="font-size:12.5px;color:#6f7a6e;margin-bottom:16px">Identitas (nama, angkatan, jurusan, ID) dikelola sekolah. Anda dapat memperbarui data karier, kontak, foto, dan privasi.</p>
+
+  {saved && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">Perubahan tersimpan.</div>}
+  {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
+
+  <form method="POST" id="pf" style="display:flex;flex-direction:column;gap:14px">
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div><div class="ro-l">Nama</div><div class="ro-v">{item.nama}</div></div>
+      <div><div class="ro-l">Jurusan</div><div class="ro-v">{item.jurusan}</div></div>
+      <div><div class="ro-l">Angkatan</div><div class="ro-v">{item.angkatan}</div></div>
+      {item.alumniId && <div><div class="ro-l">ID Alumni</div><div class="ro-v" style="font-family:monospace">{item.alumniId}</div></div>}
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div>
+          <label class="l">Status</label>
+          <select name="status" class="in">{statuses.map((s) => <option value={s} selected={(form?.status || 'Bekerja') === s}>{s}</option>)}</select>
+        </div>
+        <div><label class="l">Pekerjaan</label><input class="in" type="text" name="pekerjaan" value={form?.pekerjaan || ''} /></div>
+        <div><label class="l">Instansi</label><input class="in" type="text" name="instansi" value={form?.instansi || ''} /></div>
+      </div>
+      <div>
+        <label class="l">Domisili (kota/kabupaten)</label>
+        <input class="in" type="text" name="domisili" value={form?.domisili || ''} list="kota" placeholder="mis. Kabupaten Lamongan" />
+        <datalist id="kota">{regencies.map((r) => <option value={r.name}></option>)}</datalist>
+      </div>
+      <div><label class="l">Cerita singkat</label><textarea class="in" name="cerita" rows="3" style="resize:vertical">{form?.cerita || ''}</textarea></div>
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div class="ro-l">Foto</div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div id="ph-prev" style="width:84px;height:84px;border-radius:12px;background:#eef2ee;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          {form?.photoUrl
+            ? <img id="ph-img" src={thumb(form.photoUrl)} style="width:100%;height:100%;object-fit:cover" />
+            : <span id="ph-ic" class="material-symbols-outlined" style="color:#b8c2b6;font-size:40px">person</span>}
+        </div>
+        <div>
+          <input type="file" id="ph-file" accept="image/*" style="font-size:13px" />
+          <div id="ph-status" style="font-size:12px;color:#6f7a6e;margin-top:4px">JPG/PNG, maks 5MB.</div>
+        </div>
+      </div>
+      <input type="hidden" name="photoUrl" id="photoUrl" value={form?.photoUrl || ''} />
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div class="ro-l">Kontak (privat — tidak tampil publik)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="l">Email <span style="font-weight:500;color:#6f7a6e">— dipakai untuk login</span></label>
+          <input class="in" type="email" name="email" value={form?.email || ''} placeholder="nama@email.com" />
+        </div>
+        <div><label class="l">No. WA</label><input class="in" type="text" name="wa" value={form?.wa || ''} placeholder="08xxxx" /></div>
+      </div>
+      <p style="font-size:11.5px;color:#a16207;background:#fffaf0;border:1px solid #f5d9a8;border-radius:8px;padding:8px 10px;margin:0">Hati-hati mengubah email: email inilah tautan masuk Anda berikutnya. Pastikan benar.</p>
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:14px;padding:16px">
+      <label style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;font-weight:600;cursor:pointer">
+        <input type="checkbox" name="publicOptIn" value="1" checked={form?.publicOptIn ?? false} style="width:auto;margin-top:3px" />
+        <span>Tampilkan profil saya di direktori alumni publik <span style="font-weight:500;color:#6f7a6e">— nama, jurusan, angkatan, pekerjaan, domisili, cerita, foto. Kontak (email/WA) tetap privat. Bisa dimatikan kapan saja.</span></span>
+      </label>
+    </div>
+
+    <div style="display:flex;gap:10px"><button type="submit" class="btn-save"><span class="material-symbols-outlined" style="font-size:18px">save</span> Simpan Perubahan</button></div>
+  </form>
+
+  <style>
+    .l { display:block;font-size:12.5px;font-weight:700;margin-bottom:5px }
+    .in { width:100%;border:1px solid #d9ddd7;border-radius:9px;padding:9px 11px;font-size:13.5px;font-family:inherit;background:#fff }
+    .in:focus { outline:none;border-color:#1B7A3D;box-shadow:0 0 0 3px rgba(27,122,61,.12) }
+    .ro-l { font-size:11.5px;font-weight:700;color:#8a938a;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px }
+    .ro-v { font-size:14px;font-weight:700 }
+    .btn-save { display:inline-flex;align-items:center;gap:6px;background:#1B7A3D;color:#fff;border:0;border-radius:10px;padding:11px 18px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer }
+    .btn-save:hover { background:#146030 }
+  </style>
+
+  <script>
+    const fileEl = document.getElementById('ph-file') as HTMLInputElement | null;
+    const statusEl = document.getElementById('ph-status');
+    const hidden = document.getElementById('photoUrl') as HTMLInputElement | null;
+    const prev = document.getElementById('ph-prev');
+    fileEl?.addEventListener('change', async () => {
+      const f = fileEl.files?.[0];
+      if (!f) return;
+      if (f.size > 5 * 1024 * 1024) { if (statusEl) statusEl.textContent = 'Ukuran maksimal 5MB.'; return; }
+      if (statusEl) statusEl.textContent = 'Mengunggah...';
+      const fd = new FormData();
+      fd.append('file', f);
+      try {
+        const res = await fetch('/api/alumni/upload', { method: 'POST', body: fd });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || 'Gagal');
+        if (hidden) hidden.value = j.url;
+        if (prev) prev.innerHTML = `<img src="${j.url.startsWith('/api/image/') ? j.url + '?w=300' : j.url}" style="width:100%;height:100%;object-fit:cover" />`;
+        if (statusEl) statusEl.textContent = 'Foto siap. Klik Simpan untuk menyimpan.';
+      } catch (e) {
+        if (statusEl) statusEl.textContent = 'Gagal mengunggah: ' + (e as Error).message;
+      }
+    });
+  </script>
+</AlumniPortalLayout>

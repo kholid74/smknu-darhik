@@ -12,6 +12,12 @@ const metaEnv: Record<string, string | undefined> = {
   R2_SECRET_KEY: import.meta.env.R2_SECRET_KEY,
   R2_BUCKET: import.meta.env.R2_BUCKET,
   R2_PUBLIC_URL: import.meta.env.R2_PUBLIC_URL,
+  MAILTRAP_HOST: import.meta.env.MAILTRAP_HOST,
+  MAILTRAP_PORT: import.meta.env.MAILTRAP_PORT,
+  MAILTRAP_USER: import.meta.env.MAILTRAP_USER,
+  MAILTRAP_PASS: import.meta.env.MAILTRAP_PASS,
+  MAIL_FROM: import.meta.env.MAIL_FROM,
+  PUBLIC_SITE_URL: import.meta.env.PUBLIC_SITE_URL,
 };
 
 export function env(key: keyof typeof metaEnv | string): string | undefined {

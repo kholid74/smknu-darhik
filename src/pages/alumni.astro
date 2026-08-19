@@ -43,9 +43,14 @@ const statTiles = showStats ? [
   <div class="relative z-10 px-4 md:px-6 max-w-3xl mx-auto py-16 md:py-24 text-center text-white">
     <h1 class="text-3xl md:text-4xl font-extrabold leading-tight mb-4">Alumni {site.shortName}</h1>
     <p class="text-base md:text-lg text-white/80 leading-relaxed max-w-xl mx-auto mb-8">Jejak para lulusan — bukti nyata bahwa sekolah kejuruan di desa pun mencetak orang-orang hebat.</p>
-    <a href="/alumni/daftar" class="inline-flex items-center justify-center gap-2 bg-gold text-white font-bold px-7 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-gold-deep transition-colors shadow-lg shadow-black/20">
-      <span class="material-symbols-outlined text-lg">person_add</span> Daftar sebagai Alumni
-    </a>
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+      <a href="/alumni/daftar" class="inline-flex items-center justify-center gap-2 bg-gold text-white font-bold px-7 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-gold-deep transition-colors shadow-lg shadow-black/20">
+        <span class="material-symbols-outlined text-lg">person_add</span> Daftar sebagai Alumni
+      </a>
+      <a href="/alumni/masuk" class="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/30 text-white font-bold px-7 py-3.5 rounded-lg text-sm min-h-[48px] hover:bg-white/20 transition-colors backdrop-blur-sm">
+        <span class="material-symbols-outlined text-lg">login</span> Masuk Portal Alumni
+      </a>
+    </div>
   </div>
 </section>
 
