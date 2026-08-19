@@ -155,6 +155,7 @@ model Alumni {
   wa        String? @unique // PRIVAT — kontak/recovery; unik cegah dup (NULL boleh banyak)
   photoUrl    String? // admin isi saat verifikasi
   alumniId    String?  @unique // ID kartu alumni (SMKSDH-0001), diberi saat approve; permanen
+  verifyToken String?  @unique // token acak untuk QR/URL verify publik (anti-enumerasi); diberi saat approve
   verified    Boolean  @default(false) // gate moderasi (data valid, masuk DB)
   publicOptIn Boolean  @default(false) // alumni setuju tampil publik
   featured    Boolean  @default(false) // admin pilih tampil di showcase; hanya boleh bila publicOptIn

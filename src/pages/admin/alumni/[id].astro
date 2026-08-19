@@ -65,10 +65,13 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
     {error && <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:14px">{error}</div>}
     <div class="card" style="display:flex;flex-direction:column;gap:14px">
       {form?.alumniId && (
-        <div style="display:flex;align-items:center;gap:8px;background:#f0f7f1;border-radius:8px;padding:8px 12px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:8px;background:#f0f7f1;border-radius:8px;padding:8px 12px;font-size:13px;flex-wrap:wrap">
           <span class="material-symbols-outlined" style="font-size:18px;color:#1B7A3D">badge</span>
           <span>ID Alumni: <strong style="font-family:monospace">{form.alumniId}</strong></span>
           <span style="color:#6f7a6e;font-size:12px">— permanen, otomatis saat verifikasi</span>
+          {isEdit && item?.verified && (
+            <a href={`/admin/alumni/kartu/${id}`} class="btn btn-outline" style="margin-left:auto;padding:5px 12px;font-size:12px;color:#1B7A3D"><span class="material-symbols-outlined" style="font-size:15px">badge</span> Buka Kartu</a>
+          )}
         </div>
       )}
       <div><label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">Nama *</label><input type="text" name="nama" value={form?.nama || ''} required/></div>

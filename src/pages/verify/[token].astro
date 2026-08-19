@@ -1,0 +1,101 @@
+---
+export const prerender = false;
+import { db } from '../../lib/prisma';
+
+// Halaman verifikasi PUBLIK (tanpa login). Target QR kartu alumni.
+// Anti-enumerasi: dicari via verifyToken acak, bukan alumniId sequential.
+// PRIVASI: wa/email TIDAK PERNAH di-select/ditampilkan. Info = sama persis dgn kartu.
+const { token } = Astro.params;
+
+const alumni = token
+  ? await db.alumni.findUnique({
+      where: { verifyToken: token },
+      select: { nama: true, jurusan: true, angkatan: true, photoUrl: true, alumniId: true, verified: true },
+    })
+  : null;
+
+// Hanya alumni verified yang sah. Token ada tapi belum verified -> perlakukan tak ditemukan.
+const ok = !!alumni && alumni.verified;
+const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${url}?w=${w}` : url);
+---
+
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>{ok ? `Verifikasi Alumni — ${alumni!.nama}` : 'Verifikasi Alumni'} — SMKS NU Darul Hikam</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <style>
+      :root { --green: #1B7A3D; --gold: #C8963E; --ink: #1c1b1b; --muted: #6f7a6e; }
+      * { box-sizing: border-box; margin: 0; }
+      body { font-family: 'Plus Jakarta Sans', sans-serif; background: #fcf9f8; color: var(--ink); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+      .wrap { width: 100%; max-width: 380px; }
+      .brand { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 16px; }
+      .brand img { width: 32px; height: 32px; }
+      .brand span { font-size: 13px; font-weight: 700; color: var(--muted); }
+      .card { background: #fff; border: 1px solid rgba(0,0,0,.07); border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,.08); overflow: hidden; }
+      .banner { background: linear-gradient(135deg, var(--green), #146030); color: #fff; padding: 18px 20px; display: flex; align-items: center; gap: 10px; }
+      .banner .material-symbols-outlined { font-size: 30px; }
+      .banner h1 { font-size: 15px; font-weight: 800; line-height: 1.2; }
+      .banner p { font-size: 12px; opacity: .85; }
+      .body { padding: 24px 20px 26px; text-align: center; }
+      .photo { width: 120px; height: 120px; border-radius: 16px; object-fit: cover; margin: 0 auto 16px; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.12); background: #eef2ee; }
+      .photo-ph { display: flex; align-items: center; justify-content: center; color: #b8c2b6; }
+      .photo-ph .material-symbols-outlined { font-size: 56px; }
+      .nama { font-size: 21px; font-weight: 800; }
+      .meta { font-size: 14px; color: var(--muted); margin-top: 4px; }
+      .idpill { display: inline-block; margin-top: 14px; font-size: 13px; font-weight: 700; letter-spacing: .5px; color: var(--green); background: #eef7f0; border: 1px solid #cfe6d4; border-radius: 999px; padding: 6px 14px; }
+      .foot { font-size: 11px; color: var(--muted); text-align: center; margin-top: 16px; line-height: 1.5; }
+      .nf { text-align: center; padding: 40px 24px; }
+      .nf .material-symbols-outlined { font-size: 52px; color: #c2534a; }
+      .nf h1 { font-size: 18px; font-weight: 800; margin: 12px 0 6px; }
+      .nf p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="brand">
+        <img src="/assets/logo.png" alt="Logo" />
+        <span>SMKS NU Darul Hikam</span>
+      </div>
+
+      {ok ? (
+        <div class="card">
+          <div class="banner">
+            <span class="material-symbols-outlined">verified</span>
+            <div>
+              <h1>Alumni Terverifikasi</h1>
+              <p>Identitas resmi tervalidasi sekolah</p>
+            </div>
+          </div>
+          <div class="body">
+            {alumni!.photoUrl ? (
+              <img class="photo" src={thumb(alumni!.photoUrl, 300)} alt={alumni!.nama} />
+            ) : (
+              <div class="photo photo-ph"><span class="material-symbols-outlined">person</span></div>
+            )}
+            <div class="nama">{alumni!.nama}</div>
+            <div class="meta">{alumni!.jurusan} · Angkatan {alumni!.angkatan}</div>
+            {alumni!.alumniId && <div class="idpill">{alumni!.alumniId}</div>}
+          </div>
+        </div>
+      ) : (
+        <div class="card">
+          <div class="nf">
+            <span class="material-symbols-outlined">gpp_bad</span>
+            <h1>Tidak Ditemukan</h1>
+            <p>Kartu tidak dikenali atau bukan alumni terverifikasi. Pastikan QR discan dari kartu resmi yang dikeluarkan sekolah.</p>
+          </div>
+        </div>
+      )}
+
+      <p class="foot">Halaman verifikasi resmi SMKS NU Darul Hikam Karanggeneng.<br />Data pribadi (kontak) tidak ditampilkan di sini.</p>
+    </div>
+  </body>
+</html>

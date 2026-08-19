@@ -58,6 +58,11 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
 ---
 
 <AdminLayout title="Alumni" user={{ role: session.role }}>
+  {url.searchParams.get('kartu') === 'belum' && (
+    <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">
+      Kartu hanya tersedia untuk alumni yang sudah <strong>terverifikasi</strong> (punya ID alumni). Verifikasi dulu alumni tersebut.
+    </div>
+  )}
   {pending > 0 && (
     <div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:8px;font-size:13px">
       <span class="material-symbols-outlined" style="font-size:18px;color:#a16207">notifications_active</span>
@@ -142,6 +147,9 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
                 )}
                 {a.verified && !a.publicOptIn && (
                   <span class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#cbd5e1;cursor:not-allowed" title="Alumni tidak opt-in tampil publik"><span class="material-symbols-outlined" style="font-size:16px">star_outline</span></span>
+                )}
+                {a.verified && a.alumniId && (
+                  <a href={`/admin/alumni/kartu/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#1B7A3D" title="Kartu alumni (QR + download)"><span class="material-symbols-outlined" style="font-size:16px">badge</span></a>
                 )}
                 <a href={`/admin/alumni/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px" title="Edit"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
                 <form method="POST" action="/admin/alumni/delete" style="display:inline">
