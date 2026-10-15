@@ -102,3 +102,7 @@ Release hanya diterima jika:
 - Gladi Chromebook, distribusi PIN, identitas panitia, RPO/RTO serta penerimaan batas kerahasiaan ditandatangani pemilik operasional.
 
 Laporan implementasi nanti harus mencatat command, versi runtime/adapter, database test, jumlah tes dan hasil aktual. Proposal audit ini tidak boleh disalin menjadi bukti kelulusan.
+
+## Pengujian penghapusan data uji ? 15 Oktober 2026
+
+Tes src/lib/voting/test-cleanup-db.test.ts menjalankan semua migrasi pada PostgreSQL dalam memori. Cakupan: sampel berjalan dengan suara, sesi dicabut, master siswa/periode lain/audit utuh, audit append-only, konfirmasi salah, preview stale, non-superadmin/akun nonaktif/revoke ditolak, periode biasa/publikasi ditolak, klasifikasi immutable, konteks cleanup palsu tidak melewati proteksi periode biasa, dan rollback setelah kegagalan di tengah penghapusan. Validasi input dan RBAC juga diuji terpisah. Smoke test komponen memakai API mock untuk dua popup, password salah dan pengosongan password, serta preview stale. Tidak ada penghapusan nyata Neon dalam tes.

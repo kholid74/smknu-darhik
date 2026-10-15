@@ -1,0 +1,5 @@
+---
+interface Props { label?:string }
+const {label='Memuat data…'}=Astro.props;
+---
+<div class="loading-state" role="status" aria-live="polite">{label}</div>

@@ -1,14 +1,18 @@
 ---
 export const prerender = false;
+import PageHeader from '../../../../components/ui/PageHeader.astro';
+import StatusBadge from '../../../../components/ui/StatusBadge.astro';
+import TestPeriodCleanup from '../../../../components/voting/TestPeriodCleanup.astro';
+import {canDeleteTestPeriod} from '../../../../lib/voting/test-cleanup-input';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
-import { getPeriod } from '../../../../lib/voting/periods';
+import { getPeriod, getPeriodSetup } from '../../../../lib/voting/periods';
 import { can } from '../../../../lib/rbac';
 
 const id = Astro.params.id ?? '';
 if (!/^[0-9a-f-]{36}$/i.test(id)) return Astro.redirect('/admin/e-voting');
 const period = await getPeriod(id);
 if (!period) return Astro.redirect('/admin/e-voting');
-const editable = ['DRAFT', 'SCHEDULED'].includes(period.state) && Date.now() < period.opensAt.getTime();
+const lifecycleEditable = ['DRAFT', 'SCHEDULED'].includes(period.state) && Date.now() < period.opensAt.getTime();
 const schedulable = period.state === 'DRAFT';
 const wallTime = (date: Date) => new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 16);
 const expected = JSON.stringify({ name: period.name, academicYear: period.academicYear, opensAt: period.opensAt.toISOString(), closesAt: period.closesAt.toISOString() });
@@ -22,14 +26,28 @@ const canClosePeriod = principal ? can(principal, 'evoting.tutup') : false;
 const canPublishPeriod = principal ? can(principal, 'evoting.publikasi') : false;
 const canViewParticipation = principal ? can(principal, 'evoting.partisipasi') : false;
 const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false;
+const editable=lifecycleEditable&&canManagePeriod;
+const setup=canManageCandidates&&canManageRoster?await getPeriodSetup(id):null;
+const steps=[
+ {label:'Konfigurasi',href:canManagePeriod?'/admin/e-voting/'+id:null,ready:period.state!=='DRAFT'||!!setup?.configurationReady,detail:'Nama dan jadwal WIB'},
+ {label:'Calon',href:canManageCandidates?'/admin/e-voting/'+id+'/calon':null,ready:!!setup?.candidatesReady,detail:'Empat organisasi'},
+ {label:'Pemilih',href:canManageRoster?'/admin/e-voting/'+id+'/pemilih':null,ready:!!setup?.rosterReady,detail:setup?setup.voterCount+'/99 terdaftar':'Master siswa'},
+ {label:'PIN',href:canManagePins?'/admin/e-voting/'+id+'/pin':null,ready:!!setup?.pinsReady,detail:setup?setup.pinCount+' PIN aktif':'Kredensial pemilihan'},
+ {label:'Jadwalkan',href:canManagePeriod&&period.state==='DRAFT'?'#schedule-period':null,ready:period.state!=='DRAFT',detail:period.state==='DRAFT'?'Periksa kesiapan':period.state},
+ {label:'Partisipasi',href:canViewParticipation?'/admin/e-voting/'+id+'/partisipasi':null,ready:period.state!=='DRAFT',detail:'Status, tanpa pilihan'},
+ {label:'Hasil resmi',href:period.publishedAt?'/e-voting/'+period.slug+'/hasil':null,ready:!!period.publishedAt,detail:period.publishedAt?'Dipublikasikan':'Setelah ditutup'},
+];
+
 ---
 
 <AdminLayout title="Konfigurasi Periode" user={{ role: Astro.locals.session?.role ?? '' }}>
   <a href="/admin/e-voting" style="display:inline-flex;margin-bottom:14px;text-decoration:none;font-size:13px">â† Daftar periode</a>
-  <div style="display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:18px;flex-wrap:wrap">
-    <div><h2 style="font-size:20px;font-weight:800">{period.name}</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">{period.academicYear} · {period.slug}</p></div>
-    <span class="badge" style={`background:${period.state === 'DRAFT' ? '#fff7ed' : '#eef5ef'};color:#31573c`}>{period.state}</span>
-  </div>
+  <PageHeader title={period.name} description={period.academicYear+' · Jadwal dan langkah persiapan pemilihan'}>
+    <StatusBadge slot="actions" label={period.state} tone={period.state==='DRAFT'?'warning':'success'}/>
+  </PageHeader>
+  {period.isTest && <p class="feedback" data-tone="warning">Periode ini adalah data uji. Jangan digunakan untuk pemilihan resmi.</p>}
+  <nav class="setup-steps" aria-label="Langkah pemilihan">{steps.map((step,index)=>step.href?<a class="setup-step" href={step.href} data-ready={step.ready}><span class="step-number">{String(index+1).padStart(2,'0')}</span><strong>{step.label}</strong><small>{step.detail}</small></a>:<div class="setup-step" data-ready={step.ready}><span class="step-number">{String(index+1).padStart(2,'0')}</span><strong>{step.label}</strong><small>{step.detail}</small></div>)}</nav>
+  {setup&&period.state==='DRAFT'&&<section class="preflight" aria-label="Kesiapan penjadwalan"><strong>Pratinjau kesiapan</strong><ul><li data-ready={setup.configurationReady}>{setup.configurationReady?'✓':'!'} Jadwal mulai di masa depan dan selesai setelah mulai</li><li data-ready={setup.candidatesReady}>{setup.candidatesReady?'✓':'!'} Pasangan ketua/wakil lengkap untuk empat organisasi</li><li data-ready={setup.rosterReady}>{setup.rosterReady?'✓':'!'} {setup.voterCount} pemilih dengan empat hak suara</li><li data-ready={setup.pinsReady}>{setup.pinsReady?'✓':'!'} {setup.pinCount}/{setup.voterCount} PIN aktif</li></ul><p style="font-size:12px;margin-top:12px">Kesiapan diperiksa ulang oleh server saat dijadwalkan.</p></section>}
   <p id="period-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
   <section class="card" style="margin-bottom:18px">
     <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Konfigurasi</h3>
@@ -42,7 +60,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
       <div style="display:flex;align-items:end">{editable ? <button class="btn btn-primary" type="submit">Simpan konfigurasi</button> : <p style="font-size:13px;color:var(--color-muted)">Konfigurasi terkunci setelah periode dibuka atau ditutup.</p>}</div>
     </form>
   </section>
-  {schedulable && <section class="card" style="margin-bottom:18px">
+  {schedulable && canManagePeriod && <section class="card" style="margin-bottom:18px">
     <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Jadwalkan pemilihan</h3>
     <p style="font-size:13px;color:var(--color-muted);margin-bottom:12px">Pastikan empat organisasi, kandidat lengkap, roster, dan PIN sudah siap. Jadwal masih dapat disunting sebelum pemilihan dibuka.</p>
     <button id="schedule-period" class="btn btn-primary" type="button">Jadwalkan periode</button>
@@ -85,6 +103,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">{canManageCandidates && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/calon`}>Kelola calon</a>}{canManageRoster && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/pemilih`}>Kelola Pemilih</a>}{canManagePins && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/pin`}>Terbitkan PIN</a>}{canViewParticipation && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/partisipasi`}>Partisipasi</a>}</div>
   </section>
   <p style="font-size:12px;color:var(--color-muted);margin-top:14px">Periode terjadwal akan terbuka otomatis pada waktu mulai yang ditentukan.</p>
+  {period.isTest && !period.publishedAt && canDeleteTestPeriod(principal) && <TestPeriodCleanup periodId={id} name={period.name} slug={period.slug}/>}
 </AdminLayout>
 
 <style>
@@ -122,6 +141,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
 </script>
 
 <script>
+  import { confirmAction } from '../../../../lib/ui/confirm';
   const extendForm = document.querySelector<HTMLFormElement>('#extend-period-form');
   if (extendForm) {
     const message = document.querySelector<HTMLElement>('#period-message')!;
@@ -131,7 +151,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
     extendForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
-      if (!confirm('Tambahkan 60 menit? Perpanjangan hanya dapat digunakan satu kali.')) return;
+      if (!await confirmAction('Tambahkan 60 menit? Perpanjangan hanya dapat digunakan satu kali.')) return;
       const button = extendForm.querySelector<HTMLButtonElement>('button')!;
       button.disabled = true;
       const values = Object.fromEntries(new FormData(extendForm));
@@ -150,6 +170,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
 </script>
 
 <script>
+  import { confirmAction } from '../../../../lib/ui/confirm';
   const publishForm = document.querySelector<HTMLFormElement>('#publish-period-form');
   if (publishForm) {
     const message = document.querySelector<HTMLElement>('#period-message')!;
@@ -159,7 +180,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
     publishForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
-      if (!confirm('Publikasikan hasil pemilihan untuk umum?')) return;
+      if (!await confirmAction('Publikasikan hasil pemilihan untuk umum?')) return;
       const button = publishForm.querySelector<HTMLButtonElement>('button')!;
       button.disabled = true;
       try {
@@ -176,6 +197,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
 </script>
 
 <script>
+  import { confirmAction } from '../../../../lib/ui/confirm';
   const closeForm = document.querySelector<HTMLFormElement>('#close-period-form');
   if (closeForm) {
     const message = document.querySelector<HTMLElement>('#period-message')!;
@@ -185,7 +207,7 @@ const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false
     closeForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
-      if (!confirm('Tutup pemilihan secara permanen dan cabut seluruh sesi siswa?')) return;
+      if (!await confirmAction('Tutup pemilihan secara permanen dan cabut seluruh sesi siswa?')) return;
       const button = closeForm.querySelector<HTMLButtonElement>('button')!;
       button.disabled = true;
       try {

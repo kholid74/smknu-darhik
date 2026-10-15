@@ -58,3 +58,7 @@ Rincian teknis ada di dokumen desain, schema, API, pengujian, dan operasional be
 Source, lockfile, 19 direktori migrasi, konfigurasi, pola route/admin, dan tiga file unit test diperiksa pada audit awal. Setelah seluruh keputusan dikonfirmasi, 11 dokumen diperiksa: 51 tautan lokal valid. Revisi kandidat ditinjau lintas tujuh dokumen terkait: 18 tautan lokal valid, kontrak nama-bebas sudah dihapus dan relasi Ballot tetap anonim. Kode aplikasi tidak diubah. Build, test aplikasi, validasi Prisma, migrasi aktual, dan uji browser belum dijalankan dalam pekerjaan dokumentasi ini. Proposal schema belum dikompilasi oleh Prisma; validasi dan integrasi adapter Neon adalah pekerjaan implementasi, bukan dianggap selesai oleh audit. Referensi eksternal ditautkan dekat keputusan yang menggunakannya.
 
 **Gerbang implementasi:** `repo_audit.md` meminta “Stop and request approval before starting implementation.” Dokumen ini merupakan bahan persetujuan; jangan mengubah kode aplikasi atau menjalankan migrasi sebelum persetujuan tersebut.
+
+## Pembersihan hasil testing ? 15 Oktober 2026
+
+[Panduan Hapus data uji](08-pembersihan-data-uji.md) menjelaskan migrasi klasifikasi dua sampel awal, batas superadmin, popup berlapis, password login, data yang dibersihkan dan audit yang dipertahankan. Fitur ini telah diotorisasi operator setelah implementasi awal; gerbang persetujuan dokumentasi historis di atas tidak membatalkan instruksi implementasi berikutnya.

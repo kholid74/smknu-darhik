@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: smkdh_qa
+      POSTGRES_PASSWORD: smkdh_local_qa_only
+      POSTGRES_DB: smkdh_election_simulation
+    ports:
+      - "127.0.0.1:54329:5432"
+    volumes:
+      - smkdh_qa_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smkdh_qa -d smkdh_election_simulation"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  smkdh_qa_data:

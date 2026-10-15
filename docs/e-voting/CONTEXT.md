@@ -41,3 +41,7 @@ _Hindari_: Publikasi untuk menyebut penutupan.
 **Publikasi hasil**: Pembukaan hasil agregat yang telah ditutup resmi agar dapat dilihat publik.
 
 **Panitia**: Pemilik akun internal yang diberi izin menyelenggarakan bagian tertentu dari pemilihan.
+
+## Periode uji dan penghapusan sampel
+
+Periode uji adalah penyelenggaraan dengan isTest=true sejak dibuat; berbeda dari periode biasa dan tidak dapat dikonversi lewat edit. Dua sampel awal diklasifikasikan lewat migrasi UUID+slug sesuai konfirmasi operator. Penghapusan sampel adalah pembersihan atomik semua data turunan periode uji yang belum dipublikasikan, dengan superadmin, dua popup, konfirmasi slug dan password login. Student master dan audit append-only tetap tersimpan. Ini bukan arsip atau reset pemilihan resmi. [Panduan](08-pembersihan-data-uji.md).

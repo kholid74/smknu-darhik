@@ -1,5 +1,9 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import Pagination from '../../../components/ui/Pagination.astro';
+import {pageOptions} from '../../../lib/ui/table-state';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
@@ -14,8 +18,7 @@ const search = url.searchParams.get('q') || '';
 const statusFilter = url.searchParams.get('v') || ''; // '' | pending | verified
 const angkatanFilter = url.searchParams.get('a') || '';
 const jurusanFilter = url.searchParams.get('j') || '';
-const page = parseInt(url.searchParams.get('page') || '1');
-const limit = 15;
+const {page,size:limit}=pageOptions(url.searchParams);
 
 // Sort — kolom yang boleh diurutkan (whitelist) + arah
 const sortCols: Record<string, string> = { nama: 'nama', angkatan: 'angkatan', jurusan: 'jurusan', pekerjaan: 'pekerjaan', status: 'verified' };
@@ -42,12 +45,13 @@ const [alumni, total, pending, angkatanRows, jurusanRows] = await Promise.all([
 
 const angkatanList = angkatanRows.map((r) => r.angkatan);
 const jurusanList = jurusanRows.map((r) => r.jurusan);
-const totalPages = Math.ceil(total / limit);
+const totalPages = Math.max(1,Math.ceil(total / limit));
+if(page>totalPages){url.searchParams.set('page',String(totalPages));return Astro.redirect(url.pathname+url.search)}
 
 // Bangun querystring dgn override, jaga semua filter/sort tetap ada
 const mkQs = (ov: Record<string, string | number> = {}) => {
   const s = new URLSearchParams();
-  const base: Record<string, string> = { q: search, v: statusFilter, a: angkatanFilter, j: jurusanFilter, sort, dir, page: String(page) };
+  const base: Record<string, string> = { q: search, v: statusFilter, a: angkatanFilter, j: jurusanFilter, sort, dir, page: String(page), size: String(limit) };
   const merged = { ...base, ...Object.fromEntries(Object.entries(ov).map(([k, v]) => [k, String(v)])) };
   for (const [k, v] of Object.entries(merged)) if (v) s.set(k, v);
   return `?${s.toString()}`;
@@ -58,6 +62,7 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
 ---
 
 <AdminLayout title="Alumni" user={{ role: session.role }}>
+  <PageHeader title="Alumni"/>
   {url.searchParams.get('kartu') === 'belum' && (
     <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">
       Kartu hanya tersedia untuk alumni yang sudah <strong>terverifikasi</strong> (punya ID alumni). Verifikasi dulu alumni tersebut.
@@ -73,7 +78,7 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <div style="display:flex;gap:10px;align-items:center">
-      <form method="GET" style="display:flex;gap:8px">
+      <form method="GET" style="display:flex;gap:8px"><label>Per halaman<select name="size">{[10,25,50].map(size=><option value={size} selected={size===limit}>{size}</option>)}</select></label>
         <input type="hidden" name="sort" value={sort}/>
         <input type="hidden" name="dir" value={dir}/>
         <input type="text" name="q" value={search} placeholder="Cari nama..." style="width:200px"/>
@@ -97,7 +102,7 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
   </div>
 
   <div class="card" style="padding:0">
-    <table>
+    <DataTable id="server-alumni" label="Alumni" mode="server"><table>
       <thead>
         <tr>
           <th style="width:24%"><a href={sortLink('nama')} class="th-sort" data-active={sort === 'nama' || undefined}>Nama <span class="material-symbols-outlined">{sortIcon('nama')}</span></a></th>
@@ -161,21 +166,14 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></DataTable>
   </div>
 
-  {totalPages > 1 && (
-    <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
-      {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-        <a href={mkQs({ page: p })} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
-      ))}
-    </div>
-  )}
+  <Pagination page={page} pageCount={totalPages} total={total} size={limit} url={url}/>
 
   <p style="font-size:12px;color:#6f7a6e;margin-top:12px">Total: {total} alumni</p>
 
-  <div id="approve-modal" class="modal-overlay" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="approve-title">
+  <dialog id="approve-modal" class="ui-dialog" aria-labelledby="approve-title">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <span class="material-symbols-outlined" style="color:#16a34a;font-size:24px">check_circle</span>
         <h3 id="approve-title" style="font-size:16px;font-weight:800;margin:0">Setujui Alumni?</h3>
@@ -186,8 +184,7 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
         <button type="button" class="btn btn-outline js-approve-cancel">Batal</button>
         <button type="submit" class="btn btn-primary" style="background:#16a34a;border-color:#16a34a"><span class="material-symbols-outlined" style="font-size:16px">check</span> Setujui</button>
       </form>
-    </div>
-  </div>
+  </dialog>
 </AdminLayout>
 
 <style>
@@ -196,22 +193,19 @@ const sortIcon = (col: string) => (sort !== col ? 'unfold_more' : dir === 'asc' 
   .th-sort .material-symbols-outlined { font-size:15px; opacity:.35; }
   .th-sort[data-active] { color:#1B7A3D; }
   .th-sort[data-active] .material-symbols-outlined { opacity:1; }
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px; }
-  .modal-overlay[hidden] { display:none; }
-  .modal-card { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:400px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
 </style>
 
 <script>
-  const modal = document.getElementById('approve-modal');
+  const modal = document.querySelector<HTMLDialogElement>('#approve-modal');
   const nameEl = document.getElementById('approve-nama');
   const idEl = document.getElementById('approve-id') as HTMLInputElement | null;
   const open = (id: string, nama: string) => {
     if (!modal || !nameEl || !idEl) return;
     idEl.value = id;
     nameEl.textContent = nama;
-    modal.hidden = false;
+    modal.showModal();
   };
-  const close = () => { if (modal) modal.hidden = true; };
+  const close = () => { if (modal) modal.close(); };
   document.querySelectorAll('.js-approve').forEach((btn) => {
     btn.addEventListener('click', () => open(btn.getAttribute('data-id') || '', btn.getAttribute('data-nama') || ''));
   });

@@ -1,4 +1,6 @@
 ---
+import '../../styles/portal-tokens.css';
+import PortalHead from '../../components/ui/PortalHead.astro';
 export const prerender = false;
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
@@ -12,9 +14,10 @@ Astro.response.headers.set('X-Frame-Options', 'DENY');
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="referrer" content="no-referrer" />
+    <PortalHead/>
     <title>Pemilihan selesai · Portal Siswa</title>
     <style>
-      :root { font-family: Arial, Helvetica, sans-serif; color: #18231e; background: #f4f7f4; }
+      :root { font-family: var(--font-portal); color: var(--color-ink); background: var(--color-paper); }
       body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; }
       main { width: min(100%, 520px); padding: 36px; border: 1px solid #dce5df; border-radius: 18px; background: white; text-align: center; }
       .mark { display: grid; width: 64px; height: 64px; margin: 0 auto 22px; place-items: center; border-radius: 50%; background: #e5f2e9; color: #17643f; font-size: 2rem; font-weight: 800; }

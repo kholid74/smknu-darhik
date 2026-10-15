@@ -95,3 +95,7 @@ Rollback database bersama dapat menghapus update website, alumni dan akun selain
 - [ ] Tahun berikutnya: reuse master Student yang sudah dikoreksi, buat periode/roster/PIN baru dan sesi baru. Jangan truncate master/riwayat, menyalin PIN lama atau menggunakan kembali periode CLOSED/ARCHIVED. Tidak mempromosikan PIN/sesi pemilu menjadi akun permanen atau akses personal/akademik.
 
 Semua checklist tetap terbuka sampai ada bukti operasional. Infrastruktur/secret produksi tidak diperiksa selama audit ini; dokumen tidak merupakan persetujuan deploy.
+
+## Membersihkan dua periode sampel
+
+Gunakan [Hapus data uji](08-pembersihan-data-uji.md) pada halaman konfigurasi sebagai superadmin. Periksa ringkasan, lanjutkan popup kedua, ketik HAPUS <slug> dan password login. Jangan memakai truncate, reset database resmi, menonaktifkan trigger, atau menghapus master siswa untuk mengulang testing. Migrasi hanya menandai dua sampel; penghapusan dijalankan operator melalui UI. Periode berikutnya yang digunakan untuk pemilihan nyata harus dibuat tanpa pilihan Periode uji.

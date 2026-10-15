@@ -62,7 +62,7 @@ Semua route berikut butuh akun aktif, `evoting.lihat`, dan kapabilitas tambahan 
 | Method/path (sesudah base panitia) | Input | Izin tambahan | Output/ketentuan |
 | --- | --- | --- | --- |
 | GET `/periods` | cursor, limit | — | `200` daftar periode tanpa snapshot/roster |
-| POST `/periods` | name ≤120, slug ≤64, academicYear ≤20, opensAt, closesAt | kelola | `201` DRAFT dengan empat contest otomatis; slug duplikat `409` |
+| POST `/periods` | name ≤120, slug ≤64, academicYear ≤20, opensAt, closesAt, isTest? boolean (default false) | kelola | `201` DRAFT dengan empat contest otomatis; slug duplikat `409`; klasifikasi uji tidak dapat diedit |
 | GET `/[periodId]` | — | — | `200` konfigurasi, phase dan kandidat dengan snapshot anggota; tidak ada PIN/roster/tally |
 | PATCH `/[periodId]` | name, academicYear, opensAt, closesAt, expected configuration values | kelola | DRAFT atau sebelum opensAt; setelah dibuka hanya extension satu kali; optimistic conditional update; `409 STALE_CONFIG`/`INVALID_STATE` |
 | GET `/[periodId]/students/search` | `q` (nama/NISN/kelas), `limit` ≤20 | pemilih | `200` pilihan master `{studentId,name,nisn,className}`; tanpa PIN/kredensial. Header `X-CSRF-Token` memberi token mutasi singkat untuk akun aktif |
@@ -106,3 +106,7 @@ Data saksi dua orang untuk penerbitan PIN, penutupan dan publikasi merupakan cat
 | POST `/[periodId]/publish` | `{adminPassword}` | publikasi | `200 {publishedAt}`; CLOSED saja, idempotent setelah sudah terbit; tidak ada unpublish atau edit hasil versi awal |
 
 Tidak ada export ballot mentah, endpoint kandidat dengan field votes sebelum tutup, maupun drilldown pilihan siswa. Ekspor hasil awal cukup melalui halaman cetak agregat setelah gate yang sama; tidak perlu endpoint CSV tambahan. Operasi close yang diulang pada CLOSED mengembalikan state tersimpan, bukan menghitung atau mengganti hasil. Selisih ledger/ballot menghasilkan `409 RECONCILIATION_FAILED`; detail sensitif tidak masuk respons/log publik.
+
+## API pembersihan sampel ? implementasi 15 Oktober 2026
+
+GET dan POST /api/admin/e-voting/[periodId]/test-cleanup hanya untuk superadmin aktif dengan evoting.lihat, evoting.kelola, evoting.hapus-uji yang tidak dicabut. GET memberi jumlah data, versi preview dan CSRF; POST menerima tepat {confirmation,previewVersion,adminPassword} dan sukses 204. Reautentikasi dan rate limit wajib; nama/slug serta versi diverifikasi ulang di server. Periode biasa atau hasil terpublikasi mendapat 409. [Kontrak lengkap dan kode error](08-pembersihan-data-uji.md).

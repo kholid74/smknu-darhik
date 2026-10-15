@@ -127,6 +127,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
 </style>
 
 <script>
+  import { confirmAction } from '../../../../lib/ui/confirm';
   const form = document.querySelector<HTMLFormElement>('#candidate-form')!;
   const message = document.querySelector<HTMLElement>('#candidate-message')!;
   const periodId = form.dataset.periodId!;
@@ -259,7 +260,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
     saveButton.textContent = 'Menyimpan...';
     try {
       if (!csrfToken) await refreshToken();
-      const value = (name: string) => (form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+      const value = (name: string) => (form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null)?.value ?? '';
       const payload: Record<string, unknown> = {
         organization: value('organization'), ballotNumber: Number(value('ballotNumber')),
         chair: { studentId: chair, ...(value('chairPhotoUrl') ? { photoUrl: value('chairPhotoUrl') } : {}) },
@@ -294,7 +295,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
   });
 
   document.querySelectorAll<HTMLButtonElement>('.delete-candidate').forEach((button) => button.addEventListener('click', async () => {
-    if (!confirm('Hapus pasangan ini? Tindakan ini akan dicatat.')) return;
+    if (!await confirmAction('Hapus pasangan ini? Tindakan ini akan dicatat.')) return;
     if (!csrfToken) {
       try { await refreshToken(); } catch (error) { return showMessage(error instanceof Error ? error.message : 'Token keamanan gagal dimuat.', true); }
     }

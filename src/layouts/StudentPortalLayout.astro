@@ -1,6 +1,10 @@
 ---
+import '../styles/portal-tokens.css';
+import PortalHead from '../components/ui/PortalHead.astro';
+import Feedback from '../components/ui/Feedback.astro';
 interface Props { title: string; csrfToken: string; periodId: string }
 const { title, csrfToken, periodId } = Astro.props;
+const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
 ---
 <!doctype html>
 <html lang="id">
@@ -9,9 +13,10 @@ const { title, csrfToken, periodId } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="referrer" content="no-referrer" />
+    <PortalHead/>
     <title>{title} · Portal Siswa SMKS NU Darul Hikam</title>
     <style>
-      :root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; color: #18231e; background: #f4f7f4; }
+      :root { color-scheme: light; font-family: var(--font-portal); color: var(--color-ink); background: var(--color-paper); }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; }
       header { background: #fff; border-bottom: 1px solid #dce5df; }
@@ -20,24 +25,32 @@ const { title, csrfToken, periodId } = Astro.props;
       .brand small { display: block; margin-top: 4px; color: #58685e; font-size: .8rem; font-weight: 500; }
       main { max-width: 1100px; margin: auto; padding: 36px 24px 64px; }
       footer { max-width: 1100px; margin: auto; padding: 18px 24px 28px; color: #58685e; font-size: .85rem; }
-      button, .button { min-height: 44px; border: 0; border-radius: 8px; padding: 10px 16px; background: #17643f; color: white; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-      button.secondary, .button.secondary { background: white; color: #145c3b; border: 1px solid #a8beb0; }
-      button:focus-visible, a:focus-visible { outline: 3px solid #e6a800; outline-offset: 3px; }
+      :global(.student-portal :is(button, .button)) { min-height: 48px; border: 1px solid transparent; border-radius: 12px; padding: 12px 20px; background: #17643f; color: white; font: inherit; font-size: .9375rem; line-height: 1.4; font-weight: 700; text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px; transition: background .16s, border-color .16s, box-shadow .16s; }
+      :global(.student-portal :is(button, .button):not(:disabled):hover) { background: #104d30; box-shadow: 0 4px 12px #145c3b20; }
+      :global(.student-portal :is(button, .button).secondary) { background: white; color: #145c3b; border-color: #a8beb0; white-space: nowrap; }
+      :global(.student-portal :is(button, .button).secondary:not(:disabled):hover) { background: #eef7f1; border-color: #17643f; }
+      :global(.student-portal .button.pale) { background: white; color: #145c3b; box-shadow: 0 4px 14px #06331d26; }
+      :global(.student-portal .button.pale:hover) { background: #edf8f1; border-color: #c6e7d2; box-shadow: 0 6px 18px #06331d33; }
+      :global(.student-portal :is(button, a):focus-visible) { outline: 3px solid #e6a800; outline-offset: 3px; }
       #portal-feedback { min-height: 1.5rem; color: #8b2f22; }
       @media (max-width: 600px) { .topbar, main { padding-left: 16px; padding-right: 16px; } main { padding-top: 24px; } }
     </style>
   </head>
-  <body data-period-id={periodId} data-csrf={csrfToken}>
+  <body class="student-portal" data-period-id={periodId} data-csrf={csrfToken} data-expires-at={expiresAt}>
     <header>
       <div class="topbar">
-        <div class="brand">SMKS NU Darul Hikam<small>Portal Siswa</small></div>
+        <div class="brand" style="display:flex;align-items:center;gap:12px"><img src="/assets/logo.png" alt="" width="40" height="40"/><div>SMKS NU Darul Hikam<small>Portal Siswa</small></div></div>
         <button class="secondary" id="logout-button" type="button">Keluar</button>
       </div>
     </header>
-    <main><slot /></main>
+    <main><slot /><Feedback id="portal-feedback"/></main>
     <footer>Gunakan tombol Keluar saat selesai, terutama pada perangkat bersama.</footer>
     <script>
       const root = document.body;
+      let expiryTimer=0;
+      const expire=()=>{document.querySelector('main')?.replaceChildren();location.replace('/siswa/masuk?expired=1')};
+      const updateExpiry=()=>{window.clearTimeout(expiryTimer);const expiry=Date.parse(root.dataset.expiresAt??'');if(Number.isFinite(expiry))expiryTimer=window.setTimeout(expire,Math.max(0,expiry-Date.now()))};
+      updateExpiry();
       const feedback = document.getElementById('portal-feedback');
       const logout = document.getElementById('logout-button');
       logout?.addEventListener('click', async () => {
@@ -45,7 +58,7 @@ const { title, csrfToken, periodId } = Astro.props;
         try {
           const response = await fetch('/api/e-voting/logout', { method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': root.dataset.csrf ?? '' }, body: '{}' });
-          if (response.status === 204) location.assign('/siswa/masuk');
+          if (response.status === 204) {window.clearTimeout(expiryTimer);document.querySelector('main')?.replaceChildren();location.assign('/siswa/masuk');}
           else throw new Error('Sesi belum dapat ditutup. Coba muat ulang halaman.');
         } catch (error) {
           if (feedback) feedback.textContent = error instanceof Error ? error.message : 'Sesi belum dapat ditutup.';
@@ -63,6 +76,7 @@ const { title, csrfToken, periodId } = Astro.props;
           if (!response.ok) throw new Error('Sesi belum dapat diperpanjang.');
           const payload = await response.json();
           root.dataset.csrf = payload.csrfToken;
+          root.dataset.expiresAt=payload.idleExpiresAt;updateExpiry();
           const expiry = document.getElementById('session-expiry');
           if (expiry) expiry.textContent = new Date(payload.idleExpiresAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
           if (feedback) feedback.textContent = 'Sesi diperpanjang.';
@@ -74,8 +88,8 @@ const { title, csrfToken, periodId } = Astro.props;
         if (!event.persisted) return;
         try {
           const response = await fetch('/api/siswa/dashboard', { cache: 'no-store', credentials: 'same-origin' });
-          if (!response.ok) location.replace('/siswa/masuk');
-        } catch { location.replace('/siswa/masuk'); }
+          if (!response.ok) expire();
+        } catch { expire(); }
       });
     </script>
   </body>

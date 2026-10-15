@@ -289,6 +289,7 @@ model ElectionPeriod {
   slug            String             @unique @db.VarChar(64)
   name            String             @db.VarChar(120)
   academicYear    String             @db.VarChar(20)
+  isTest          Boolean            @default(false)
   state           ElectionState      @default(DRAFT)
   opensAt         DateTime           @db.Timestamptz(3)
   closesAt        DateTime           @db.Timestamptz(3)
@@ -299,7 +300,6 @@ model ElectionPeriod {
   createdAt       DateTime           @default(now()) @db.Timestamptz(3)
   contests        ElectionContest[]
   voters          ElectionVoter[]
-  auditEvents     VotingAuditEvent[]
 }
 
 model ElectionContest {
@@ -420,7 +420,6 @@ model VotingAuditEvent {
   reasonCode     String?         @db.VarChar(64)
   detail         Json?
   createdAt      DateTime        @default(now()) @db.Timestamptz(3)
-  period         ElectionPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   actor          Account?        @relation(fields: [actorAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([periodId, createdAt])

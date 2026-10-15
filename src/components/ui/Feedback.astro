@@ -1,0 +1,5 @@
+---
+interface Props { id:string; tone?:'error'|'success'|'info'; text?:string }
+const {id,tone='info',text}=Astro.props;
+---
+<p id={id} class="feedback" data-tone={tone} role="status" aria-live="polite">{text}</p>

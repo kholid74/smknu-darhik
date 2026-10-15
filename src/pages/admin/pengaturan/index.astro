@@ -1,5 +1,6 @@
 ---
 export const prerender = false;
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
@@ -34,6 +35,7 @@ if (Astro.request.method === 'POST') {
 ---
 
 <AdminLayout title="Pengaturan" user={{ role: session.role }}>
+  <PageHeader title="Pengaturan"/>
   <form method="POST" style="max-width:600px">
     <div class="card" style="margin-bottom:16px">
       <h3 style="font-size:15px;font-weight:700;margin-bottom:14px">Informasi Sekolah</h3>

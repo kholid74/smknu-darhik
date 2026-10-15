@@ -39,5 +39,5 @@ export async function getOrganizationCandidates(periodId: string, slug: string, 
     select: { id: true, ballotNumber: true, vision: true, mission: true,
       members: { select: { position: true, nameSnapshot: true, classSnapshot: true, photoUrl: true } } } });
   if (!candidates.length) throw new BallotPageError('NO_CANDIDATES');
-  return { period, candidates };
+  return { period, candidates, participation };
 }

@@ -1,5 +1,8 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import FormField from '../../../components/ui/FormField.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { db } from '../../../lib/prisma';
 import { listSchoolClasses } from '../../../lib/students';
@@ -12,24 +15,24 @@ Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
 ---
 
 <AdminLayout title="Master Kelas" user={{ role: Astro.locals.session?.role ?? '' }}>
-  <div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800">Master Kelas</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">Kelas dibedakan per tahun ajaran dan jurusan. Jurusan diambil dari master jurusan sekolah.</p></div>
+  <PageHeader title="Master Kelas" description="Kelas dikelompokkan menurut tahun ajaran dan jurusan dari master sekolah."/>
   <p id="class-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
   <section class="card" style="margin-bottom:18px">
     <h3 style="font-size:16px;font-weight:800">Tambah kelas</h3>
     {departments.length === 0 ? <p style="margin-top:10px;font-size:13px;color:var(--color-muted)">Tambahkan jurusan terlebih dahulu melalui Data Sekolah → Jurusan.</p> : <form id="class-form" class="class-form">
-      <label>Tahun ajaran<input name="academicYear" maxlength="9" pattern="[0-9]{4}/[0-9]{4}" required placeholder="2026/2027"/><small>Contoh: 2026/2027</small></label>
-      <label>Nama kelas<input name="name" maxlength="40" required placeholder="X DKV 1"/></label>
-      <label>Jurusan<select name="departmentId" required><option value="">Pilih jurusan</option>{departments.map((department) => <option value={department.id}>{department.name}</option>)}</select></label>
+      <FormField id="class-year" label="Tahun ajaran" hint="Contoh: 2026/2027"><input id="class-year" name="academicYear" maxlength="9" pattern="[0-9]{4}/[0-9]{4}" required placeholder="2026/2027" aria-describedby="class-year-hint"/></FormField>
+      <FormField id="class-name" label="Nama kelas"><input id="class-name" name="name" maxlength="40" required placeholder="X DKV 1"/></FormField>
+      <FormField id="class-department" label="Jurusan"><select id="class-department" name="departmentId" required><option value="">Pilih jurusan</option>{departments.map((department) => <option value={department.id}>{department.name}</option>)}</select></FormField>
       <button class="btn btn-primary" type="submit">Simpan kelas</button>
     </form>}
   </section>
-  <div class="card class-table"><table><thead><tr><th>Tahun ajaran</th><th>Nama kelas</th><th>Jurusan</th><th>Aksi</th></tr></thead><tbody>
+  <div class="card class-table"><DataTable id="table-kelas" label="Kelas" filterColumn={2} filterLabel="Filter"><table><thead><tr><th>Tahun ajaran</th><th>Nama kelas</th><th>Jurusan</th><th>Aksi</th></tr></thead><tbody>
     {classes.length === 0 ? <tr><td colspan="4" style="text-align:center;padding:32px;color:var(--color-muted)">Belum ada kelas.</td></tr> : classes.map((item) => <tr><td>{item.academicYear}</td><td style="font-weight:600">{item.name}</td><td>{item.department.name}</td><td><div class="class-actions">
       <button type="button" class="btn btn-outline edit-class" data-class={JSON.stringify({ id: item.id, academicYear: item.academicYear, name: item.name, departmentId: item.department.id })} aria-label={`Edit kelas ${item.name}`} title="Edit kelas"><span class="material-symbols-outlined">edit</span></button>
       <button type="button" class="btn btn-outline delete-class" data-id={item.id} data-name={`${item.name} · ${item.academicYear}`} aria-label={`Hapus kelas ${item.name}`} title="Hapus kelas"><span class="material-symbols-outlined">delete</span></button>
     </div></td></tr>)}
-  </tbody></table></div>
-  <dialog id="edit-class-dialog" aria-labelledby="edit-class-title">
+  </tbody></table></DataTable></div>
+  <dialog class="ui-dialog" id="edit-class-dialog" aria-labelledby="edit-class-title">
     <form id="edit-class-form" class="edit-class-form">
       <h3 id="edit-class-title">Edit kelas</h3>
       <p id="edit-class-message" role="alert" hidden></p>
@@ -63,6 +66,7 @@ Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
 </style>
 
 <script>
+  import { confirmAction } from '../../../lib/ui/confirm';
   const form = document.querySelector<HTMLFormElement>('#class-form');
   const editForm = document.querySelector<HTMLFormElement>('#edit-class-form')!;
   const dialog = document.querySelector<HTMLDialogElement>('#edit-class-dialog')!;
@@ -116,7 +120,7 @@ Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
     } catch { editMessage.textContent = 'Koneksi terputus. Periksa koneksi lalu coba lagi.'; editMessage.hidden = false; }
   });
   document.querySelectorAll<HTMLButtonElement>('.delete-class').forEach((button) => button.addEventListener('click', async () => {
-    if (!window.confirm(`Hapus kelas ${button.dataset.name}? Tindakan ini tidak dapat dibatalkan.`)) return;
+    if (!await confirmAction(`Hapus kelas ${button.dataset.name}? Tindakan ini tidak dapat dibatalkan.`)) return;
     if (!csrf) { showMessage('Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'); return; }
     try {
       const response = await fetch(`/api/admin/classes/${button.dataset.id}`, { method: 'DELETE', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf } });

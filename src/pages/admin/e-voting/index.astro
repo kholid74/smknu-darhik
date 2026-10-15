@@ -1,16 +1,22 @@
 ---
 export const prerender = false;
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import { listPeriods } from '../../../lib/voting/periods';
+import { can } from '../../../lib/rbac';
 
 const periods = await listPeriods();
+const principal = Astro.locals.principal;
+const canManagePeriod = principal ? can(principal, 'evoting.kelola') : false;
+const canManageCandidates = canManagePeriod && !!principal && can(principal, 'evoting.pemilih');
 const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(date);
 ---
 
 <AdminLayout title="Pemilihan" user={{ role: Astro.locals.session?.role ?? '' }}>
-  <div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800">Periode Pemilihan</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">Buat periode terlebih dahulu. Empat organisasi E-Voting disiapkan otomatis.</p></div>
+  <PageHeader title="Periode Pemilihan" description="Buat periode terlebih dahulu. Empat organisasi E-Voting disiapkan otomatis." />
+  {Astro.url.searchParams.get('deleted') === '1' && <p class="feedback" data-tone="success" role="status">Periode uji beserta data turunannya sudah dihapus. Master siswa dan audit tetap tersimpan.</p>}
   <p id="period-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
-  <details class="card" style="margin-bottom:20px" open>
+  {canManagePeriod && <details class="card" style="margin-bottom:20px" open={periods.length === 0}>
     <summary style="font-size:15px;font-weight:800;cursor:pointer">Buat periode</summary>
     <form id="period-form" class="period-form" style="margin-top:16px">
       <label>Nama periode<input name="name" maxlength="120" required placeholder="Pemilihan OSIS 2026"/></label>
@@ -18,15 +24,16 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
       <label>Tahun ajaran<input name="academicYear" maxlength="20" required placeholder="2026/2027"/></label>
       <label>Mulai (WIB)<input name="opensAt" type="datetime-local" required/></label>
       <label>Selesai (WIB)<input name="closesAt" type="datetime-local" required/></label>
+      <label style="grid-column:1/-1;flex-direction:row;align-items:center;gap:10px"><input name="isTest" type="checkbox"/>Periode uji — dapat dibersihkan oleh superadmin. Pilihan ini tidak dapat diubah setelah dibuat.</label>
       <div style="display:flex;align-items:end"><button class="btn btn-primary" type="submit">Buat periode DRAFT</button></div>
     </form>
-  </details>
+  </details>}
   <section aria-labelledby="period-list-title">
     <h3 id="period-list-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Daftar periode ({periods.length})</h3>
     {periods.length === 0 ? <div class="card" style="padding:24px;color:var(--color-muted);font-size:13px">Belum ada periode pemilihan.</div> : <div style="display:grid;gap:10px">
       {periods.map((period) => <article class="card period-row">
-        <div><h4 style="font-size:15px;font-weight:800">{period.name}</h4><p style="font-size:12px;color:var(--color-muted);margin-top:4px">{period.academicYear} · {period.slug}</p><p style="font-size:12px;margin-top:5px">{dateLabel(period.opensAt)} – {dateLabel(period.closesAt)} WIB</p></div>
-        <div style="display:flex;align-items:center;gap:8px"><span class="badge" style={`background:${period.state === 'DRAFT' ? '#fff7ed' : period.state === 'CLOSED' || period.state === 'ARCHIVED' ? '#f3f4f6' : '#eef5ef'};color:#31573c`}>{period.state}</span><a class="btn btn-outline" href={`/admin/e-voting/${period.id}`}>Konfigurasi</a><a class="btn btn-outline" href={`/admin/e-voting/${period.id}/calon`}>Kelola calon</a></div>
+        <div><h4 style="font-size:15px;font-weight:800">{period.name} {period.isTest && <span class="badge badge-gold">Data uji</span>}</h4><p style="font-size:12px;color:var(--color-muted);margin-top:4px">{period.academicYear} · {period.slug}</p><p style="font-size:12px;margin-top:5px">{dateLabel(period.opensAt)} – {dateLabel(period.closesAt)} WIB</p></div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="badge" style={`background:${period.state === 'DRAFT' ? '#fff7ed' : period.state === 'CLOSED' || period.state === 'ARCHIVED' ? '#f3f4f6' : '#eef5ef'};color:#31573c`}>{period.state}</span><a class="btn btn-outline" href={`/admin/e-voting/${period.id}`}>{canManagePeriod ? 'Konfigurasi' : 'Lihat periode'}</a>{canManageCandidates && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/calon`}>Kelola calon</a>}</div>
       </article>)}
     </div>}
   </section>
@@ -45,13 +52,13 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
   const form = document.querySelector<HTMLFormElement>('#period-form')!;
   const message = document.querySelector<HTMLElement>('#period-message')!;
   let csrf = '';
-  fetch('/api/admin/e-voting/periods').then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
-  form.addEventListener('submit', async (event) => {
+  if (form) fetch('/api/admin/e-voting/periods').then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+  form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
     const values = Object.fromEntries(new FormData(form)) as Record<string, string>;
     const asWib = (value: string) => new Date(`${value}:00+07:00`).toISOString();
-    const body = { ...values, opensAt: asWib(values.opensAt), closesAt: asWib(values.closesAt) };
+    const body = { ...values, isTest: values.isTest === 'on', opensAt: asWib(values.opensAt), closesAt: asWib(values.closesAt) };
     try {
       const response = await fetch('/api/admin/e-voting/periods', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(body) });
       if (!response.ok) {

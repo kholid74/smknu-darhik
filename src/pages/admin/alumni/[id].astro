@@ -133,8 +133,7 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
     <div style="display:flex;gap:10px;margin-top:16px"><button type="submit" class="btn btn-primary"><span class="material-symbols-outlined">save</span> Simpan</button><a href="/admin/alumni" class="btn btn-outline">Batal</a></div>
   </form>
 
-  <div id="pub-modal" class="modal-overlay" hidden>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pub-title">
+  <dialog id="pub-modal" class="ui-dialog" aria-labelledby="pub-title">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <span class="material-symbols-outlined" style="color:#C8963E;font-size:24px">public</span>
         <h3 id="pub-title" style="font-size:16px;font-weight:800;margin:0">Tampilkan ke Publik?</h3>
@@ -144,19 +143,15 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
         <button type="button" class="btn btn-outline" id="pub-cancel">Batal</button>
         <button type="button" class="btn btn-primary" id="pub-confirm"><span class="material-symbols-outlined" style="font-size:16px">check</span> Ya, tampilkan</button>
       </div>
-    </div>
-  </div>
+  </dialog>
 </AdminLayout>
 
 <style>
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:60; padding:16px; }
-  .modal-overlay[hidden] { display:none; }
-  .modal-card { background:#fff; border-radius:14px; padding:22px; width:100%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,.25); }
 </style>
 
 <script>
   const form = document.getElementById('alumni-form') as HTMLFormElement | null;
-  const modal = document.getElementById('pub-modal');
+  const modal = document.querySelector<HTMLDialogElement>('#pub-modal');
   if (form && modal) {
     const optin = form.querySelector('input[name="publicOptIn"]') as HTMLInputElement;
     const featured = form.querySelector('input[name="featured"]') as HTMLInputElement;
@@ -174,11 +169,11 @@ const statuses = ['Bekerja', 'Kuliah', 'Wirausaha', 'Lainnya'];
       e.preventDefault();
       const nama = namaEl?.value || 'Alumni ini';
       if (msg) msg.innerHTML = `<strong style="color:#1c1b1b">${nama}</strong> akan ditampilkan publik${featured?.checked ? ' di showcase beranda' : ' (opt-in)'}. Pastikan alumni sudah menyetujui. Lanjutkan?`;
-      modal.hidden = false;
+      modal.showModal();
     });
 
-    document.getElementById('pub-cancel')?.addEventListener('click', () => { modal.hidden = true; });
-    modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.hidden = true; });
-    document.getElementById('pub-confirm')?.addEventListener('click', () => { confirmed = true; modal.hidden = true; form.submit(); });
+    document.getElementById('pub-cancel')?.addEventListener('click', () => { modal.close(); });
+    modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.close(); });
+    document.getElementById('pub-confirm')?.addEventListener('click', () => { confirmed = true; modal.close(); form.submit(); });
   }
 </script>

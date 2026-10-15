@@ -1,0 +1,96 @@
+---
+interface Props {periodId: string; name: string; slug: string}
+const {periodId, name, slug} = Astro.props;
+---
+<section class="card cleanup-card" data-test-cleanup data-period-id={periodId} data-slug={slug}>
+  <h3>Hapus data uji</h3>
+  <p>Hapus periode <strong>{name}</strong> beserta calon, daftar pemilih, PIN, sesi, partisipasi, dan suara uji. Master siswa dan catatan audit tetap tersimpan.</p>
+  <button type="button" class="btn btn-danger" data-cleanup-open>Hapus periode uji</button>
+  <p data-cleanup-message role="status" aria-live="polite" hidden></p>
+  <dialog class="ui-dialog" data-cleanup-preview aria-labelledby="cleanup-preview-title">
+    <h2 id="cleanup-preview-title">Konfirmasi penghapusan data uji</h2>
+    <p><strong>{name}</strong><br/><code>{slug}</code></p>
+    <p data-cleanup-summary></p>
+    <p>Semua sesi siswa pada periode ini akan dicabut. Tindakan ini permanen. Data pada periode lain tetap tersimpan.</p>
+    <div class="dialog-actions"><button type="button" class="btn btn-outline" data-cleanup-cancel autofocus>Batal</button><button type="button" class="btn btn-danger" data-cleanup-next>Lanjutkan verifikasi</button></div>
+  </dialog>
+  <dialog class="ui-dialog" data-cleanup-verify aria-labelledby="cleanup-verify-title">
+    <h2 id="cleanup-verify-title">Verifikasi admin</h2>
+    <p>Ketik <strong>HAPUS {slug}</strong> dan masukkan password akun admin yang sedang login.</p>
+    <form method="post" data-cleanup-form>
+      <label>Konfirmasi periode<input name="confirmation" autocomplete="off" spellcheck="false" maxlength="70" required autofocus/></label>
+      <label>Password admin<input name="adminPassword" type="password" autocomplete="current-password" maxlength="256" required/></label>
+      <p data-cleanup-error role="alert" hidden></p>
+      <div class="dialog-actions"><button type="button" class="btn btn-outline" data-cleanup-cancel>Batal</button><button type="submit" class="btn btn-danger" data-cleanup-submit disabled>Hapus permanen</button></div>
+    </form>
+  </dialog>
+</section>
+<style>
+  .cleanup-card{margin-top:20px;border-color:#efc4bc}.cleanup-card h3{font-size:16px;margin-bottom:8px}.cleanup-card>p{font-size:13px;line-height:1.6;margin-bottom:14px;color:var(--color-muted)}
+  label{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;font-size:13px;font-weight:700}
+  [data-cleanup-error]{color:var(--color-danger);font-size:13px;margin-top:12px}
+</style>
+<script>
+  import type {TestCleanupPreview} from '../../lib/voting/test-cleanup-input';
+  for (const root of document.querySelectorAll<HTMLElement>('[data-test-cleanup]')) {
+    const open = root.querySelector<HTMLButtonElement>('[data-cleanup-open]')!;
+    const preview = root.querySelector<HTMLDialogElement>('[data-cleanup-preview]')!;
+    const verify = root.querySelector<HTMLDialogElement>('[data-cleanup-verify]')!;
+    const form = root.querySelector<HTMLFormElement>('[data-cleanup-form]')!;
+    const confirmation = form.elements.namedItem('confirmation') as HTMLInputElement;
+    const password = form.elements.namedItem('adminPassword') as HTMLInputElement;
+    const submit = root.querySelector<HTMLButtonElement>('[data-cleanup-submit]')!;
+    const message = root.querySelector<HTMLElement>('[data-cleanup-message]')!;
+    const error = root.querySelector<HTMLElement>('[data-cleanup-error]')!;
+    const endpoint = `/api/admin/e-voting/${root.dataset.periodId}/test-cleanup`;
+    let version = '', csrf = '', sending = false;
+    const feedback = (text: string) => {message.textContent = text; message.hidden = false;};
+    const labels: Record<string, string> = {
+      INVALID_REAUTH: 'Password admin tidak cocok.', RATE_LIMITED: 'Terlalu banyak percobaan verifikasi. Tunggu 15 menit.',
+      FORBIDDEN: 'Akun tidak memiliki izin menghapus data uji.', TEST_CLEANUP_NOT_ALLOWED: 'Periode ini bukan data uji atau hasilnya sudah dipublikasikan.',
+      STALE_CLEANUP_PREVIEW: 'Data periode berubah. Buka kembali pratinjau sebelum menghapus.',
+      CSRF_REJECTED: 'Verifikasi kedaluwarsa. Buka kembali pratinjau.', CONFIRMATION_MISMATCH: 'Teks konfirmasi tidak cocok dengan periode.',
+    };
+    const refreshSubmit = () => {submit.disabled = sending || !version || !csrf || confirmation.value !== `HAPUS ${root.dataset.slug}` || !password.value;};
+    open.addEventListener('click', async () => {
+      open.disabled = true; message.hidden = true;
+      try {
+        const response = await fetch(endpoint, {cache: 'no-store', credentials: 'same-origin'});
+        const payload = await response.json();
+        if (!response.ok) throw new Error(labels[payload.error?.code] ?? 'Pratinjau belum dapat dimuat. Coba lagi.');
+        const data: TestCleanupPreview = payload.data;
+        if (data.id !== root.dataset.periodId || data.slug !== root.dataset.slug) throw new Error('Data periode berubah. Muat ulang halaman.');
+        version = data.version; csrf = response.headers.get('x-csrf-token') ?? '';
+        if (!csrf) throw new Error('Sesi keamanan belum siap. Muat ulang halaman.');
+        root.querySelector<HTMLElement>('[data-cleanup-summary]')!.textContent = `${data.contests} organisasi, ${data.candidates} pasangan calon, ${data.members} anggota calon, ${data.voters} pemilih, ${data.pins} PIN, ${data.participation} hak suara, ${data.ballots} suara uji, dan ${data.sessions} sesi akan dihapus. ${data.auditEvents} catatan audit tetap disimpan.`;
+        form.reset(); error.hidden = true; refreshSubmit(); preview.showModal();
+      } catch (cause) {feedback(cause instanceof Error ? cause.message : 'Pratinjau gagal dimuat.');}
+      finally {open.disabled = false;}
+    });
+    root.querySelector('[data-cleanup-next]')!.addEventListener('click', () => {preview.close(); verify.showModal();});
+    form.addEventListener('input', refreshSubmit);
+    for (const button of root.querySelectorAll<HTMLButtonElement>('[data-cleanup-cancel]')) {
+      button.addEventListener('click', () => {if (!sending) {preview.close(); verify.close();}});
+    }
+    verify.addEventListener('close', () => {form.reset(); version = ''; csrf = ''; refreshSubmit();});
+    verify.addEventListener('cancel', event => {if (sending) event.preventDefault();});
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (submit.disabled || sending || !form.reportValidity()) return;
+      sending = true; refreshSubmit(); error.hidden = true; submit.textContent = 'Menghapus...';
+      verify.querySelector<HTMLButtonElement>('[data-cleanup-cancel]')!.disabled = true;
+      try {
+        const response = await fetch(endpoint, {method: 'POST', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json', 'X-CSRF-Token': csrf},
+          body: JSON.stringify({confirmation: confirmation.value, previewVersion: version, adminPassword: password.value})});
+        password.value = '';
+        if (response.status === 204) {location.replace('/admin/e-voting?deleted=1'); return;}
+        const payload = await response.json().catch(() => null);
+        const code = payload?.error?.code;
+        if (code === 'INVALID_REAUTH') {error.textContent = labels[code]; error.hidden = false; password.focus();}
+        else {verify.close(); feedback(labels[code] ?? 'Penghapusan belum dapat dipastikan. Muat ulang daftar periode sebelum mencoba lagi.');}
+      } catch {password.value = ''; verify.close(); feedback('Koneksi terputus. Muat ulang daftar periode untuk memeriksa hasil penghapusan.');}
+      finally {sending = false; submit.textContent = 'Hapus permanen'; verify.querySelector<HTMLButtonElement>('[data-cleanup-cancel]')!.disabled = false; refreshSubmit();}
+    });
+  }
+</script>

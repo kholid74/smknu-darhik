@@ -11,7 +11,11 @@
     "postinstall": "prisma generate",
     "preview": "astro preview",
     "astro": "astro",
-    "test": "npx tsx --test \"src/**/*.test.ts\""
+    "test": "npx tsx --test \"src/**/*.test.ts\"",
+    "qa:seed": "tsx scripts/election-simulation.ts seed",
+    "qa:reset": "tsx scripts/election-simulation.ts reset",
+    "qa:dev": "tsx scripts/simulation-dev.ts",
+    "qa:ui": "astro build --root scripts/ui-fixture && node scripts/ui-smoke-test.mjs"
   },
   "dependencies": {
     "@astrojs/node": "^11.0.2",
@@ -41,6 +45,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.4.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/nodemailer": "^8.0.1",
     "tsx": "^4.23.15"

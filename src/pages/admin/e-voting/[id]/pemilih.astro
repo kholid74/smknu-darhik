@@ -1,5 +1,6 @@
 ---
 export const prerender = false;
+import DataTable from '../../../../components/ui/DataTable.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { db } from '../../../../lib/prisma';
 import { can } from '../../../../lib/rbac';
@@ -40,7 +41,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
   </section>}
   <section aria-labelledby="roster-list-title">
     <h3 id="roster-list-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Pemilih terdaftar ({voters.length})</h3>
-    <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>Kredensial PIN</th>{editable && <th>Aksi</th>}</tr></thead><tbody>
+    <div class="card" style="padding:0;overflow:auto"><DataTable id="table-e-voting" label="Pemilih" filterColumn={2} filterLabel="Filter"><table><thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>Kredensial PIN</th>{editable && <th>Aksi</th>}</tr></thead><tbody>
       {voters.length === 0 ? <tr><td colspan={editable ? 5 : 4} style="text-align:center;padding:32px;color:var(--color-muted)">Belum ada pemilih.</td></tr> : voters.map((voter) => <tr>
         <td>{voter.nisn}</td><td style="font-weight:600">{voter.name}</td><td>{voter.className}</td><td>{voter.pinIssued && voter.credentialEnabled ? 'PIN diterbitkan' : 'Belum diterbitkan'}</td>
         {editable && <td><div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -48,11 +49,12 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
           <button class="btn btn-outline roster-action" type="button" data-action="delete" data-voter-id={voter.id} data-snapshot={JSON.stringify({ nisn: voter.nisn, name: voter.name, className: voter.className })}>Hapus dari roster</button>
         </div></td>}
       </tr>)}
-    </tbody></table></div>
+    </tbody></table></DataTable></div>
   </section>
 </AdminLayout>
 
 <script>
+  import { confirmAction } from '../../../../lib/ui/confirm';
   const periodId = location.pathname.split('/')[3];
   const previewButton = document.querySelector<HTMLButtonElement>('#preview-master-roster');
   const syncButton = document.querySelector<HTMLButtonElement>('#sync-master-roster');
@@ -77,7 +79,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
       } catch { showMessage('Koneksi terputus. Periksa koneksi lalu coba lagi.'); }
     });
     syncButton.addEventListener('click', async () => {
-      if (!preview?.canSync || !preview.additions || !csrf || !confirm(`Tambahkan ${preview.additions} siswa tahun ajaran ${preview.academicYear} ke roster?`)) return;
+      if (!preview?.canSync || !preview.additions || !csrf || !await confirmAction(`Tambahkan ${preview.additions} siswa tahun ajaran ${preview.academicYear} ke roster?`)) return;
       syncButton.disabled = true;
       try {
         const response = await fetch(`/api/admin/e-voting/${periodId}/voters`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: '{}' });
@@ -88,6 +90,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
     });
   }
 </script><script>
+  import { confirmAction } from '../../../../lib/ui/confirm';
   const correctionForm = document.querySelector<HTMLFormElement>('#post-open-correction');
   if (correctionForm) {
     const correctionPeriodId = location.pathname.split('/')[3];
@@ -99,7 +102,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
     event.preventDefault();
     const selected = correctionSelect.selectedOptions[0];
     if (!correctionCsrf || !selected?.value) { correctionMessage.textContent = 'Pilih siswa dan tunggu sesi keamanan siap.'; correctionMessage.style.display = 'block'; return; }
-    if (!confirm(`Koreksi NISN ${selected.textContent}? PIN lama dan sesi siswa akan dicabut.`)) return;
+    if (!await confirmAction(`Koreksi NISN ${selected.textContent}? PIN lama dan sesi siswa akan dicabut.`)) return;
     const button = correctionForm.querySelector<HTMLButtonElement>('button[type="submit"]')!;
     button.disabled = true;
     try {
@@ -123,6 +126,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
 </script>
 
 <script>
+  import { confirmAction } from '../../../../lib/ui/confirm';
   const periodIdForRoster = location.pathname.split('/')[3];
   const rosterMessage = document.querySelector<HTMLElement>('#roster-message');
   const notifyRoster = (text: string) => { if (rosterMessage) { rosterMessage.textContent = text; rosterMessage.style.display = 'block'; rosterMessage.style.background = '#fff1f0'; rosterMessage.style.color = '#991b1b'; } };
@@ -134,7 +138,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
     const expectedSnapshot = JSON.parse(button.dataset.snapshot!) as { nisn: string; name: string; className: string };
     const sync = button.dataset.action === 'sync';
     const prompt = sync ? 'Sinkronkan data pemilih dari master? Jika ada perubahan, PIN lama akan dicabut dan harus diterbitkan ulang.' : 'Hapus pemilih ini dari roster? Tindakan hanya tersedia sebelum periode dibuka dan sebelum pemilih memberi suara.';
-    if (!confirm(prompt)) return;
+    if (!await confirmAction(prompt)) return;
     button.disabled = true;
     try {
       const response = await fetch(`/api/admin/e-voting/${periodIdForRoster}/voters/${voterId}`, {

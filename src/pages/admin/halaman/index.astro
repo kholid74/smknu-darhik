@@ -1,5 +1,7 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import SortTh from '../../../components/SortTh.astro';
 import { tableSort } from '../../../lib/tablesort';
@@ -15,14 +17,13 @@ const pages = await db.page.findMany({ orderBy: s.orderBy });
 ---
 
 <AdminLayout title="Halaman Statis" user={{ role: session.role }}>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-    <h2 style="font-size:18px;font-weight:800">Halaman Statis</h2>
+  <PageHeader title="Halaman Statis"><Fragment slot="actions">
     <a href="/admin/halaman/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah</a>
-  </div>
-  <div class="card" style="padding:0"><table><thead><tr><SortTh label="Judul" href={s.sortLink('judul')} active={s.sort==='judul'} icon={s.sortIcon('judul')} /><SortTh label="Slug" href={s.sortLink('slug')} active={s.sort==='slug'} icon={s.sortIcon('slug')} /><SortTh label="Status" href={s.sortLink('status')} active={s.sort==='status'} icon={s.sortIcon('status')} /><th style="width:80px"></th></tr></thead>
+  </Fragment></PageHeader>
+  <div class="card" style="padding:0"><DataTable id="table-halaman" label="Halaman" filterColumn={2} filterLabel="Filter"><table><thead><tr><SortTh label="Judul" href={s.sortLink('judul')} active={s.sort==='judul'} icon={s.sortIcon('judul')} /><SortTh label="Slug" href={s.sortLink('slug')} active={s.sort==='slug'} icon={s.sortIcon('slug')} /><SortTh label="Status" href={s.sortLink('status')} active={s.sort==='status'} icon={s.sortIcon('status')} /><th style="width:80px"></th></tr></thead>
     <tbody>{pages.length===0?(<tr><td colspan="4" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada halaman.</td></tr>):pages.map((p:any)=>(
       <tr><td style="font-weight:600">{p.title}</td><td style="font-family:monospace;font-size:12px">{p.slug}</td><td><span class={`badge ${p.published?'badge-green':'badge-gray'}`}>{p.published?'Publish':'Draft'}</span></td><td><div style="display:flex;gap:4px">
         <a href={`/admin/halaman/${p.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
         <form method="POST" action="/admin/halaman/delete"><input type="hidden" name="id" value={p.id}/><button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button></form>
-      </div></td></tr>))}</tbody></table></div>
+      </div></td></tr>))}</tbody></table></DataTable></div>
 </AdminLayout>

@@ -29,3 +29,4 @@ dev.db*
 .env
 .vercel
 .env*
+artifacts/ui-qa/

@@ -6,6 +6,8 @@
 // time, so a dynamic lookup like `import.meta.env[key]` resolves to nothing.
 const metaEnv: Record<string, string | undefined> = {
   DATABASE_URL: import.meta.env.DATABASE_URL,
+  SIMULATION_DATABASE_URL: import.meta.env.SIMULATION_DATABASE_URL,
+  SMKDH_SIMULATION: import.meta.env.SMKDH_SIMULATION,
   JWT_SECRET: import.meta.env.JWT_SECRET,
   VOTING_CSRF_SECRET: import.meta.env.VOTING_CSRF_SECRET,
   VOTING_PIN_SECRET: import.meta.env.VOTING_PIN_SECRET,

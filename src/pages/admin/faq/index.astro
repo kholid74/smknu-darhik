@@ -1,5 +1,9 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import Pagination from '../../../components/ui/Pagination.astro';
+import {pageOptions} from '../../../lib/ui/table-state';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import SortTh from '../../../components/SortTh.astro';
 import { tableSort } from '../../../lib/tablesort';
@@ -13,8 +17,7 @@ if (!session) return Astro.redirect('/admin/login');
 
 const url = new URL(Astro.request.url);
 const search = url.searchParams.get('q') || '';
-const page = parseInt(url.searchParams.get('page') || '1');
-const limit = 15;
+const {page,size:limit}=pageOptions(url.searchParams);
 
 const where: any = {};
 if (search) where.question = { contains: search };
@@ -26,22 +29,24 @@ const [faqs, total] = await Promise.all([
   db.faq.count({ where }),
 ]);
 
-const totalPages = Math.ceil(total / limit);
+const totalPages = Math.max(1,Math.ceil(total / limit));
+if(page>totalPages){url.searchParams.set('page',String(totalPages));return Astro.redirect(url.pathname+url.search)}
 ---
 
 <AdminLayout title="FAQ" user={{ role: session.role }}>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-    <div style="display:flex;gap:10px;align-items:center">
-      <form method="GET" style="display:flex;gap:8px">
-        <input type="text" name="q" value={search} placeholder="Cari pertanyaan..." style="width:280px"/>
-        <button type="submit" class="btn btn-outline" style="padding:10px 14px">Cari</button>
+  <PageHeader title="FAQ"/>
+  <div class="list-toolbar">
+      <form method="GET" class="table-toolbar">
+        <label>Cari FAQ<input type="search" name="q" value={search} placeholder="Cari pertanyaan..."/></label>
+        <label>Per halaman<select name="size">{[10,25,50].map(size=><option value={size} selected={size===limit}>{size}</option>)}</select></label>
+        <input type="hidden" name="sort" value={url.searchParams.get('sort')??''}/><input type="hidden" name="dir" value={url.searchParams.get('dir')??''}/>
+        <button type="submit" class="btn btn-outline">Cari</button>
       </form>
-    </div>
     <a href="/admin/faq/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah FAQ</a>
   </div>
 
   <div class="card" style="padding:0">
-    <table>
+    <DataTable id="server-faq" label="faq" mode="server"><table>
       <thead>
         <tr>
           <SortTh label="#" href={s.sortLink('urutan')} active={s.sort === 'urutan'} icon={s.sortIcon('urutan')} width="5%" />
@@ -70,16 +75,10 @@ const totalPages = Math.ceil(total / limit);
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></DataTable>
   </div>
 
-  {totalPages > 1 && (
-    <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
-      {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-        <a href={s.mkQs({ page: p })} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
-      ))}
-    </div>
-  )}
+  <Pagination page={page} pageCount={totalPages} total={total} size={limit} url={url}/>
 
   <p style="font-size:12px;color:#6f7a6e;margin-top:12px">Total: {total} FAQ</p>
 </AdminLayout>

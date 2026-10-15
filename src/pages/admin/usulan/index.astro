@@ -1,5 +1,7 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { verifyToken } from '../../../lib/auth';
 import { db } from '../../../lib/prisma';
@@ -29,6 +31,7 @@ function statusBadge(a: { reviewStatus: string | null; published: boolean }) {
 ---
 
 <AdminLayout title="Usulan Saya" user={{ role: session.role }}>
+  <PageHeader title="Usulan Saya"/>
   {saved && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">Draf tersimpan.</div>}
   {submitted && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">Usulan diajukan. Menunggu tinjauan staf.</div>}
 
@@ -41,7 +44,7 @@ function statusBadge(a: { reviewStatus: string | null; published: boolean }) {
   </div>
 
   <div class="card" style="padding:0">
-    <table>
+    <DataTable id="table-usulan" label="Usulan" filterColumn={-1} filterLabel="Filter"><table>
       <thead><tr><th>Judul</th><th style="width:120px">Kategori</th><th style="width:150px">Status</th><th style="width:130px">Diperbarui</th><th style="width:60px"></th></tr></thead>
       <tbody>
         {articles.length === 0 ? (
@@ -70,6 +73,6 @@ function statusBadge(a: { reviewStatus: string | null; published: boolean }) {
           );
         })}
       </tbody>
-    </table>
+    </table></DataTable>
   </div>
 </AdminLayout>
