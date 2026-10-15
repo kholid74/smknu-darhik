@@ -1,0 +1,315 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import MediaPicker from '../../../../components/MediaPicker.astro';
+import { db } from '../../../../lib/prisma';
+import { can } from '../../../../lib/rbac';
+
+const periodId = Astro.params.id ?? '';
+if (!/^[0-9a-f-]{36}$/i.test(periodId)) return Astro.redirect('/admin/e-voting');
+const period = await db.electionPeriod.findUnique({ where: { id: periodId } });
+if (!period) return Astro.redirect('/admin/e-voting');
+Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+const candidates = await db.candidatePair.findMany({
+  where: { periodId }, orderBy: [{ organization: 'asc' }, { ballotNumber: 'asc' }],
+  include: { members: { include: { student: { select: { name: true, nisn: true, className: true } } } } },
+});
+const principal = Astro.locals.principal;
+const canUseMedia = principal ? can(principal, 'media.kelola') : false;
+const organizations = [
+  ['OSIS', 'OSIS'], ['DEWAN_AMBALAN', 'Dewan Ambalan'], ['IPNU', 'IPNU'], ['IPPNU', 'IPPNU'],
+];
+const orgLabel = (key: string) => organizations.find(([value]) => value === key)?.[1] ?? key;
+const memberFor = (pair: (typeof candidates)[number], position: string) => pair.members.find((member) => member.position === position);
+---
+
+<AdminLayout title="Kelola Calon" user={{ role: Astro.locals.session?.role ?? '' }}>
+  <a href={`/admin/e-voting/${periodId}`} style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;text-decoration:none;font-size:13px">← Kembali ke periode</a>
+  <div style="display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:18px;flex-wrap:wrap">
+    <div>
+      <h2 style="font-size:20px;font-weight:800">Pasangan Calon</h2>
+      <p style="font-size:13px;color:var(--color-muted);margin-top:4px">{period.name} · {period.academicYear}. Nama dan kelas kandidat mengikuti snapshot saat disimpan.</p>
+    </div>
+    <span class="badge" style={`background:${period.state === 'DRAFT' ? '#fff7ed' : '#eef5ef'};color:#31573c`}>{period.state}</span>
+  </div>
+
+  <p id="candidate-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
+
+  <section class="card" style="margin-bottom:20px">
+    <h3 id="form-title" style="font-size:16px;font-weight:800;margin-bottom:16px">Tambah Pasangan</h3>
+    <form id="candidate-form" data-period-id={periodId}>
+      <div class="form-grid">
+        <label>Organisasi
+          <select name="organization" required>
+            {organizations.map(([value, label]) => <option value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label>Nomor urut
+          <input name="ballotNumber" type="number" min="1" step="1" required/>
+        </label>
+        <div class="member-picker" data-position="chair">
+          <h4>Ketua</h4>
+          <label for="chair-search">Cari siswa dari master (nama, NISN, atau kelas)</label>
+          <input id="chair-search" class="student-search" type="search" autocomplete="off" placeholder="Ketik minimal 2 karakter" aria-autocomplete="list" aria-controls="chair-student-results" aria-expanded="false"/>
+          <input class="student-id" type="hidden"/>
+          <p class="selected-student" role="status" aria-live="polite">Belum dipilih. Pilih nama dari suggestion.</p>
+          <div id="chair-student-results" class="student-results" role="list" aria-label="Suggestion siswa dari master" aria-live="polite"></div>
+          {canUseMedia && <MediaPicker field="chairPhotoUrl" label="Foto ketua (opsional)" folder="e-voting" hint="Gunakan foto siswa dari pustaka media sekolah." />}
+        </div>
+        <div class="member-picker" data-position="viceChair">
+          <h4>Wakil Ketua</h4>
+          <label for="vice-search">Cari siswa dari master (nama, NISN, atau kelas)</label>
+          <input id="vice-search" class="student-search" type="search" autocomplete="off" placeholder="Ketik minimal 2 karakter" aria-autocomplete="list" aria-controls="vice-student-results" aria-expanded="false"/>
+          <input class="student-id" type="hidden"/>
+          <p class="selected-student" role="status" aria-live="polite">Belum dipilih. Pilih nama dari suggestion.</p>
+          <div id="vice-student-results" class="student-results" role="list" aria-label="Suggestion siswa dari master" aria-live="polite"></div>
+          {canUseMedia && <MediaPicker field="viceChairPhotoUrl" label="Foto wakil ketua (opsional)" folder="e-voting" hint="Gunakan foto siswa dari pustaka media sekolah." />}
+        </div>
+        <label class="wide">Visi
+          <textarea name="vision" rows="3" maxlength="2000" required></textarea>
+        </label>
+        <label class="wide">Misi
+          <textarea name="mission" rows="3" maxlength="2000" required></textarea>
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="save-candidate" class="btn btn-primary" type="submit">Simpan pasangan</button>
+        <button id="cancel-edit" class="btn btn-outline" type="button" style="display:none">Batal edit</button>
+      </div>
+    </form>
+  </section>
+
+  <section aria-labelledby="current-candidates-title">
+    <h3 id="current-candidates-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Daftar pasangan ({candidates.length})</h3>
+    {candidates.length === 0 ? <div class="card" style="padding:24px;color:var(--color-muted);font-size:13px">Belum ada pasangan calon.</div> : (
+      <div style="display:grid;gap:12px">
+        {candidates.map((pair) => {
+          const chair = memberFor(pair, 'CHAIR');
+          const vice = memberFor(pair, 'VICE_CHAIR');
+          const formData = JSON.stringify({
+            id: pair.id, organization: pair.organization, ballotNumber: pair.ballotNumber,
+            vision: pair.vision, mission: pair.mission,
+            chair: { studentId: chair?.studentId, name: chair?.student.name, nisn: chair?.student.nisn, className: chair?.student.className, photoUrl: chair?.photoUrl },
+            viceChair: { studentId: vice?.studentId, name: vice?.student.name, nisn: vice?.student.nisn, className: vice?.student.className, photoUrl: vice?.photoUrl },
+          });
+          return <article class="card candidate-row" style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
+            <div>
+              <p style="font-size:12px;color:var(--color-muted);font-weight:700">{orgLabel(pair.organization)} · Nomor {pair.ballotNumber}</p>
+              <h4 style="font-size:15px;font-weight:800;margin-top:6px">{chair?.nameSnapshot ?? 'Ketua belum diatur'} <span style="font-weight:500;color:var(--color-muted)">/</span> {vice?.nameSnapshot ?? 'Wakil belum diatur'}</h4>
+              <p style="font-size:12px;color:var(--color-muted);margin-top:3px">{chair?.classSnapshot ?? '—'} · {vice?.classSnapshot ?? '—'}</p>
+              <p style="font-size:12px;margin-top:9px"><strong>Visi:</strong> {pair.vision}</p>
+              <p style="font-size:12px;margin-top:3px"><strong>Misi:</strong> {pair.mission}</p>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="btn btn-outline edit-candidate" data-candidate={formData}>Edit</button>
+              <button type="button" class="btn btn-outline delete-candidate" data-candidate-id={pair.id} style="color:#b91c1c">Hapus</button>
+            </div>
+          </article>;
+        })}
+      </div>
+    )}
+  </section>
+</AdminLayout>
+
+<style>
+  .form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  .form-grid label,.member-picker{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700}
+  .form-grid .wide{grid-column:1/-1}
+  .member-picker{padding:14px;border:1px solid var(--color-line);border-radius:10px}
+  .member-picker h4{font-size:14px}
+  .member-picker>label{font-size:12px}
+  .selected-student{font-size:12px;color:var(--color-muted);font-weight:500}
+  .student-results{display:grid;gap:4px}
+  .student-results button{padding:8px 10px;text-align:left;background:#f7faf7;border:1px solid var(--color-line);border-radius:7px;color:var(--color-ink)}
+  .student-results button:hover{background:#eaf4eb}
+  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.candidate-row{grid-template-columns:1fr!important}}
+</style>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#candidate-form')!;
+  const message = document.querySelector<HTMLElement>('#candidate-message')!;
+  const periodId = form.dataset.periodId!;
+  const tokenUrl = `/api/admin/e-voting/${periodId}/students/search`;
+  let csrfToken = '';
+
+  function showMessage(text: string, error = false) {
+    message.textContent = text;
+    message.style.display = 'block';
+    message.style.background = error ? '#fef2f2' : '#eef7ef';
+    message.style.color = error ? '#991b1b' : '#14532d';
+  }
+
+  async function refreshToken(query = '') {
+    const response = await fetch(`${tokenUrl}?q=${encodeURIComponent(query)}&limit=20`, { credentials: 'same-origin' });
+    csrfToken = response.headers.get('X-CSRF-Token') ?? '';
+    if (!response.ok) throw new Error('Gagal memuat pilihan siswa. Muat ulang halaman.');
+    return (await response.json()).data as Array<{ id: string; name: string; nisn: string; className: string }>;
+  }
+
+  for (const picker of document.querySelectorAll<HTMLElement>('.member-picker')) {
+    const input = picker.querySelector<HTMLInputElement>('.student-search')!;
+    const hidden = picker.querySelector<HTMLInputElement>('.student-id')!;
+    const selected = picker.querySelector<HTMLElement>('.selected-student')!;
+    const results = picker.querySelector<HTMLElement>('.student-results')!;
+    let timer = 0;
+    let searchVersion = 0;
+    input.addEventListener('input', () => {
+      window.clearTimeout(timer);
+      const version = ++searchVersion;
+      hidden.value = '';
+      selected.textContent = 'Pilih satu siswa dari suggestion master.';
+      timer = window.setTimeout(async () => {
+        const query = input.value.trim();
+        results.replaceChildren();
+        if (query.length < 2) {
+          input.setAttribute('aria-expanded', 'false');
+          results.textContent = 'Ketik minimal 2 karakter untuk mencari siswa.';
+          return;
+        }
+        input.setAttribute('aria-expanded', 'true');
+        results.textContent = 'Mencari siswa di master...';
+        try {
+          const students = await refreshToken(query);
+          if (version !== searchVersion) return;
+          results.replaceChildren();
+          for (const student of students) {
+            const option = document.createElement('button');
+            option.type = 'button';
+            option.setAttribute('role', 'listitem');
+            option.textContent = `${student.name} · ${student.nisn} · ${student.className}`;
+            option.addEventListener('click', () => {
+              hidden.value = student.id;
+              selected.textContent = `${student.name} · ${student.nisn} · ${student.className}`;
+              input.value = student.name;
+              results.replaceChildren();
+              input.setAttribute('aria-expanded', 'false');
+            });
+            results.append(option);
+          }
+          if (!students.length) results.textContent = 'Tidak ada siswa yang cocok di master.';
+          input.setAttribute('aria-expanded', students.length ? 'true' : 'false');
+        } catch (error) {
+          if (version !== searchVersion) return;
+          results.textContent = 'Pencarian gagal dimuat.';
+          input.setAttribute('aria-expanded', 'false');
+          showMessage(error instanceof Error ? error.message : 'Pencarian gagal.', true);
+        }
+      }, 220);
+    });
+  }
+
+  function setPicker(position: 'chair' | 'viceChair', data: { studentId?: string; name?: string; nisn?: string; className?: string; photoUrl?: string | null }) {
+    const picker = document.querySelector<HTMLElement>(`.member-picker[data-position="${position}"]`)!;
+    picker.querySelector<HTMLInputElement>('.student-id')!.value = data.studentId ?? '';
+    picker.querySelector<HTMLInputElement>('.student-search')!.value = data.name ?? '';
+    picker.querySelector<HTMLElement>('.selected-student')!.textContent = data.name
+      ? `${data.name} · ${data.nisn ?? ''} · ${data.className ?? ''}` : 'Belum dipilih.';
+    const photo = picker.querySelector<HTMLInputElement>('.mp-input');
+    if (photo) {
+      photo.value = data.photoUrl ?? '';
+      photo.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
+  function resetForm() {
+    form.reset();
+    form.dataset.candidateId = '';
+    delete form.dataset.expected;
+    for (const position of ['chair', 'viceChair'] as const) setPicker(position, {});
+    (form.elements.namedItem('organization') as HTMLSelectElement).disabled = false;
+    document.querySelector('#form-title')!.textContent = 'Tambah Pasangan';
+    document.querySelector('#save-candidate')!.textContent = 'Simpan pasangan';
+    document.querySelector<HTMLElement>('#cancel-edit')!.style.display = 'none';
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.edit-candidate').forEach((button) => button.addEventListener('click', () => {
+    const candidate = JSON.parse(button.dataset.candidate ?? '{}');
+    form.dataset.candidateId = candidate.id;
+    form.dataset.expected = JSON.stringify({
+      ballotNumber: candidate.ballotNumber,
+      chairStudentId: candidate.chair.studentId,
+      viceChairStudentId: candidate.viceChair.studentId,
+      vision: candidate.vision,
+      mission: candidate.mission,
+    });
+    (form.elements.namedItem('organization') as HTMLSelectElement).value = candidate.organization;
+    (form.elements.namedItem('organization') as HTMLSelectElement).disabled = true;
+    (form.elements.namedItem('ballotNumber') as HTMLInputElement).value = String(candidate.ballotNumber);
+    (form.elements.namedItem('vision') as HTMLTextAreaElement).value = candidate.vision;
+    (form.elements.namedItem('mission') as HTMLTextAreaElement).value = candidate.mission;
+    setPicker('chair', candidate.chair);
+    setPicker('viceChair', candidate.viceChair);
+    document.querySelector('#form-title')!.textContent = 'Edit Pasangan';
+    document.querySelector('#save-candidate')!.textContent = 'Simpan perubahan';
+    document.querySelector<HTMLElement>('#cancel-edit')!.style.display = 'inline-flex';
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+
+  document.querySelector('#cancel-edit')?.addEventListener('click', resetForm);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const saveButton = document.querySelector<HTMLButtonElement>('#save-candidate')!;
+    const chair = document.querySelector<HTMLInputElement>('[data-position="chair"] .student-id')!.value;
+    const viceChair = document.querySelector<HTMLInputElement>('[data-position="viceChair"] .student-id')!.value;
+    if (!chair || !viceChair) return showMessage('Pilih ketua dan wakil ketua dari master siswa.', true);
+    if (chair === viceChair) return showMessage('Ketua dan wakil ketua harus siswa yang berbeda.', true);
+    saveButton.disabled = true;
+    saveButton.textContent = 'Menyimpan...';
+    try {
+      if (!csrfToken) await refreshToken();
+      const value = (name: string) => (form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+      const payload: Record<string, unknown> = {
+        organization: value('organization'), ballotNumber: Number(value('ballotNumber')),
+        chair: { studentId: chair, ...(value('chairPhotoUrl') ? { photoUrl: value('chairPhotoUrl') } : {}) },
+        viceChair: { studentId: viceChair, ...(value('viceChairPhotoUrl') ? { photoUrl: value('viceChairPhotoUrl') } : {}) },
+        vision: value('vision'), mission: value('mission'),
+      };
+      const candidateId = form.dataset.candidateId;
+      const method = candidateId ? 'PATCH' : 'POST';
+      if (candidateId) payload.expected = JSON.parse(form.dataset.expected ?? '{}');
+      const response = await fetch(candidateId ? `${tokenUrl.replace('/students/search', `/candidates/${candidateId}`)}` : `${tokenUrl.replace('/students/search', '/candidates')}`, {
+        method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        const code = result?.error?.code;
+        const text = code === 'DUPLICATE_CANDIDATE' ? 'Siswa sudah menjadi anggota pasangan lain pada organisasi ini.'
+          : code === 'CANDIDATES_LOCKED' ? 'Daftar calon sudah terkunci karena waktu pemilihan dibuka.'
+          : code === 'STALE_CANDIDATE' ? 'Data pasangan berubah. Muat ulang halaman sebelum mengedit.'
+          : code === 'INVALID_STUDENT' ? 'Siswa tidak ditemukan pada master siswa.'
+          : code === 'CSRF_INVALID' ? 'Sesi keamanan kedaluwarsa. Muat ulang halaman lalu coba lagi.'
+          : 'Pasangan gagal disimpan. Periksa data dan coba lagi.';
+        showMessage(text, true);
+        return;
+      }
+      location.reload();
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : 'Pasangan gagal disimpan. Periksa koneksi lalu coba lagi.', true);
+    } finally {
+      saveButton.disabled = false;
+      saveButton.textContent = form.dataset.candidateId ? 'Simpan perubahan' : 'Simpan pasangan';
+    }
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.delete-candidate').forEach((button) => button.addEventListener('click', async () => {
+    if (!confirm('Hapus pasangan ini? Tindakan ini akan dicatat.')) return;
+    if (!csrfToken) {
+      try { await refreshToken(); } catch (error) { return showMessage(error instanceof Error ? error.message : 'Token keamanan gagal dimuat.', true); }
+    }
+    const response = await fetch(`${tokenUrl.replace('/students/search', `/candidates/${button.dataset.candidateId}`)}`, {
+      method: 'DELETE', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrfToken },
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      const code = result?.error?.code;
+      return showMessage(code === 'LAST_CANDIDATE' ? 'Organisasi harus menyisakan minimal satu pasangan.'
+        : code === 'CANDIDATE_HAS_BALLOTS' ? 'Pasangan yang sudah menerima suara tidak dapat dihapus.'
+        : code === 'CANDIDATES_LOCKED' ? 'Daftar calon sudah terkunci.' : 'Pasangan gagal dihapus.', true);
+    }
+    location.reload();
+  }));
+
+  refreshToken().catch(() => showMessage('Token keamanan gagal dimuat; muat ulang halaman.', true));
+</script>

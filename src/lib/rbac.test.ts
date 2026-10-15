@@ -91,6 +91,19 @@ test('tanpa role tak punya izin', () => {
   const p: Principal = { roles: [] };
   assert.equal(can(p, 'artikel.hapus'), false);
 });
+
+test('E-Voting dan master siswa memerlukan grant eksplisit', () => {
+  for (const role of ['staf', 'guru', 'siswa']) {
+    assert.equal(can({ roles: [role] }, 'evoting.kelola'), false);
+    assert.equal(can({ roles: [role] }, 'evoting.pemilih'), false);
+    assert.equal(can({ roles: [role] }, 'evoting.pin'), false);
+    assert.equal(can({ roles: [role] }, 'student.kelola'), false);
+  }
+  assert.equal(can({ roles: ['guru'], grants: ['evoting.kelola', 'evoting.pemilih'] }, 'evoting.kelola'), true);
+  assert.equal(can({ roles: ['staf'], grants: ['evoting.pin', 'evoting.pemilih'] }, 'evoting.pin'), true);
+  assert.equal(can({ roles: ['staf'], grants: ['student.kelola'] }, 'student.kelola'), true);
+  assert.equal(can({ roles: ['superadmin'], revokes: ['evoting.*'] }, 'evoting.kelola'), false);
+});
 test('effectiveCaps daftar pola allow (untuk UI)', () => {
   const p: Principal = { roles: ['guru'], grants: ['ppdb.kelola'] };
   const caps = effectiveCaps(p);

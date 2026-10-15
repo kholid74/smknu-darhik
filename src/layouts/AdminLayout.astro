@@ -17,6 +17,14 @@ const allow = (cap: string) => (principal ? can(principal, cap) : false);
 const isGuru = principal?.roles.includes('guru') ?? false;
 
 const allGroups = [
+  ...(allow('student.kelola') || allow('evoting.lihat') ? [{
+    label: 'Modul',
+    icon: 'how_to_vote',
+    items: [
+      { label: 'Pemilihan', href: '/admin/e-voting', cap: 'evoting.lihat' },
+      { label: 'Absensi', href: null, cap: null, comingSoon: true },
+    ],
+  }] : []),
   ...(isGuru
     ? [{
         label: 'Guru',
@@ -28,18 +36,21 @@ const allGroups = [
       }]
     : []),
   {
-    label: 'Konten',
+    label: 'Konten Website',
     icon: 'edit_note',
     items: [
       { label: 'Artikel', href: '/admin/artikel', cap: 'artikel.kelola' },
       { label: 'Halaman Statis', href: '/admin/halaman', cap: 'halaman.kelola' },
       { label: 'Pengumuman', href: '/admin/pengumuman', cap: 'pengumuman.kelola' },
+      { label: 'FAQ', href: '/admin/faq', cap: 'faq.kelola' },
     ],
   },
   {
-    label: 'Sekolah',
+    label: 'Data Sekolah',
     icon: 'school',
     items: [
+      { label: 'Data Siswa', href: '/admin/siswa', cap: 'student.kelola' },
+      { label: 'Master Kelas', href: '/admin/kelas', cap: 'student.kelola' },
       { label: 'Jurusan', href: '/admin/jurusan', cap: 'jurusan.kelola' },
       { label: 'Guru & Staf', href: '/admin/guru', cap: 'guru.kelola' },
       { label: 'Fasilitas', href: '/admin/fasilitas', cap: 'fasilitas.kelola' },
@@ -48,14 +59,13 @@ const allGroups = [
     ],
   },
   {
-    label: 'Prestasi & Bukti',
+    label: 'Prestasi & Alumni',
     icon: 'emoji_events',
     items: [
       { label: 'Prestasi', href: '/admin/prestasi', cap: 'prestasi.kelola' },
       { label: 'Testimoni', href: '/admin/testimoni', cap: 'testimoni.kelola' },
       { label: 'Alumni', href: '/admin/alumni', cap: 'alumni.moderasi' },
       { label: 'Kontribusi Alumni', href: '/admin/kontribusi', cap: 'kontribusi.kelola' },
-      { label: 'FAQ', href: '/admin/faq', cap: 'faq.kelola' },
     ],
   },
   {
@@ -79,7 +89,7 @@ const allGroups = [
 
 // Sisakan hanya item yang diizinkan; buang grup yang jadi kosong.
 const groups = allGroups
-  .map((g) => ({ ...g, items: g.items.filter((i) => allow(i.cap)) }))
+  .map((g) => ({ ...g, items: g.items.filter((i) => i.comingSoon || (i.cap && allow(i.cap))) }))
   .filter((g) => g.items.length > 0);
 
 const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'Staf', guru: 'Guru', siswa: 'Siswa' };
@@ -128,6 +138,8 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
     .sidebar-group-items[data-open="true"]{grid-template-rows:1fr}
     .sidebar-group-inner{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:2px;padding-left:6px}
     .sidebar-group-inner a{font-size:13px}
+    .sidebar-coming-soon{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 16px;color:rgba(255,255,255,.68);font-size:13px;cursor:default}
+    .sidebar-coming-soon small{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:3px 6px}
     .main-content{margin-left:240px;min-height:100vh}
     .topbar{background:white;border-bottom:1px solid rgba(0,0,0,0.06);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
     .page-body{padding:24px}
@@ -185,7 +197,7 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
         <span class="material-symbols-outlined">dashboard</span> Dashboard
       </a>
       {groups.map(g => {
-        const groupActive = g.items.some(i => currentPath.startsWith(i.href));
+        const groupActive = g.items.some(i => i.href && currentPath.startsWith(i.href));
         return (
           <div class="sidebar-group" data-group={g.label} data-active={String(groupActive)}>
             <button type="button" class="sidebar-group-toggle" aria-expanded={groupActive ? 'true' : 'false'}>
@@ -195,10 +207,14 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
             </button>
             <div class="sidebar-group-items" data-open={String(groupActive)}>
               <div class="sidebar-group-inner">
-                {g.items.map(i => (
+                {g.items.map(i => i.href ? (
                   <a href={i.href} class:list={[{ active: currentPath.startsWith(i.href) }]}>
                     {i.label}
                   </a>
+                ) : (
+                  <span class="sidebar-coming-soon" aria-disabled="true">
+                    {i.label}<small>Segera hadir</small>
+                  </span>
                 ))}
               </div>
             </div>

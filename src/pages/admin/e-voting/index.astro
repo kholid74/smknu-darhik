@@ -1,0 +1,65 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { listPeriods } from '../../../lib/voting/periods';
+
+const periods = await listPeriods();
+const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(date);
+---
+
+<AdminLayout title="Pemilihan" user={{ role: Astro.locals.session?.role ?? '' }}>
+  <div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800">Periode Pemilihan</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">Buat periode terlebih dahulu. Empat organisasi E-Voting disiapkan otomatis.</p></div>
+  <p id="period-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
+  <details class="card" style="margin-bottom:20px" open>
+    <summary style="font-size:15px;font-weight:800;cursor:pointer">Buat periode</summary>
+    <form id="period-form" class="period-form" style="margin-top:16px">
+      <label>Nama periode<input name="name" maxlength="120" required placeholder="Pemilihan OSIS 2026"/></label>
+      <label>Slug tautan<input name="slug" maxlength="64" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required placeholder="osis-2026"/><small>Huruf kecil, angka, dan tanda hubung.</small></label>
+      <label>Tahun ajaran<input name="academicYear" maxlength="20" required placeholder="2026/2027"/></label>
+      <label>Mulai (WIB)<input name="opensAt" type="datetime-local" required/></label>
+      <label>Selesai (WIB)<input name="closesAt" type="datetime-local" required/></label>
+      <div style="display:flex;align-items:end"><button class="btn btn-primary" type="submit">Buat periode DRAFT</button></div>
+    </form>
+  </details>
+  <section aria-labelledby="period-list-title">
+    <h3 id="period-list-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Daftar periode ({periods.length})</h3>
+    {periods.length === 0 ? <div class="card" style="padding:24px;color:var(--color-muted);font-size:13px">Belum ada periode pemilihan.</div> : <div style="display:grid;gap:10px">
+      {periods.map((period) => <article class="card period-row">
+        <div><h4 style="font-size:15px;font-weight:800">{period.name}</h4><p style="font-size:12px;color:var(--color-muted);margin-top:4px">{period.academicYear} · {period.slug}</p><p style="font-size:12px;margin-top:5px">{dateLabel(period.opensAt)} – {dateLabel(period.closesAt)} WIB</p></div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="badge" style={`background:${period.state === 'DRAFT' ? '#fff7ed' : period.state === 'CLOSED' || period.state === 'ARCHIVED' ? '#f3f4f6' : '#eef5ef'};color:#31573c`}>{period.state}</span><a class="btn btn-outline" href={`/admin/e-voting/${period.id}`}>Konfigurasi</a><a class="btn btn-outline" href={`/admin/e-voting/${period.id}/calon`}>Kelola calon</a></div>
+      </article>)}
+    </div>}
+  </section>
+</AdminLayout>
+
+<style>
+  .period-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .period-form label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700}
+  .period-form small{font-size:11px;font-weight:400;color:var(--color-muted)}
+  .period-row{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+  @media(max-width:800px){.period-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:480px){.period-form{grid-template-columns:1fr}}
+</style>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#period-form')!;
+  const message = document.querySelector<HTMLElement>('#period-message')!;
+  let csrf = '';
+  fetch('/api/admin/e-voting/periods').then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
+    const values = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    const asWib = (value: string) => new Date(`${value}:00+07:00`).toISOString();
+    const body = { ...values, opensAt: asWib(values.opensAt), closesAt: asWib(values.closesAt) };
+    try {
+      const response = await fetch('/api/admin/e-voting/periods', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(body) });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        message.textContent = result?.error?.code === 'DUPLICATE_SLUG' ? 'Slug periode sudah digunakan.' : result?.error?.code === 'INVALID_SCHEDULE' ? 'Jadwal tidak valid atau waktu mulai sudah lewat.' : 'Periode gagal dibuat.';
+        message.style.display = 'block'; message.style.background = '#fff1f0'; message.style.color = '#991b1b'; return;
+      }
+      location.reload();
+    } catch { message.textContent = 'Koneksi terputus. Periksa koneksi lalu coba lagi.'; message.style.display = 'block'; }
+  });
+</script>

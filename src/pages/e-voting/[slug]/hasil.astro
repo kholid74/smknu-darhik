@@ -1,0 +1,67 @@
+---
+export const prerender = false;
+import { VotingOrganization } from '@prisma/client';
+import { getPublishedResult } from '../../../lib/voting/public-results';
+
+const slug = Astro.params.slug ?? '';
+let published = null;
+try { published = await getPublishedResult({ slug }); }
+catch { Astro.response.status = 503; }
+if (!published && Astro.response.status !== 503) Astro.response.status = 404;
+Astro.response.headers.set('Cache-Control', published ? 'public, max-age=60, stale-while-revalidate=300' : 'private, no-store');
+Astro.response.headers.set('X-Content-Type-Options', 'nosniff');
+const labels: Record<VotingOrganization, string> = {
+  OSIS: 'OSIS', DEWAN_AMBALAN: 'Dewan Ambalan', IPNU: 'IPNU', IPPNU: 'IPPNU',
+};
+const dateLabel = (date: Date | null) => date ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: 'Asia/Jakarta' }).format(date) : '';
+---
+
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={published ? `Hasil resmi ${published.period.name} SMKS NU Darul Hikam.` : 'Hasil pemilihan SMKS NU Darul Hikam'} />
+    <title>{published ? `Hasil ${published.period.name}` : 'Hasil pemilihan'} · SMKS NU Darul Hikam</title>
+    <style>
+      :root{font-family:Arial,Helvetica,sans-serif;color:#18231e;background:#f4f7f4}*{box-sizing:border-box}body{margin:0;min-height:100vh}header{background:white;border-bottom:1px solid #dce5df}.wrap{width:min(100% - 32px,960px);margin:auto}header .wrap{padding:20px 0;font-weight:800;color:#145c3b}main{padding:42px 0 70px}h1{margin:0 0 8px;font-size:clamp(1.7rem,4vw,2.4rem)}.muted{color:#58685e;line-height:1.55}.summary{display:flex;gap:12px;flex-wrap:wrap;margin:24px 0}.stat{flex:1 1 150px;padding:16px;border:1px solid #dce5df;border-radius:12px;background:white}.stat strong{display:block;font-size:1.35rem;color:#145c3b}.contest{margin:26px 0;padding:22px;border:1px solid #dce5df;border-radius:16px;background:white}.contest h2{margin:0 0 8px}.candidates{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:18px}.candidate{padding:16px;border:1px solid #e4eae5;border-radius:12px}.candidate h3{margin:0 0 8px}.members{display:grid;gap:8px}.member{display:flex;align-items:center;gap:10px;color:#36443b}.member img{width:44px;height:44px;object-fit:cover;border-radius:50%;background:#edf2ee}.number{color:#17643f;font-weight:800}.votes{display:flex;justify-content:space-between;gap:10px;margin-top:14px;font-weight:700}.tag{font-size:.8rem;color:#145c3b;background:#e5f2e9;border-radius:999px;padding:4px 8px}footer{padding:22px 0;color:#58685e;font-size:.9rem}a{color:#145c3b}a:focus-visible{outline:3px solid #e6a800;outline-offset:3px}@media(max-width:600px){main{padding-top:28px}.contest{padding:16px}}
+    </style>
+  </head>
+  <body>
+    <header><div class="wrap">SMKS NU Darul Hikam</div></header>
+    <main class="wrap">
+      {published ? <>
+        <p class="muted">Hasil resmi · Tahun ajaran {published.period.academicYear}</p>
+        <h1>{published.period.name}</h1>
+        <p class="muted">Pemungutan suara ditutup {dateLabel(published.period.closedAt)}. Hasil ini menggunakan snapshot resmi saat penutupan.</p>
+        <section class="summary" aria-label="Ringkasan partisipasi">
+          <div class="stat"><strong>{published.result.eligibleVoters}</strong>Pemilih terdaftar</div>
+          <div class="stat"><strong>{published.result.complete}</strong>Partisipasi lengkap</div>
+          <div class="stat"><strong>{published.result.partial}</strong>Partisipasi sebagian</div>
+          <div class="stat"><strong>{published.result.notStarted}</strong>Belum mulai</div>
+        </section>
+        {published.result.contests.map((contest) => {
+          const highest = Math.max(0, ...contest.candidates.map((candidate) => candidate.votes));
+          const leaders = contest.votesCast ? contest.candidates.filter((candidate) => candidate.votes === highest) : [];
+          return <section class="contest">
+            <h2>{labels[contest.organization]}</h2>
+            <p class="muted">{contest.votesCast} suara tercatat</p>
+            <div class="candidates">
+              {[...contest.candidates].sort((a, b) => a.ballotNumber - b.ballotNumber).map((candidate) => <article class="candidate">
+                <h3><span class="number">Nomor {candidate.ballotNumber}</span>{leaders.includes(candidate) && <span class="tag" style="margin-left:8px">{leaders.length > 1 ? 'Seri pada perolehan tertinggi' : 'Perolehan tertinggi'}</span>}</h3>
+                <div class="members">
+                  <div class="member">{candidate.chair.photoUrl && <img src={candidate.chair.photoUrl} alt="" loading="lazy"/>}<span><strong>Ketua:</strong> {candidate.chair.name} <small>({candidate.chair.className})</small></span></div>
+                  <div class="member">{candidate.viceChair.photoUrl && <img src={candidate.viceChair.photoUrl} alt="" loading="lazy"/>}<span><strong>Wakil:</strong> {candidate.viceChair.name} <small>({candidate.viceChair.className})</small></span></div>
+                </div>
+                <p><strong>Visi</strong><br/>{candidate.vision}</p>
+                <p><strong>Misi</strong><br/>{candidate.mission}</p>
+                <div class="votes"><span>{candidate.votes} suara</span><span>{contest.votesCast ? `${(candidate.votes * 100 / contest.votesCast).toFixed(1)}%` : '—'}</span></div>
+              </article>)}
+            </div>
+          </section>;
+        })}
+      </> : <section class="contest"><h1>{Astro.response.status === 503 ? 'Hasil sementara tidak tersedia' : 'Hasil belum tersedia'}</h1><p class="muted">{Astro.response.status === 503 ? 'Silakan coba kembali nanti.' : 'Hasil akan ditampilkan setelah penutupan dan publikasi resmi.'}</p></section>}
+    </main>
+    <footer class="wrap">SMKS NU Darul Hikam · <a href="/">Kembali ke beranda</a></footer>
+  </body>
+</html>

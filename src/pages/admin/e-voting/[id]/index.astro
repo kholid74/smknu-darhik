@@ -1,0 +1,255 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getPeriod } from '../../../../lib/voting/periods';
+import { can } from '../../../../lib/rbac';
+
+const id = Astro.params.id ?? '';
+if (!/^[0-9a-f-]{36}$/i.test(id)) return Astro.redirect('/admin/e-voting');
+const period = await getPeriod(id);
+if (!period) return Astro.redirect('/admin/e-voting');
+const editable = ['DRAFT', 'SCHEDULED'].includes(period.state) && Date.now() < period.opensAt.getTime();
+const schedulable = period.state === 'DRAFT';
+const wallTime = (date: Date) => new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 16);
+const expected = JSON.stringify({ name: period.name, academicYear: period.academicYear, opensAt: period.opensAt.toISOString(), closesAt: period.closesAt.toISOString() });
+const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(date);
+const principal = Astro.locals.principal;
+const canManageCandidates = principal ? can(principal, 'evoting.kelola') && can(principal, 'evoting.pemilih') : false;
+const canManageRoster = principal ? can(principal, 'evoting.pemilih') : false;
+const canManagePins = principal ? can(principal, 'evoting.pin') && can(principal, 'evoting.pemilih') : false;
+const canManagePeriod = principal ? can(principal, 'evoting.kelola') : false;
+const canClosePeriod = principal ? can(principal, 'evoting.tutup') : false;
+const canPublishPeriod = principal ? can(principal, 'evoting.publikasi') : false;
+const canViewParticipation = principal ? can(principal, 'evoting.partisipasi') : false;
+const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false;
+---
+
+<AdminLayout title="Konfigurasi Periode" user={{ role: Astro.locals.session?.role ?? '' }}>
+  <a href="/admin/e-voting" style="display:inline-flex;margin-bottom:14px;text-decoration:none;font-size:13px">â† Daftar periode</a>
+  <div style="display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:18px;flex-wrap:wrap">
+    <div><h2 style="font-size:20px;font-weight:800">{period.name}</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">{period.academicYear} · {period.slug}</p></div>
+    <span class="badge" style={`background:${period.state === 'DRAFT' ? '#fff7ed' : '#eef5ef'};color:#31573c`}>{period.state}</span>
+  </div>
+  <p id="period-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
+  <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Konfigurasi</h3>
+    <p style="font-size:12px;color:var(--color-muted);margin-bottom:14px">Slug tidak dapat diubah. Jadwal ditampilkan dalam WIB.</p>
+    <form id="period-config-form" class="period-form" data-expected={expected}>
+      <label>Nama periode<input name="name" maxlength="120" value={period.name} required disabled={!editable}/></label>
+      <label>Tahun ajaran<input name="academicYear" maxlength="20" value={period.academicYear} required disabled={!editable}/></label>
+      <label>Mulai (WIB)<input name="opensAt" type="datetime-local" value={wallTime(period.opensAt)} required disabled={!editable}/></label>
+      <label>Selesai (WIB)<input name="closesAt" type="datetime-local" value={wallTime(period.closesAt)} required disabled={!editable}/></label>
+      <div style="display:flex;align-items:end">{editable ? <button class="btn btn-primary" type="submit">Simpan konfigurasi</button> : <p style="font-size:13px;color:var(--color-muted)">Konfigurasi terkunci setelah periode dibuka atau ditutup.</p>}</div>
+    </form>
+  </section>
+  {schedulable && <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Jadwalkan pemilihan</h3>
+    <p style="font-size:13px;color:var(--color-muted);margin-bottom:12px">Pastikan empat organisasi, kandidat lengkap, roster, dan PIN sudah siap. Jadwal masih dapat disunting sebelum pemilihan dibuka.</p>
+    <button id="schedule-period" class="btn btn-primary" type="button">Jadwalkan periode</button>
+  </section>}
+  {period.state === 'CLOSED' && canManagePeriod && <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Arsipkan periode</h3>
+    <p style="font-size:13px;color:var(--color-muted);margin-bottom:12px">Arsipkan periode yang sudah ditutup. Data suara dan audit tetap tersimpan.</p>
+    <button id="archive-period" class="btn btn-outline" type="button">Arsipkan periode</button>
+  </section>}
+  {period.state === 'CLOSED' && canPublishPeriod && <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Publikasikan hasil</h3>
+    <p style="font-size:13px;color:var(--color-muted);margin-bottom:12px">Publikasi membuka snapshot agregat untuk ditampilkan. Hasil yang sudah diterbitkan tidak dapat ditarik kembali.</p>
+    {period.publishedAt ? <p>Hasil dipublikasikan {dateLabel(period.publishedAt)}.</p> : <form id="publish-period-form" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <label style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700">Kata sandi admin<input name="adminPassword" type="password" autocomplete="current-password" required maxlength="256"/></label>
+      <button class="btn btn-primary" type="submit">Publikasikan hasil</button>
+    </form>}
+  </section>}
+  {period.state === 'SCHEDULED' && Date.now() >= period.closesAt.getTime() && canClosePeriod && <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Tutup pemilihan</h3>
+    <p style="font-size:13px;color:var(--color-muted);margin-bottom:12px">Penutupan merekonsiliasi seluruh suara, menyimpan snapshot hasil, dan mencabut sesi siswa. Tindakan ini tidak dapat dibatalkan.</p>
+    <form id="close-period-form" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <label style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700">Kata sandi admin<input name="adminPassword" type="password" autocomplete="current-password" required maxlength="256"/></label>
+      <button class="btn btn-primary" type="submit">Tutup dan rekonsiliasi</button>
+    </form>
+  </section>}
+  {period.state === 'SCHEDULED' && !period.extensionUsedAt && Date.now() >= period.opensAt.getTime() && Date.now() < period.closesAt.getTime() && canExtendPeriod && <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:5px">Perpanjang waktu pemilihan</h3>
+    <p style="font-size:13px;color:var(--color-muted);margin-bottom:12px">Dapat digunakan satu kali untuk menambah 60 menit. Siswa yang sesinya berakhir pada tenggat lama dapat masuk kembali dengan PIN yang sama.</p>
+    <form id="extend-period-form" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <label style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700">Kode alasan<input name="reasonCode" required maxlength="64" pattern="[A-Z][A-Z0-9_]{1,63}" placeholder="TECHNICAL_DISRUPTION"/></label>
+      <label style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700">Kata sandi admin<input name="adminPassword" type="password" autocomplete="current-password" required maxlength="256"/></label>
+      <button class="btn btn-outline" type="submit">Tambah 60 menit</button>
+    </form>
+  </section>}
+  <section class="card">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:10px">Organisasi</h3>
+    <div style="display:grid;gap:8px">
+      {period.contests.map((contest) => <div style="display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--color-border,#e5e7eb);padding:8px 0;font-size:13px"><span>{contest.organization.replace('_', ' ')}</span><span>{contest._count.candidates} pasangan</span></div>)}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">{canManageCandidates && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/calon`}>Kelola calon</a>}{canManageRoster && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/pemilih`}>Kelola Pemilih</a>}{canManagePins && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/pin`}>Terbitkan PIN</a>}{canViewParticipation && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/partisipasi`}>Partisipasi</a>}</div>
+  </section>
+  <p style="font-size:12px;color:var(--color-muted);margin-top:14px">Periode terjadwal akan terbuka otomatis pada waktu mulai yang ditentukan.</p>
+</AdminLayout>
+
+<style>
+  .period-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .period-form label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700}
+  @media(max-width:800px){.period-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:480px){.period-form{grid-template-columns:1fr}}
+</style>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#period-config-form');
+  if (form) {
+    const message = document.querySelector<HTMLElement>('#period-message')!;
+    const expected = JSON.parse(form.dataset.expected!) as { name: string; academicYear: string; opensAt: string; closesAt: string };
+    const periodId = location.pathname.split('/')[3];
+    let csrf = '';
+    fetch(`/api/admin/e-voting/${periodId}`).then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
+      const values = Object.fromEntries(new FormData(form)) as Record<string, string>;
+      const asWib = (value: string) => new Date(`${value}:00+07:00`).toISOString();
+      const input = { name: values.name, academicYear: values.academicYear, opensAt: asWib(values.opensAt), closesAt: asWib(values.closesAt) };
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ input, expected }) });
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          message.textContent = result?.error?.code === 'STALE_CONFIG' ? 'Konfigurasi berubah di sesi lain. Muat ulang sebelum mengedit.' : result?.error?.code === 'INVALID_STATE' ? 'Periode sudah dibuka atau ditutup.' : 'Konfigurasi gagal disimpan. Periksa jadwal dan coba lagi.';
+          message.style.display = 'block'; message.style.background = '#fff1f0'; message.style.color = '#991b1b'; return;
+        }
+        location.reload();
+      } catch { message.textContent = 'Koneksi terputus. Periksa koneksi lalu coba lagi.'; message.style.display = 'block'; }
+    });
+  }
+</script>
+
+<script>
+  const extendForm = document.querySelector<HTMLFormElement>('#extend-period-form');
+  if (extendForm) {
+    const message = document.querySelector<HTMLElement>('#period-message')!;
+    const periodId = location.pathname.split('/')[3];
+    let csrf = '';
+    fetch(`/api/admin/e-voting/${periodId}`).then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+    extendForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
+      if (!confirm('Tambahkan 60 menit? Perpanjangan hanya dapat digunakan satu kali.')) return;
+      const button = extendForm.querySelector<HTMLButtonElement>('button')!;
+      button.disabled = true;
+      const values = Object.fromEntries(new FormData(extendForm));
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}/extend`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(values) });
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          const code = result?.error?.code;
+          message.textContent = code === 'EXTENSION_UNAVAILABLE' ? 'Perpanjangan sudah digunakan atau periode tidak dapat diperpanjang.' : code === 'INVALID_REAUTH' ? 'Kata sandi admin tidak valid.' : code === 'RATE_LIMITED' ? 'Terlalu banyak percobaan autentikasi ulang. Coba kembali nanti.' : 'Periode gagal diperpanjang.';
+          message.style.display = 'block'; message.style.background = '#fff1f0'; message.style.color = '#991b1b'; button.disabled = false; return;
+        }
+        location.reload();
+      } catch { message.textContent = 'Koneksi terputus. Periksa status periode sebelum mencoba lagi.'; message.style.display = 'block'; button.disabled = false; }
+    });
+  }
+</script>
+
+<script>
+  const publishForm = document.querySelector<HTMLFormElement>('#publish-period-form');
+  if (publishForm) {
+    const message = document.querySelector<HTMLElement>('#period-message')!;
+    const periodId = location.pathname.split('/')[3];
+    let csrf = '';
+    fetch(`/api/admin/e-voting/${periodId}`).then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+    publishForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
+      if (!confirm('Publikasikan hasil pemilihan untuk umum?')) return;
+      const button = publishForm.querySelector<HTMLButtonElement>('button')!;
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ adminPassword: new FormData(publishForm).get('adminPassword') }) });
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          message.textContent = result?.error?.code === 'INVALID_REAUTH' ? 'Kata sandi admin tidak valid.' : result?.error?.code === 'RATE_LIMITED' ? 'Terlalu banyak percobaan autentikasi ulang. Coba kembali nanti.' : 'Hasil belum dapat dipublikasikan.';
+          message.style.display = 'block'; message.style.background = '#fff1f0'; message.style.color = '#991b1b'; button.disabled = false; return;
+        }
+        location.reload();
+      } catch { message.textContent = 'Koneksi terputus. Periksa koneksi lalu coba lagi.'; message.style.display = 'block'; button.disabled = false; }
+    });
+  }
+</script>
+
+<script>
+  const closeForm = document.querySelector<HTMLFormElement>('#close-period-form');
+  if (closeForm) {
+    const message = document.querySelector<HTMLElement>('#period-message')!;
+    const periodId = location.pathname.split('/')[3];
+    let csrf = '';
+    fetch(`/api/admin/e-voting/${periodId}`).then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+    closeForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
+      if (!confirm('Tutup pemilihan secara permanen dan cabut seluruh sesi siswa?')) return;
+      const button = closeForm.querySelector<HTMLButtonElement>('button')!;
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ adminPassword: new FormData(closeForm).get('adminPassword') }) });
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          const code = result?.error?.code;
+          message.textContent = code === 'RECONCILIATION_FAILED' ? 'Rekonsiliasi tidak cocok. Periode tidak ditutup; hentikan proses dan minta pemeriksaan teknis.' : code === 'BEFORE_DEADLINE' ? 'Waktu penutupan belum tercapai.' : code === 'INVALID_REAUTH' ? 'Kata sandi admin tidak valid.' : code === 'RATE_LIMITED' ? 'Terlalu banyak percobaan autentikasi ulang. Coba kembali nanti.' : 'Periode gagal ditutup. Muat ulang dan coba lagi.';
+          message.style.display = 'block'; message.style.background = '#fff1f0'; message.style.color = '#991b1b'; button.disabled = false; return;
+        }
+        location.reload();
+      } catch { message.textContent = 'Koneksi terputus. Periksa status periode sebelum mencoba kembali.'; message.style.display = 'block'; button.disabled = false; }
+    });
+  }
+</script>
+
+<script>
+  const archiveButton = document.querySelector<HTMLButtonElement>('#archive-period');
+  if (archiveButton) {
+    const message = document.querySelector<HTMLElement>('#period-message')!;
+    const periodId = location.pathname.split('/')[3];
+    let csrf = '';
+    fetch(`/api/admin/e-voting/${periodId}`).then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+    archiveButton.addEventListener('click', async () => {
+      if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
+      archiveButton.disabled = true;
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}/archive`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: '{}' });
+        if (!response.ok) {
+          message.textContent = 'Periode hanya dapat diarsipkan setelah ditutup.';
+          message.style.display = 'block'; message.style.background = '#fff1f0'; message.style.color = '#991b1b'; archiveButton.disabled = false; return;
+        }
+        location.reload();
+      } catch { message.textContent = 'Koneksi terputus. Periksa koneksi lalu coba lagi.'; message.style.display = 'block'; archiveButton.disabled = false; }
+    });
+  }
+</script>
+
+<script>
+  const scheduleButton = document.querySelector<HTMLButtonElement>('#schedule-period');
+  if (scheduleButton) {
+    const message = document.querySelector<HTMLElement>('#period-message')!;
+    const periodId = location.pathname.split('/')[3];
+    let csrf = '';
+    fetch(`/api/admin/e-voting/${periodId}`).then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+    scheduleButton.addEventListener('click', async () => {
+      if (!csrf) { message.textContent = 'Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'; message.style.display = 'block'; return; }
+      scheduleButton.disabled = true;
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}/schedule`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: '{}' });
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          const code = result?.error?.code;
+          message.textContent = code === 'NOT_READY' ? 'Periode belum siap. Pastikan ada kandidat lengkap di keempat organisasi, jumlah pemilih 1–99, dan setiap pemilih memiliki PIN aktif serta empat baris partisipasi.'
+            : code === 'ANOTHER_SCHEDULED_PERIOD' ? 'Periode lain sudah terjadwal.'
+            : code === 'INVALID_SCHEDULE' ? 'Waktu mulai harus masih di masa depan dan waktu selesai harus sesudah waktu mulai.'
+            : code === 'INVALID_STATE' ? 'Periode ini bukan berstatus draft dan tidak dapat dijadwalkan.'
+            : code === 'CSRF_REJECTED' ? 'Sesi keamanan kedaluwarsa. Muat ulang halaman lalu coba lagi.'
+            : code === 'TEMPORARILY_UNAVAILABLE' ? 'Server atau database sedang gagal memproses penjadwalan. Coba lagi beberapa saat.'
+            : `Periode gagal dijadwalkan (${code ?? response.status}). Muat ulang dan coba lagi.`;
+          message.style.display = 'block'; message.style.background = '#fff1f0'; message.style.color = '#991b1b'; scheduleButton.disabled = false; return;
+        }
+        location.reload();
+      } catch { message.textContent = 'Koneksi terputus. Periksa koneksi lalu coba lagi.'; message.style.display = 'block'; scheduleButton.disabled = false; }
+    });
+  }
+</script>

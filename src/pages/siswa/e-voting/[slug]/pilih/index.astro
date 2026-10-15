@@ -1,0 +1,57 @@
+---
+import StudentPortalLayout from '../../../../../layouts/StudentPortalLayout.astro';
+import { votingCsrfSecret } from '../../../../../lib/voting/student-auth';
+import { createStudentSessionCsrfToken } from '../../../../../lib/voting/security';
+import { BallotPageError, getBallotProgress, ORGANIZATIONS } from '../../../../../lib/voting/ballot-pages';
+
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+Astro.response.headers.set('X-Frame-Options', 'DENY');
+const session = Astro.locals.votingSession;
+if (!session) return Astro.redirect('/siswa/masuk');
+let data;
+try { data = await getBallotProgress(session.periodId, Astro.params.slug!, session.voterId); }
+catch (error) {
+  if (error instanceof BallotPageError && error.code === 'UNAUTHENTICATED') return Astro.redirect('/siswa/masuk');
+  return Astro.redirect('/siswa');
+}
+const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
+const completed = ORGANIZATIONS.filter(({ id }) => data.participation[id]).length;
+---
+<StudentPortalLayout title="Pilih organisasi" csrfToken={csrfToken} periodId={session.periodId}>
+  <p class="eyebrow">E-VOTING · {data.period.name}</p>
+  <h1>Pilih organisasi</h1>
+  <p class="muted">Pilih organisasi yang ingin Anda ikuti. Setiap pilihan hanya dapat dikirim satu kali.</p>
+  <div class="progress" aria-label={`${completed} dari 4 selesai`}><span style={`width:${completed * 25}%`}></span></div>
+  <p class="muted">{completed} dari 4 pemilihan selesai</p>
+  <div class="org-grid">
+    {ORGANIZATIONS.map(({ id, label }) => {
+      const voted = data.participation[id];
+      const count = data.candidateCounts[id] ?? 0;
+      return <article class="org-card">
+        <div><p class="eyebrow">ORGANISASI</p><h2>{label}</h2></div>
+        {voted ? <span class="state done">Selesai</span> : count > 0
+          ? <a class="button" href={`/siswa/e-voting/${data.period.slug}/pilih/${id}`}>Pilih kandidat <span aria-hidden="true">→</span></a>
+          : <span class="state">Kandidat belum tersedia</span>}
+      </article>;
+    })}
+  </div>
+  <a class="back" href="/siswa">← Kembali ke dashboard</a>
+</StudentPortalLayout>
+
+<style>
+  h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 3vw, 2.25rem); }
+  .eyebrow { margin: 0 0 8px; color: #27714b; font-size: .74rem; letter-spacing: .1em; font-weight: 800; }
+  .muted { color: #58685e; line-height: 1.5; }
+  .progress { height: 8px; margin-top: 24px; overflow: hidden; border-radius: 99px; background: #dce5df; }
+  .progress span { display: block; height: 100%; background: #17643f; }
+  .org-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
+  .org-card { display: flex; min-height: 160px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 22px; border: 1px solid #dce5df; border-radius: 14px; background: #fff; }
+  .org-card h2 { margin: 0; font-size: 1.2rem; }
+  .state { color: #58685e; font-size: .9rem; font-weight: 700; }
+  .state.done { color: #17643f; }
+  .back { display: inline-block; margin-top: 28px; color: #145c3b; font-weight: 700; }
+  @media (max-width: 620px) { .org-grid { grid-template-columns: 1fr; } }
+</style>

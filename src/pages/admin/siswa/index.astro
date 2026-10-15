@@ -1,0 +1,204 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { listSchoolClasses, listStudentsPage } from '../../../lib/students';
+
+const q = Astro.url.searchParams.get('q') ?? '';
+const requestedPage = Number(Astro.url.searchParams.get('page') ?? '1');
+const pageSize = 10;
+const pageNumber = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+const [studentPage, classes] = await Promise.all([listStudentsPage(q, pageNumber, pageSize), listSchoolClasses()]);
+const { data: students, total, page, pageCount } = studentPage;
+const pageUrl = (target: number) => `?${new URLSearchParams({ ...(q ? { q } : {}), page: String(target) })}`;
+const firstVisible = total ? (page - 1) * pageSize + 1 : 0;
+const lastVisible = Math.min(page * pageSize, total);
+Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+---
+
+<AdminLayout title="Data Siswa" user={{ role: Astro.locals.session?.role ?? '' }}>
+  <div class="student-header">
+    <div><h2 style="font-size:20px;font-weight:800">Master Siswa</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">Data identitas permanen. PIN pemilihan dikelola terpisah per periode.</p></div>
+    <button class="btn btn-primary" id="student-add" type="button"><span class="material-symbols-outlined">person_add</span>Tambah siswa</button>
+  </div>
+  <p id="student-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
+  <section class="card student-card" id="student-card" hidden>
+    <h3 id="student-form-title" style="font-size:16px;font-weight:800">Tambah siswa</h3>
+    {classes.length === 0 && <p style="margin-top:10px;font-size:13px;color:var(--color-muted)">Buat master kelas dan jurusan terlebih dahulu di <a href="/admin/kelas">Master Kelas</a>.</p>}
+    <form id="student-form" class="student-form">
+      <label>NISN<input name="nisn" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" required aria-describedby="nisn-help"/><small id="nisn-help">10 digit angka.</small></label>
+      <label>Nama lengkap<input name="name" maxlength="120" required/></label>
+      <label>Kelas &amp; jurusan<select name="schoolClassId" required><option value="">Pilih kelas</option>{classes.map((item) => <option value={item.id}>{item.academicYear} · {item.name} · {item.department.name}</option>)}</select></label>
+      <div class="student-actions"><button class="btn btn-primary" type="submit">Simpan</button><button class="btn btn-outline" id="student-cancel" type="button" hidden>Batal</button></div>
+    </form>
+  </section>
+  <section class="card import-card" aria-labelledby="student-import-title">
+    <div><h3 id="student-import-title" style="font-size:15px;font-weight:800">Impor siswa</h3><p style="font-size:12px;color:var(--color-muted);margin-top:4px">Isi template di Excel lalu simpan sebagai CSV untuk diunggah.</p></div>
+    <a class="btn btn-outline" href="/templates/import-siswa.csv" download><span class="material-symbols-outlined">download</span>Unduh template</a>
+    <p class="import-fields"><strong>Kolom wajib:</strong> NISN, Nama Lengkap, Tahun Ajaran, Kelas, Jurusan. Data kelas dan jurusan harus cocok dengan master; NISN harus 10 digit dan tidak boleh duplikat.</p>
+    <form id="student-import-form" class="import-upload">
+      <label>File CSV<input id="student-import-file" type="file" accept=".csv,text/csv" required/></label>
+      <button class="btn btn-primary" type="submit">Validasi &amp; pratinjau</button>
+    </form>
+    <p id="import-message" role="status" aria-live="polite" class="import-message" hidden></p>
+    <section id="import-preview" class="import-preview" hidden aria-label="Pratinjau impor siswa">
+      <div class="import-preview-head"><p id="import-summary"></p><button id="import-confirm" class="btn btn-primary" type="button" hidden>Impor siswa</button></div>
+      <div class="import-table"><table><thead><tr><th>Baris</th><th>NISN</th><th>Nama</th><th>Tahun ajaran</th><th>Kelas</th><th>Jurusan</th><th>Validasi</th></tr></thead><tbody id="import-preview-rows"></tbody></table></div>
+    </section>
+  </section>
+  <form method="GET" class="student-search"><label class="sr-only" for="student-q">Cari siswa</label><input id="student-q" name="q" value={q} placeholder="Cari nama, NISN, atau kelas"/><button class="btn btn-outline">Cari</button></form>
+  <p class="student-count">Menampilkan {firstVisible}–{lastVisible} dari {total} siswa</p>
+  <div class="card student-table"><table><thead><tr><th>NISN</th><th>Nama</th><th>Tahun ajaran</th><th>Kelas</th><th>Jurusan</th><th style="width:80px"></th></tr></thead><tbody>
+    {students.length === 0 ? <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--color-muted)">Belum ada data siswa.</td></tr> : students.map((student) => <tr>
+      <td>{student.nisn}</td><td style="font-weight:600">{student.name}</td><td>{student.schoolClass?.academicYear ?? '—'}</td><td>{student.className}</td><td>{student.schoolClass?.department.name ?? 'Belum ditautkan'}</td>
+      <td><button type="button" class="btn btn-outline edit-student" data-student={JSON.stringify({ id: student.id, nisn: student.nisn, name: student.name, className: student.className, schoolClassId: student.schoolClassId })} aria-label={`Edit ${student.name}`}>Edit</button></td>
+    </tr>)}
+  </tbody></table></div>
+  {pageCount > 1 && <nav class="student-pagination" aria-label="Halaman siswa">
+    {page > 1 ? <a class="btn btn-outline" href={pageUrl(page - 1)} aria-label="Halaman sebelumnya">Sebelumnya</a> : <span class="btn btn-outline" aria-disabled="true">Sebelumnya</span>}
+    <span class="page-indicator">Halaman {page} dari {pageCount}</span>
+    {page < pageCount ? <a class="btn btn-outline" href={pageUrl(page + 1)} aria-label="Halaman berikutnya">Berikutnya</a> : <span class="btn btn-outline" aria-disabled="true">Berikutnya</span>}
+  </nav>}
+</AdminLayout>
+
+<style>
+  .student-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+  .student-card{margin-bottom:18px}
+  .student-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start;margin-top:14px}
+  .student-card[hidden]{display:none}
+  .import-card{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px 16px;margin-bottom:18px}
+  .import-fields{grid-column:1/-1;font-size:12px;color:var(--color-muted)}
+  .import-upload{grid-column:1/-1;display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+  .import-upload label{display:flex;flex:1;min-width:min(100%,260px);flex-direction:column;gap:6px;font-size:13px;font-weight:700}
+  .import-message{grid-column:1/-1;padding:10px 12px;border-radius:8px;font-size:13px}
+  .import-preview{grid-column:1/-1;display:grid;gap:10px}
+  .import-preview-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px}
+  .import-table{max-height:360px;overflow:auto;border:1px solid var(--color-line);border-radius:8px}
+  .import-table table{width:100%;border-collapse:collapse;font-size:12px}
+  .import-table th,.import-table td{padding:8px 10px;border-bottom:1px solid var(--color-line);text-align:left;vertical-align:top}
+  .import-table th{position:sticky;top:0;background:#f8faf8}
+  .import-error{color:#991b1b}
+  .student-form label{display:flex;min-width:0;flex-direction:column;gap:6px;font-size:13px;font-weight:700}
+  .student-form small{font-size:11px;font-weight:400;color:var(--color-muted)}
+  .student-actions{grid-column:1/-1;display:flex;gap:8px;align-items:center;padding-top:2px}
+  .student-search{display:flex;gap:8px;align-items:center;max-width:520px;margin-bottom:12px}
+  .student-search input{min-width:0}
+  .student-table{padding:0;overflow:auto}
+  .student-table thead th{background:#e5e7eb;color:var(--color-ink);font-size:13px;text-transform:none;font-weight:700}
+  .student-count{margin:0 0 8px;font-size:12px;color:var(--color-muted)}
+  .student-pagination{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+  .student-pagination [aria-disabled="true"]{opacity:.45;cursor:default}
+  .page-indicator{font-size:13px;font-weight:600;color:var(--color-ink)}
+  @media(max-width:700px){.student-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:480px){.student-form{grid-template-columns:1fr}.student-search{align-items:stretch}.student-search .btn{flex:none}}
+  @media(max-width:480px){.import-card{grid-template-columns:1fr}.import-card .btn{justify-self:start}}
+</style>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#student-form')!;
+  const message = document.querySelector<HTMLElement>('#student-message')!;
+  const title = document.querySelector<HTMLElement>('#student-form-title')!;
+  const cancel = document.querySelector<HTMLButtonElement>('#student-cancel')!;
+  const add = document.querySelector<HTMLButtonElement>('#student-add')!;
+  const card = document.querySelector<HTMLElement>('#student-card')!;
+  const importForm = document.querySelector<HTMLFormElement>('#student-import-form')!;
+  const importFile = document.querySelector<HTMLInputElement>('#student-import-file')!;
+  const importMessage = document.querySelector<HTMLElement>('#import-message')!;
+  const importPreview = document.querySelector<HTMLElement>('#import-preview')!;
+  const importSummary = document.querySelector<HTMLElement>('#import-summary')!;
+  const importRows = document.querySelector<HTMLTableSectionElement>('#import-preview-rows')!;
+  const importConfirm = document.querySelector<HTMLButtonElement>('#import-confirm')!;
+  let importCsv = '';
+  let importCount = 0;
+  let edit: { id: string; nisn: string; name: string; className: string; schoolClassId: string | null } | null = null;
+  let csrf = '';
+  fetch('/api/admin/students?limit=1').then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+  const show = (text: string, ok = false) => {
+    message.textContent = text; message.style.display = 'block';
+    message.style.background = ok ? '#eef5ef' : '#fff1f0'; message.style.color = ok ? '#31573c' : '#991b1b';
+  };
+  const showImportMessage = (text: string, ok = false) => {
+    importMessage.textContent = text; importMessage.hidden = false;
+    importMessage.style.background = ok ? '#eef5ef' : '#fff1f0'; importMessage.style.color = ok ? '#31573c' : '#991b1b';
+  };
+  const renderImportPreview = (data: { rows: Array<{ line: number; nisn: string; name: string; academicYear: string; className: string; departmentName: string; errors: string[] }>; total: number; valid: number; invalid: number }) => {
+    importPreview.hidden = false; importRows.replaceChildren(); importCount = data.valid;
+    importSummary.textContent = `${data.total} baris: ${data.valid} valid, ${data.invalid} bermasalah.`;
+    importConfirm.hidden = data.invalid > 0;
+    importConfirm.textContent = `Impor ${data.valid} siswa`;
+    for (const row of data.rows) {
+      const tr = document.createElement('tr');
+      for (const value of [String(row.line), row.nisn, row.name, row.academicYear, row.className, row.departmentName]) {
+        const td = document.createElement('td'); td.textContent = value; tr.append(td);
+      }
+      const status = document.createElement('td'); status.textContent = row.errors.length ? row.errors.join(' ') : 'Siap diimpor';
+      if (row.errors.length) status.className = 'import-error';
+      tr.append(status); importRows.append(tr);
+    }
+  };
+  const reset = () => { edit = null; form.reset(); title.textContent = 'Tambah siswa'; cancel.hidden = true; card.hidden = true; add.hidden = false; };
+  add.addEventListener('click', () => { reset(); card.hidden = false; add.hidden = true; cancel.hidden = false; form.elements.namedItem('nisn')!.focus(); });
+  document.querySelectorAll<HTMLButtonElement>('.edit-student').forEach((button) => button.addEventListener('click', () => {
+    edit = JSON.parse(button.dataset.student!); card.hidden = false; add.hidden = true; title.textContent = `Edit ${edit.name}`; cancel.hidden = false;
+    form.elements.namedItem('nisn')!.value = edit.nisn;
+    form.elements.namedItem('name')!.value = edit.name;
+    form.elements.namedItem('schoolClassId')!.value = edit.schoolClassId ?? '';
+    form.querySelector<HTMLInputElement>('[name=nisn]')!.focus();
+  }));
+  cancel.addEventListener('click', reset);
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!csrf) { show('Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'); return; }
+    const values = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    const input = { nisn: values.nisn, name: values.name, schoolClassId: values.schoolClassId };
+    try {
+      const response = await fetch(edit ? `/api/admin/students/${edit.id}` : '/api/admin/students', {
+        method: edit ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify(edit ? { input, expected: edit } : input),
+      });
+      if (!response.ok) { const data = await response.json().catch(() => null); show(data?.error?.code === 'DUPLICATE_NISN' ? 'NISN sudah terdaftar.' : data?.error?.code === 'STALE_STUDENT' ? 'Data berubah sejak dibuka. Muat ulang dan coba lagi.' : 'Data siswa gagal disimpan.'); return; }
+      location.reload();
+    } catch { show('Koneksi terputus. Periksa koneksi lalu coba lagi.'); }
+  });
+  importForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const file = importFile.files?.[0];
+    if (!file) return;
+    if (file.size > 256 * 1024) { showImportMessage('Ukuran file maksimal 256 KiB.'); return; }
+    if (!csrf) { showImportMessage('Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'); return; }
+    importConfirm.hidden = true; importPreview.hidden = true; importMessage.hidden = true;
+    try {
+      importCsv = await file.text();
+      const response = await fetch('/api/admin/students/import/preview', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'text/csv', 'X-CSRF-Token': csrf }, body: importCsv,
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        const code = result?.error?.code;
+        showImportMessage(code === 'TOO_MANY_IMPORT_ROWS' ? 'File melewati batas 500 siswa.' : code === 'FILE_TOO_LARGE' ? 'Ukuran file maksimal 256 KiB.'
+          : code === 'INVALID_CSV_HEADERS' ? 'Header kolom tidak sesuai template.' : code === 'EMPTY_IMPORT' ? 'File tidak berisi data siswa.'
+          : code === 'CSRF_REJECTED' ? 'Sesi keamanan sudah kedaluwarsa. Muat ulang halaman lalu coba lagi.'
+          : 'File gagal dibaca. Pastikan memakai template CSV yang benar.'); return;
+      }
+      renderImportPreview(result.data);
+      if (result.data.invalid) showImportMessage('Perbaiki baris bermasalah, lalu pilih kembali file untuk validasi ulang.');
+    } catch { showImportMessage('Koneksi terputus. Periksa koneksi lalu coba lagi.'); }
+  });
+  importConfirm.addEventListener('click', async () => {
+    if (!importCount || !window.confirm(`Impor ${importCount} siswa ke master siswa?`)) return;
+    importConfirm.disabled = true;
+    try {
+      const response = await fetch('/api/admin/students/import/commit', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'text/csv', 'X-CSRF-Token': csrf }, body: importCsv,
+      });
+      const result = await response.json().catch(() => null);
+      if (response.status === 422 && result?.data) {
+        renderImportPreview(result.data); showImportMessage('Data berubah setelah pratinjau. Periksa baris yang bermasalah sebelum mencoba lagi.'); return;
+      }
+      if (!response.ok) { showImportMessage(result?.error?.code === 'DUPLICATE_NISN' ? 'Ada NISN yang sudah terdaftar. Validasi file kembali.' : 'Impor gagal; tidak ada data yang disimpan.'); return; }
+      showImportMessage(`${result.data.imported} siswa berhasil diimpor.`, true);
+      location.reload();
+    } catch { showImportMessage('Koneksi terputus. Periksa koneksi lalu coba lagi.'); }
+    finally { importConfirm.disabled = false; }
+  });
+</script>
