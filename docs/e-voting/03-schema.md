@@ -208,7 +208,7 @@ Prisma schema tidak merepresentasikan seluruh kebijakan berikut. Migration SQL a
 | Bentuk NISN, nomor calon, versi | CHECK NISN regex `^[0-9]{10}$`, ballotNumber > 0, pinVersion ≥ 0, attempts ≥ 0 |
 | Satu periode terjadwal | Partial unique index pada state untuk baris `state = 'SCHEDULED'`; periode lama harus ditutup sebelum menjadwalkan berikutnya |
 | State dan snapshot konsisten | DRAFT/SCHEDULED: closedAt, publishedAt, resultSnapshot SQL NULL; CLOSED/ARCHIVED: closedAt dan snapshot non-null; publishedAt hanya boleh setelah closedAt |
-| Deadline penutupan | CHECK closedAt null atau closedAt ≥ closesAt; service memeriksa waktu DB |
+| Waktu penutupan | Service memeriksa waktu DB sesudah lock: closedAt ≥ opensAt; sebelum closesAt hanya jika seluruh pemilih terdaftar selesai empat suara dan rekonsiliasi cocok. closesAt tetap menyimpan jadwal asli. Tidak memakai CHECK closedAt ≥ closesAt karena menolak penutupan lebih awal |
 | Empat organisasi dan empat hak per voter | Create period membuat empat contest; sinkronisasi master membuat empat participation atomik. Gate schedule menghitung seluruh kelengkapan di bawah lock periode |
 | Surat suara tak berubah | Runtime role: INSERT/SELECT yang diperlukan, tanpa UPDATE/DELETE/TRUNCATE atas Ballot. Trigger menolak UPDATE/DELETE untuk defense in depth; runtime bukan owner dan tidak punya DDL |
 | Partisipasi monoton | Trigger menolak perubahan key dan true → false; DELETE hanya sebelum schedule dan ketika false, lewat service DRAFT yang mengunci periode |

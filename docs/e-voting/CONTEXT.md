@@ -33,9 +33,9 @@ _Hindari_: Nama bebas yang tidak terhubung ke Student master.
 
 **Selesai memilih**: Kondisi ketika keempat hak pilih sudah digunakan. Suara yang sudah dikirim tetap sah meskipun pemilih belum selesai semuanya.
 
-**Batas waktu pemungutan**: Saat setelahnya tidak ada pengiriman suara baru yang diterima, berdasarkan jadwal bersama.
+**Batas waktu pemungutan**: Tenggat penerimaan suara berdasarkan jadwal bersama. Penerimaan juga berakhir ketika periode ditutup resmi lebih awal.
 
-**Penutupan resmi**: Pengesahan akhir oleh panitia sesudah batas waktu pemungutan dan pemeriksaan jumlah partisipasi serta surat suara.
+**Penutupan resmi**: Pengesahan akhir oleh panitia setelah pemeriksaan jumlah partisipasi serta surat suara. Dilakukan setelah batas waktu pemungutan, atau lebih awal ketika seluruh pemilih terdaftar telah menyelesaikan empat suara. Jadwal asli tetap tersimpan dan publikasi hasil merupakan langkah terpisah.
 _Hindari_: Publikasi untuk menyebut penutupan.
 
 **Publikasi hasil**: Pembukaan hasil agregat yang telah ditutup resmi agar dapat dilihat publik.

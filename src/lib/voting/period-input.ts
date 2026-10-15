@@ -6,6 +6,15 @@ export type PeriodInput = { slug: string; name: string; academicYear: string; op
 export type PeriodConfig = { name: string; academicYear: string; opensAt: Date; closesAt: Date };
 export type PeriodExtensionInput = { adminPassword: string; reasonCode: string };
 
+export function validatePeriodClose(value: unknown): { adminPassword: string; early: boolean } {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PeriodError('INVALID_INPUT');
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).some((key) => !['adminPassword', 'early'].includes(key)) ||
+      typeof input.adminPassword !== 'string' || !input.adminPassword || input.adminPassword.length > 256 ||
+      (input.early !== undefined && typeof input.early !== 'boolean')) throw new PeriodError('INVALID_INPUT');
+  return { adminPassword: input.adminPassword, early: input.early === true };
+}
+
 export function validatePeriodExtension(value: unknown): PeriodExtensionInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PeriodError('INVALID_INPUT');
   const input = value as Record<string, unknown>;

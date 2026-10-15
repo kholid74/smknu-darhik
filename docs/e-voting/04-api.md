@@ -101,11 +101,13 @@ Data saksi dua orang untuk penerbitan PIN, penutupan dan publikasi merupakan cat
 | --- | --- | --- | --- |
 | GET `/[periodId]/participation` | — | partisipasi | `200 {eligible,notStarted,partial,complete,byOrganization}` dari ledger; tanpa kandidat |
 | GET `/[periodId]/participation/voters` | cursor/limit | partisipasi + pemilih | `200` daftar status empat organisasi per siswa, tanpa waktu suara/pilihan; hanya untuk pendampingan |
-| POST `/[periodId]/close` | `{adminPassword}` | tutup | `200 {state,closedAt}`; setelah deadline, transaksi lock/reconciliation/snapshot. Tidak mengembalikan hasil bila caller tak punya hasil |
+| POST `/[periodId]/close` | `{adminPassword, early?: boolean}` | tutup | `200 {state,closedAt}`; early default false. Setelah deadline atau lebih awal dengan seluruh pemilih selesai empat suara; transaksi lock/reconciliation/snapshot. Respons hanya state/waktu, tanpa tally |
 | GET `/[periodId]/results` | — | hasil | `200` snapshot setelah CLOSED/ARCHIVED; sebelumnya `409 RESULTS_NOT_AVAILABLE`, tanpa melakukan query tally |
 | POST `/[periodId]/publish` | `{adminPassword}` | publikasi | `200 {publishedAt}`; CLOSED saja, idempotent setelah sudah terbit; tidak ada unpublish atau edit hasil versi awal |
 
 Tidak ada export ballot mentah, endpoint kandidat dengan field votes sebelum tutup, maupun drilldown pilihan siswa. Ekspor hasil awal cukup melalui halaman cetak agregat setelah gate yang sama; tidak perlu endpoint CSV tambahan. Operasi close yang diulang pada CLOSED mengembalikan state tersimpan, bukan menghitung atau mengganti hasil. Selisih ledger/ballot menghasilkan `409 RECONCILIATION_FAILED`; detail sensitif tidak masuk respons/log publik.
+
+Sebelum deadline tanpa `early: true`, atau periode belum dibuka: `409 BEFORE_DEADLINE`. Opt-in lebih awal dengan roster kosong/ada pemilih belum selesai: `409 EARLY_CLOSE_INCOMPLETE`; pemeriksaan mendahului query tally kandidat. PIN nonaktif tetap dihitung. Password akun caller, limiter, izin `evoting.tutup`, Origin dan CSRF tetap wajib. Unknown field/nonboolean `early` ditolak `400 INVALID_INPUT`. Form early yang tiba sesudah deadline mengikuti penutupan normal. `closesAt` tetap, audit menyimpan alasan dan waktu aktual; publikasi terpisah.
 
 ## API pembersihan sampel ? implementasi 15 Oktober 2026
 

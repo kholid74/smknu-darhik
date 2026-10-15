@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PeriodError, validateExpectedPeriodConfig, validatePeriodConfig, validatePeriodExtension, validatePeriodInput } from './period-input';
+import { PeriodError, validateExpectedPeriodConfig, validatePeriodConfig, validatePeriodExtension, validatePeriodInput, validatePeriodClose } from './period-input';
 
 test('period input allows a validated schedule and trims display values', () => {
   const input = validatePeriodInput({ slug: 'osis-2026', name: '  Pemilihan OSIS ', academicYear: ' 2026/2027 ', opensAt: '2026-11-01T01:00:00.000Z', closesAt: '2026-11-01T03:00:00.000Z' });
@@ -28,6 +28,17 @@ test('period extension accepts a reason code and reauthentication password only'
     { reasonCode: 'TECHNICAL_DISRUPTION', adminPassword: 'secret' });
   assert.throws(() => validatePeriodExtension({ reasonCode: 'technical disruption', adminPassword: 'secret' }), PeriodError);
   assert.throws(() => validatePeriodExtension({ reasonCode: 'VALID_REASON', adminPassword: 'secret', minutes: 60 }), PeriodError);
+});
+
+test('period close requires a password and explicit boolean early opt-in, without force fields', () => {
+  assert.deepEqual(validatePeriodClose({adminPassword: 'secret'}), {adminPassword: 'secret', early: false});
+  assert.deepEqual(validatePeriodClose({adminPassword: 'secret', early: true}), {adminPassword: 'secret', early: true});
+  assert.equal(validatePeriodClose({adminPassword: 'secret', early: false}).early, false);
+  for (const value of [null, [], {}, {adminPassword: ''}, {adminPassword: 'x'.repeat(257)},
+    {adminPassword: 'secret', early: 'true'}, {adminPassword: 'secret', early: 1},
+    {adminPassword: 'secret', early: true, force: true}]) {
+    assert.throws(() => validatePeriodClose(value), PeriodError);
+  }
 });
 
 test('test classification is explicit at creation and cannot be edited with configuration', () => {

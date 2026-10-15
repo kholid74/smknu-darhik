@@ -13,7 +13,9 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
 ---
 
 <AdminLayout title="Pemilihan" user={{ role: Astro.locals.session?.role ?? '' }}>
-  <PageHeader title="Periode Pemilihan" description="Buat periode terlebih dahulu. Empat organisasi E-Voting disiapkan otomatis." />
+  <PageHeader title="Periode Pemilihan" description="Buat periode terlebih dahulu. Empat organisasi E-Voting disiapkan otomatis.">
+    <a slot="actions" class="btn btn-outline" href="/admin/e-voting/panduan">Panduan pemilihan</a>
+  </PageHeader>
   {Astro.url.searchParams.get('deleted') === '1' && <p class="feedback" data-tone="success" role="status">Periode uji beserta data turunannya sudah dihapus. Master siswa dan audit tetap tersimpan.</p>}
   <p id="period-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
   {canManagePeriod && <details class="card" style="margin-bottom:20px" open={periods.length === 0}>

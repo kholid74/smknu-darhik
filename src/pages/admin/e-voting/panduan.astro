@@ -1,0 +1,150 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
+
+const chapters = [
+  {id: 'master-siswa', label: 'Siapkan master siswa'},
+  {id: 'periode', label: 'Buat periode'},
+  {id: 'calon', label: 'Isi pasangan calon'},
+  {id: 'pemilih', label: 'Sinkronkan pemilih'},
+  {id: 'pin', label: 'Terbitkan dan cetak PIN'},
+  {id: 'jadwal', label: 'Jadwalkan pemilihan'},
+  {id: 'pelaksanaan', label: 'Laksanakan pemilihan'},
+  {id: 'penutupan', label: 'Tutup dan publikasikan hasil'},
+];
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+---
+
+<AdminLayout title="Panduan Pemilihan" user={{role: Astro.locals.session?.role ?? ''}}>
+  <PageHeader title="Panduan Konfigurasi Pemilihan" description="Ikuti urutan ini untuk menyiapkan E-Voting, mendampingi siswa, dan menerbitkan hasil resmi.">
+    <a slot="actions" class="btn btn-outline" href="/admin/e-voting">Daftar periode</a>
+  </PageHeader>
+
+  <div class="feedback" data-tone="info">
+    <strong>Satu master siswa, empat hak suara.</strong> Data siswa diimpor sekali ke master. Setiap periode memakai daftar pemilih dan PIN sendiri untuk OSIS, Dewan Ambalan, IPNU, dan IPPNU. Maksimal 99 pemilih per periode.
+  </div>
+
+  <div class="guide-layout">
+    <nav class="card guide-nav" aria-label="Daftar isi panduan">
+      <h2>Langkah konfigurasi</h2>
+      <ol>{chapters.map(chapter => <li><a href={`#${chapter.id}`}>{chapter.label}</a></li>)}</ol>
+      <a class="guide-help-link" href="#bantuan">Kendala yang sering ditemui</a>
+    </nav>
+
+    <div class="guide-content">
+      <section class="card guide-overview" aria-labelledby="status-title">
+        <h2 id="status-title">Pahami status periode</h2>
+        <dl>
+          <div><dt>DRAFT</dt><dd>Siapkan data, lalu jadwalkan.</dd></div>
+          <div><dt>SCHEDULED</dt><dd>Terbuka otomatis sesuai jadwal. Status tetap SCHEDULED saat berlangsung.</dd></div>
+          <div><dt>CLOSED</dt><dd>Sudah ditutup resmi. Publikasi hasil dilakukan terpisah.</dd></div>
+          <div><dt>ARCHIVED</dt><dd>Riwayat disimpan untuk dokumentasi.</dd></div>
+        </dl>
+      </section>
+
+      <ol class="guide-steps">
+        <li class="card" id="master-siswa">
+          <h2><span class="guide-number" aria-hidden="true">01</span>Siapkan master siswa</h2>
+          <p>Buka <strong>Data Sekolah → Jurusan</strong>, lalu <strong>Master Kelas</strong>. Buat kelas dengan tahun ajaran yang akan dipakai pada pemilihan, misalnya <strong>2026/2027</strong>.</p>
+          <p>Di <strong>Data Siswa</strong>, gunakan <strong>Tambah siswa</strong> atau <strong>Impor siswa</strong>. Untuk impor: unduh template, isi di Excel, simpan sebagai CSV, unggah, pilih <strong>Validasi &amp; pratinjau</strong>, lalu <strong>Impor siswa</strong>.</p>
+          <p class="guide-note"><strong>Kolom wajib:</strong> NISN, Nama Lengkap, Tahun Ajaran, Kelas, Jurusan. NISN harus 10 digit, termasuk nol di depan, dan tidak boleh duplikat. Kelas serta jurusan harus cocok dengan master.</p>
+          <p class="guide-result">Selesai jika semua siswa sudah tersimpan dan terhubung ke kelas dengan tahun ajaran yang benar.</p>
+        </li>
+
+        <li class="card" id="periode">
+          <h2><span class="guide-number" aria-hidden="true">02</span>Buat periode</h2>
+          <p>Buka <strong>Modul → Pemilihan → Buat periode</strong>. Isi nama, slug tautan, tahun ajaran, serta waktu mulai dan selesai dalam <strong>WIB</strong>. Waktu mulai harus di masa depan dan waktu selesai sesudahnya.</p>
+          <p>Contoh: nama <strong>Pemilihan Organisasi 2026</strong>, slug <code>pem-osis-2026</code>, tahun ajaran <strong>2026/2027</strong>. Slug memakai huruf kecil, angka, atau tanda hubung dan tidak dapat diganti setelah dibuat.</p>
+          <p class="guide-note">Centang <strong>Periode uji</strong> hanya untuk simulasi. Penanda ini tidak dapat diubah setelah dibuat. Untuk pemilihan resmi, biarkan tidak dicentang.</p>
+          <p class="guide-result">Pilih <strong>Buat periode DRAFT</strong>, lalu buka <strong>Konfigurasi</strong>. Empat organisasi sudah disiapkan otomatis.</p>
+        </li>
+
+        <li class="card" id="calon">
+          <h2><span class="guide-number" aria-hidden="true">03</span>Isi pasangan calon</h2>
+          <p>Dari konfigurasi periode, buka <strong>Kelola calon</strong>. Pilih organisasi, nomor urut, ketua, wakil ketua, visi, dan misi. Foto masing-masing anggota bersifat opsional dan dapat dipilih dari pustaka media jika akun memiliki izin media.</p>
+          <p>Ketik minimal dua karakter pada pencarian siswa, lalu <strong>pilih nama dari suggestion</strong>. Mengetik nama saja belum memilih siswa. Periksa nama, NISN, dan kelas sebelum menyimpan pasangan.</p>
+          <p class="guide-note">Ketua dan wakil harus berbeda siswa. Satu siswa tidak boleh masuk dua pasangan pada organisasi dan periode yang sama. Jumlah pasangan boleh berbeda antarorganisasi, tetapi setiap organisasi harus memiliki minimal satu pasangan lengkap.</p>
+          <p class="guide-result">Simpan seluruh pasangan sebelum waktu mulai. Nama dan kelas disimpan sebagai snapshot historis; perubahan master setelahnya tidak otomatis mengganti snapshot calon. Calon tidak dapat diedit setelah pemilihan dibuka.</p>
+        </li>
+
+        <li class="card" id="pemilih">
+          <h2><span class="guide-number" aria-hidden="true">04</span>Sinkronkan pemilih</h2>
+          <p>Buka <strong>Kelola Pemilih → Pratinjau sinkronisasi</strong>. Periksa jumlah dan daftar siswa, lalu pilih <strong>Tambahkan pemilih dari master</strong>.</p>
+          <p>Daftar diambil dari siswa yang terhubung ke kelas dengan tahun ajaran yang sama dengan periode. Siswa yang sudah terdaftar tidak ditambahkan dua kali. <strong>Tidak perlu mengimpor file siswa lagi di sini.</strong></p>
+          <p class="guide-note">Jika jumlah belum sesuai, perbaiki kelas atau tahun ajaran pada master siswa, lalu buat pratinjau baru. Daftar pemilih harus berisi 1–99 siswa dan hanya dapat ditambah atau dihapus sebelum periode dibuka.</p>
+          <p class="guide-result">Pastikan jumlah pemilih sesuai daftar resmi. Setiap pemilih mendapat empat hak suara; master siswa tetap terpisah dari PIN dan data periode.</p>
+        </li>
+
+        <li class="card" id="pin">
+          <h2><span class="guide-number" aria-hidden="true">05</span>Terbitkan dan cetak PIN</h2>
+          <p>Buka <strong>Terbitkan PIN</strong>, pilih aksi <strong>Terbitkan PIN</strong>, centang pemilih, lalu masukkan password login admin dan pilih <strong>Buat slip PIN</strong>.</p>
+          <p>Checkbox paling atas memilih maksimal <strong>25 pemilih yang memenuhi aksi</strong> dari seluruh daftar, bukan hanya halaman yang sedang terlihat. Cetak per batch sampai semua pemilih memiliki PIN aktif.</p>
+          <p class="guide-note">PIN hanya ditampilkan pada slip saat diterbitkan. Bagikan secara individual setelah verifikasi identitas. Jika slip hilang atau cetak gagal, gunakan <strong>Reset PIN</strong> dengan alasan dan password admin; PIN lama serta sesi lama dicabut. Jangan menyimpan salinan digital slip.</p>
+          <p class="guide-result">Selesaikan penerbitan awal sebelum waktu mulai. PIN hanya berlaku untuk periode tersebut; siswa tidak membuat akun atau password sendiri.</p>
+        </li>
+
+        <li class="card" id="jadwal">
+          <h2><span class="guide-number" aria-hidden="true">06</span>Jadwalkan pemilihan</h2>
+          <p>Kembali ke <strong>Konfigurasi</strong> dan periksa <strong>Pratinjau kesiapan</strong>: jadwal valid, pasangan lengkap pada empat organisasi, pemilih sesuai, serta PIN aktif untuk setiap pemilih.</p>
+          <p>Pilih <strong>Jadwalkan periode</strong>. Server memeriksa kesiapan sekali lagi. Hanya satu periode dapat berstatus SCHEDULED pada satu waktu.</p>
+          <p class="guide-note">SCHEDULED belum berarti siswa dapat langsung masuk. Form login tersedia ketika waktu mulai tercapai dan sebelum waktu selesai. Tidak ada tombol buka manual. Nama, tahun ajaran, dan jadwal masih dapat disunting sebelum waktu mulai.</p>
+          <p class="guide-result">Bagikan tautan <code>/siswa/masuk?periode=&lt;slug&gt;</code>, misalnya <code>/siswa/masuk?periode=pem-osis-2026</code>. Siswa masuk memakai NISN dan PIN.</p>
+        </li>
+
+        <li class="card" id="pelaksanaan">
+          <h2><span class="guide-number" aria-hidden="true">07</span>Laksanakan pemilihan</h2>
+          <p>Siapkan <strong>tiga Chromebook</strong>, satu siswa pada setiap perangkat. Setelah login, siswa masuk ke Portal Siswa, memilih <strong>Mulai memilih</strong>, dan menyelesaikan empat organisasi. Layanan Coming Soon belum dapat digunakan.</p>
+          <p>Pantau <strong>Partisipasi</strong> untuk jumlah belum mulai, parsial, dan lengkap. Pilihan kandidat tidak ditampilkan selama pemungutan. Siswa yang baru menyelesaikan sebagian dapat login lagi memakai NISN dan PIN valid yang sama untuk melanjutkan.</p>
+          <p class="guide-note">Sesi berakhir setelah 5 menit tanpa aktivitas atau maksimal 15 menit. Sesudah empat suara, sesi dicabut dan layar selesai ditampilkan. Sebelum siswa berikutnya memakai perangkat, pastikan logout atau sesi berakhir dan layar sudah netral; matikan penyimpanan password browser.</p>
+          <p>Jika diperlukan dan disetujui panitia, <strong>Perpanjang waktu pemilihan</strong> tersedia satu kali selama periode berlangsung, menambah 60 menit dengan kode alasan dan password admin.</p>
+          <p class="guide-result">Muat ulang laporan untuk melihat progres terbaru. Pastikan pendamping tidak melihat atau menentukan pilihan siswa.</p>
+        </li>
+
+        <li class="card" id="penutupan">
+          <h2><span class="guide-number" aria-hidden="true">08</span>Tutup dan publikasikan hasil</h2>
+          <p>Sesudah waktu selesai, buka <strong>Konfigurasi → Tutup dan rekonsiliasi</strong>, masukkan password admin, lalu setujui popup. Setelah deadline, penutupan tetap diperbolehkan meskipun ada pemilih yang belum lengkap.</p>
+          <p>Untuk selesai sebelum jadwal, gunakan <strong>Tutup lebih awal dan rekonsiliasi</strong>. Tombol aktif hanya jika <strong>seluruh pemilih terdaftar telah menyelesaikan empat suara</strong>, termasuk pemilih dengan PIN nonaktif. Muat ulang setelah pemilih terakhir selesai. Jangan menghapus pemilih untuk memenuhi syarat ini.</p>
+          <p class="guide-note">Server memeriksa ulang dan mencocokkan partisipasi dengan surat suara. Penutupan menyimpan snapshot hasil, mencabut sesi siswa, dan mencatat audit. Jadwal asli tetap tersimpan. Jika rekonsiliasi gagal, hentikan proses dan minta pemeriksaan teknis; jangan mengubah suara secara manual. Periode yang sudah ditutup tidak dapat dibuka kembali.</p>
+          <p>Setelah CLOSED, pilih <strong>Publikasikan hasil</strong> dengan password dan konfirmasi. Hasil publik baru tersedia di <code>/e-voting/&lt;slug&gt;/hasil</code> setelah langkah ini. Laksanakan penutupan dan publikasi dengan saksi sesuai prosedur panitia.</p>
+          <p class="guide-result">Gunakan <strong>Arsipkan periode</strong> untuk menyimpan riwayat; arsip tidak menghapus data. Publikasikan dahulu jika hasil hendak dibuka untuk umum, karena aksi publikasi tersedia pada status CLOSED.</p>
+        </li>
+      </ol>
+
+      <section class="card guide-help" id="bantuan" aria-labelledby="help-title">
+        <h2 id="help-title">Kendala yang sering ditemui</h2>
+        <details><summary>Kelola Pemilih masih 0 padahal siswa sudah diimpor</summary><p>Impor mengisi master siswa. Buka Kelola Pemilih pada periode yang dipilih, jalankan pratinjau, lalu tambahkan pemilih dari master. Jika pratinjau kosong, cocokkan tahun ajaran periode dengan kelas siswa.</p></details>
+        <details><summary>Periode gagal dijadwalkan atau siswa belum bisa login</summary><p>Periksa empat organisasi, pasangan lengkap, 1–99 pemilih, PIN aktif, dan jadwal mulai yang masih di masa depan saat dijadwalkan. Pastikan tidak ada periode SCHEDULED lain. Untuk login, waktu mulai harus sudah tercapai dan periode belum ditutup atau melewati waktu selesai.</p></details>
+        <details><summary>Hasil belum tersedia setelah siswa selesai memilih</summary><p>Selesainya seluruh siswa tidak otomatis menutup atau menerbitkan hasil. Tutup dan rekonsiliasi dahulu, lalu publikasikan hasil. Bila belum seluruh siswa lengkap, tunggu deadline untuk penutupan normal.</p></details>
+        <details><summary>Menu atau tombol tertentu tidak terlihat</summary><p>Aksi mengikuti izin akun: pengelolaan periode, siswa, calon/pemilih, PIN, partisipasi, penutupan, dan publikasi dapat diberikan terpisah. Hubungi superadmin untuk memeriksa izin akun panitia.</p></details>
+        <details><summary>Bagaimana membersihkan pemilihan simulasi?</summary><p>Untuk periode yang ditandai Periode uji sejak dibuat dan belum dipublikasikan, superadmin dapat memakai Hapus data uji pada konfigurasi. Periksa pratinjau, lanjutkan popup konfirmasi, lalu ketik HAPUS diikuti slug dan password login. Data turunan periode dihapus; master siswa dan audit tetap disimpan. Hasil uji yang sudah dipublikasikan tidak dapat dibersihkan lewat fitur ini.</p></details>
+      </section>
+      <a class="guide-top" href="#admin-main">Kembali ke awal panduan</a>
+    </div>
+  </div>
+</AdminLayout>
+
+<style>
+  .guide-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:24px;align-items:start;margin-top:24px}
+  .guide-nav{position:sticky;top:88px;padding:20px}
+  .guide-nav h2{font-size:15px;margin-bottom:14px}
+  .guide-nav ol{padding-left:20px;display:grid;gap:12px;font-size:13px;line-height:1.5}
+  .guide-nav a{text-decoration:none}.guide-nav a:hover{text-decoration:underline}
+  .guide-help-link{display:block;border-top:1px solid var(--color-line);padding-top:14px;margin-top:18px;font-size:13px}
+  .guide-content{min-width:0}.guide-content h2{font-size:18px;line-height:1.5;margin-bottom:16px}
+  .guide-overview{margin-bottom:20px}.guide-overview dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  .guide-overview dt{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--color-accent)}
+  .guide-overview dd{font-size:13px;line-height:1.6;margin-top:4px;color:var(--color-muted)}
+  .guide-steps{list-style:none;display:grid;gap:20px}.guide-steps>li,.guide-help{scroll-margin-top:88px}
+  .guide-steps h2{display:flex;align-items:center;gap:12px}
+  .guide-number{display:inline-flex;align-items:center;justify-content:center;flex:none;width:36px;height:36px;border-radius:10px;background:#eef8f1;color:var(--color-accent);font-size:13px;font-weight:800}
+  .guide-content p{font-size:14px;line-height:1.8;margin-top:12px}
+  .guide-note{padding:12px 14px;background:var(--color-paper);border-left:3px solid #cfdbd4;border-radius:0 8px 8px 0}
+  .guide-result{border-top:1px solid var(--color-line);padding-top:12px;color:var(--color-muted)}
+  code{font:inherit;font-size:13px;padding:2px 5px;border-radius:4px;background:#edf3ef;overflow-wrap:anywhere}
+  .guide-help{margin-top:24px}.guide-help details{border-top:1px solid var(--color-line);padding:14px 0}
+  .guide-help summary{cursor:pointer;font-weight:700;line-height:1.6}.guide-help details:last-child{padding-bottom:0}
+  .guide-help p{color:var(--color-muted)}.guide-top{display:inline-block;font-size:13px;margin-top:20px}
+  @media(max-width:1100px){.guide-layout{grid-template-columns:1fr}.guide-nav{position:static}.guide-nav ol{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 28px}}
+  @media(max-width:480px){.guide-nav ol,.guide-overview dl{grid-template-columns:1fr}.guide-content .card{padding:18px}.guide-content h2{font-size:17px}}
+</style>
