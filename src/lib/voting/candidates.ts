@@ -1,5 +1,6 @@
 import type { VotingOrganization } from '@prisma/client';
 import { db } from '../prisma';
+import { retryDatabaseRead } from '../database-read';
 import { CandidateError, type CandidateInput, type ExpectedCandidate } from './candidate-input';
 
 export { CandidateError, validateCandidateInput } from './candidate-input';
@@ -85,9 +86,9 @@ export async function deleteCandidatePair(periodId: string, candidateId: string,
 export async function searchStudents(query: string, limit = 20) {
   const q = query.trim();
   if (q.length < 2) return [];
-  return db.student.findMany({
+  return retryDatabaseRead(() => db.student.findMany({
     where: { OR: [{ name: { contains: q, mode: 'insensitive' } }, { nisn: { startsWith: q } }, { className: { contains: q, mode: 'insensitive' } }] },
     select: { id: true, name: true, nisn: true, className: true },
     orderBy: [{ name: 'asc' }, { id: 'asc' }], take: Math.min(Math.max(limit, 1), 20),
-  });
+  }));
 }

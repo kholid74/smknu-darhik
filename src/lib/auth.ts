@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { db } from './prisma';
 import { requireEnv } from './env';
 import { primaryRole, type Principal } from './rbac';
+import { retryDatabaseRead } from './database-read';
 
 // Isi sesi terverifikasi. `role` (utama) dipertahankan untuk kompat halaman lama;
 // `roles` (semua peran) yang jadi acuan otorisasi.
@@ -67,10 +68,10 @@ export async function login(identifier: string, password: string): Promise<strin
 // Bentuk Principal (untuk rbac.can) dari DB: roles + override grant/revoke.
 // Override dibaca saat pengecekan (bukan dari token) agar cabut izin langsung berlaku.
 export async function getPrincipal(accountId: string): Promise<Principal | null> {
-  const account = await db.account.findUnique({
+  const account = await retryDatabaseRead(() => db.account.findUnique({
     where: { id: accountId },
     include: { roles: true, overrides: true },
-  });
+  }));
   if (!account || !account.active) return null;
   return {
     roles: account.roles.map((r) => r.role),

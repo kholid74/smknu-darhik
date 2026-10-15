@@ -1,7 +1,7 @@
 import { defineMiddleware } from 'astro:middleware';
 import { verifyToken, getPrincipal } from './lib/auth';
 import { getAlumniSession } from './lib/alumni-auth';
-import { can } from './lib/rbac';
+import { can, type Principal } from './lib/rbac';
 import { db } from './lib/prisma';
 import { tokenHash } from './lib/voting/student-auth';
 import { isActiveVotingSession, isStudentSessionCookie, studentRouteAccess, VOTING_SESSION_COOKIE } from './lib/voting/student-session';
@@ -131,7 +131,16 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // Override dibaca dari DB (akun bisa nonaktif / izin dicabut sejak token terbit).
-  const principal = await getPrincipal(session.sub);
+  let principal: Principal | null;
+  try { principal = await getPrincipal(session.sub); }
+  catch {
+    console.error('Admin permission database lookup failed');
+    return new Response(apiCap ? JSON.stringify({error: {code: 'TEMPORARILY_UNAVAILABLE'}}) : 'Layanan sementara tidak tersedia. Muat ulang halaman beberapa saat lagi.', {
+      status: 503,
+      headers: {'Content-Type': apiCap ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8',
+        'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'Retry-After': '1'},
+    });
+  }
   if (!principal) {
     if (apiCap) return new Response('Unauthorized', { status: 401 });
     return context.redirect('/admin/login');

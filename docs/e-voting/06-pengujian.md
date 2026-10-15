@@ -27,7 +27,7 @@ Integration setup wajib menolak connection string di luar database test yang dit
 | V09 | Ulangi submit organisasi terisi dengan candidateId berbeda | `ALREADY_VOTED`, pilihan lama tidak berubah dan tidak terungkap |
 | V10 | PIN reset/disable/login kedua berlomba dengan vote | Lock menentukan urutan: commit sah sebelum revoke atau vote ditolak sesudahnya; status tidak pernah di-reset |
 | V11 | Waktu tepat opensAt dan closesAt; request menunggu lock melewati deadline | opensAt diterima; closesAt ditolak; cek clock setelah lock, bukan jam request/browser |
-| V12 | Vote lolos sebelum deadline, close mengambil exclusive lock sesudah deadline | Close menunggu vote commit, snapshot menyertakannya; tidak ada vote commit yang hilang dari snapshot |
+| V12 | Vote terakhir lolos sebelum deadline, close mengambil exclusive lock setelah deadline atau meminta close lebih awal | Close menunggu vote commit, memeriksa kelengkapan ulang, snapshot menyertakannya; tidak ada vote yang hilang atau diterima setelah close |
 | V13 | Close paralel dua panitia, atau close diulang | Satu snapshot immutable, audit transisi satu kali, pemanggilan ulang aman |
 | V14 | Ubah manual fixture agar ledger/ballot tidak seimbang | Close gagal dan hasil tetap tersembunyi; tidak auto-repair suara |
 | V15 | Insert ballot candidate lintas scope, participation lintas periode, true → false, UPDATE/DELETE ballot sebagai runtime role | FK/trigger/privilege menolak; tes benar-benar memakai role runtime non-owner |
@@ -36,6 +36,8 @@ Integration setup wajib menolak connection string di luar database test yang dit
 | V18 | Edit roster/calon dan pembukaan periode bersamaan | Lock menentukan urutan; semua perubahan sebelum buka tercakup, sesudah buka ditolak tanpa snapshot parsial |
 | V19 | Reader dashboard di tengah sejumlah transaksi | Snapshot ringkasan konsisten (gunakan satu query atau transaksi read snapshot); tidak ada total campuran |
 | V20 | Perpanjang sekali, 60 menit, dua kali, setelah close, atau akses tanpa `evoting.perpanjang` | Satu perpanjangan maksimal 60 menit; request kedua/close ditolak; audit aktor/alasan tercatat. Saksi dan pemisahan dari pengelola PIN diverifikasi lewat prosedur operasional, karena aplikasi tidak menegakkannya |
+| V21 | Close lebih awal: semua pemilih lengkap; satu parsial/belum mulai/PIN nonaktif; roster kosong; periode belum dibuka; tanpa opt-in | Hanya roster tidak kosong dengan semua empat suara dan periode sudah dibuka diterima; kasus lain rollback, tidak ada query tally sebelum syarat lengkap terpenuhi |
+| V22 | Close lebih awal sukses, retry, audit gagal, ledger/ballot selisih, atau form early tiba setelah deadline | Jadwal asli tetap, closedAt aktual, alasan ALL_VOTERS_COMPLETED/DEADLINE_REACHED diaudit; snapshot/sesi/audit atomik, retry idempoten, publikasi tidak otomatis; lewat deadline boleh turnout parsial |
 | C01 | Buat/edit pasangan dengan studentId malformed atau tidak ada dalam master | Validasi/FK menolak request; tidak ada pair/member/audit parsial |
 | C02 | Student sama dipilih dua kali dalam satu pair atau pada pair lain di organisasi/periode sama | Ditolak sebagai pasangan tidak valid/`DUPLICATE_CANDIDATE`; pasangan lain pada organisasi berbeda tetap dapat memakai Student yang sama |
 | C03 | Pair hanya punya chair, hanya vice-chair, posisi ganda, atau satu Student untuk dua posisi | Commit CRUD/open ditolak; setiap pair tersimpan/opened selalu tepat dua posisi dan Student berbeda |
@@ -54,7 +56,7 @@ Integration setup wajib menolak connection string di luar database test yang dit
 | A12 | Sinkronisasi batch 52 siswa pada Neon dengan delay jaringan normal dan terburuk yang disetujui | Semua 52 voter dan 208 eligibility tercatat bersama satu audit, atau seluruh transaksi rollback; tidak terkena timeout transaksi interaktif |
 | A10 | Koreksi NISN dari sumber resmi dengan dua pemeriksa, sebelum buka dan untuk voter belum memilih setelah buka | Student ID tetap, old PIN/sesi dicabut, PIN baru wajib; tidak ada name-match otomatis; membership roster tetap beku; voter yang sudah memilih tidak dapat dikoreksi |
 | A11 | Reauth password akun lain/salah, grant/revoke override via akun management | Reauth terikat caller; limiter/CSRF/audit bekerja; revoke langsung memblok panitia |
-| R01 | Setiap role meminta hasil sebelum deadline, setelah deadline sebelum close, lewat HTML/API | Tidak ada tally di body/hidden data/JSON/DOM, bahkan superadmin; query hasil belum dijalankan |
+| R01 | Setiap role meminta hasil sebelum close resmi, lewat HTML/API, termasuk seluruh pemilih sudah selesai tetapi belum close | Tidak ada tally di body/hidden data/JSON/DOM, bahkan superadmin; endpoint hasil tidak melakukan query tally. Hasil yang telah ditutup lebih awal dan dipublikasikan dapat dibaca sebelum jadwal asli berakhir |
 | R02 | CLOSED belum publish; lalu publish; lalu archive | Panitia berizin bisa baca setelah close; publik baru sesudah publish; snapshot tetap |
 | R03 | Kandidat nol, kontes nol suara, calon tunggal yang disetujui, hasil seri, siswa parsial | Semua kandidat tampil; seri eksplisit; turnout tanpa quorum; tidak membuat pemenang otomatis |
 | R04 | Enumerasi route, trailing slash, encoded path, HEAD/OPTIONS/method tak didukung | Tidak bypass guard, tidak expose PII atau cache body sensitif |
@@ -75,6 +77,10 @@ Integration setup wajib menolak connection string di luar database test yang dit
 P01/P02 tidak membuktikan anonimitas terhadap WAL/DB owner; batas [ADR](adr/0001-integrasi-dan-batas-kerahasiaan.md) tetap berlaku meskipun semua test lulus. Jangan menambahkan audit per vote untuk membantu debugging test produksi.
 
 ## Pengujian browser di Chromebook
+
+Regresi pencarian calon (15 Oktober 2026): `src/middleware.test.ts` memanggil middleware, pembacaan izin, dan endpoint pencarian yang sebenarnya dengan database sintetis. Cakupan: error pembacaan izin sebelum handler, pemulihan lewat satu retry, kegagalan berulang menghasilkan JSON 503/no-store, revoke/akun hilang/sesi invalid tetap ditolak, query siswa pulih atau gagal dengan respons aman, dan operasi lanjutan tidak diulang. Tidak memuat `.env` atau mengakses Neon. Suite saat perbaikan: 108/108 lulus; build berhasil. Penyebab spesifik gangguan koneksi Neon tidak disimpulkan dari simulasi ini.
+
+Verifikasi penutupan lebih awal (15 Oktober 2026): `npm test` lulus 101/101 dan `npm run build` berhasil. `src/lib/voting/period-close.test.ts` menjalankan logika transaksi penutupan dengan aggregate SQL asli pada PGlite 0.4.3 setelah seluruh migrasi diterapkan, memakai facade delegate Prisma untuk fixture. Cakupan: seluruh pemilih lengkap, pemilih parsial/belum mulai/PIN nonaktif, roster kosong, opt-in dan waktu buka, akun nonaktif, close normal dengan turnout parsial, form early melewati deadline, rekonsiliasi gagal, retry CLOSED/ARCHIVED, jadwal/snapshot historis/master/ballot tetap, sesi periode lain tetap, serta rollback snapshot/state/sesi saat audit gagal. Validator request juga diuji. Pengujian ini tidak mengakses Neon dan tidak membuktikan concurrency koneksi independen, adapter PrismaNeon, atau alur browser nyata; V12/gladi perangkat masih perlu diuji pada staging. Perubahan tidak memerlukan migrasi schema baru.
 
 Gladi bersih manual wajib pada perangkat sekolah yang nyata. Gunakan browser automation tambahan hanya bila setup proyek membutuhkannya; tidak wajib menambah framework e2e baru untuk merencanakan pekerjaan ini.
 
