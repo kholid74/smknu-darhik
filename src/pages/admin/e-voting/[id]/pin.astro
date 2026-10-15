@@ -1,0 +1,112 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { db } from '../../../../lib/prisma';
+import { listVoters } from '../../../../lib/voting/voters';
+
+const periodId = Astro.params.id ?? '';
+if (!/^[0-9a-f-]{36}$/i.test(periodId)) return Astro.redirect('/admin/e-voting');
+const period = await db.electionPeriod.findUnique({ where: { id: periodId }, select: { id: true, name: true, academicYear: true, state: true, opensAt: true, closesAt: true } });
+if (!period) return Astro.redirect('/admin/e-voting');
+Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+const voters = await listVoters(periodId, null, 100, null);
+const editable = (period.state === 'DRAFT' && Date.now() < period.opensAt.getTime()) || (period.state === 'SCHEDULED' && Date.now() < period.closesAt.getTime());
+const canIssue = (['DRAFT', 'SCHEDULED'].includes(period.state) && Date.now() < period.opensAt.getTime()) ||
+  (period.state === 'SCHEDULED' && Date.now() >= period.opensAt.getTime() && Date.now() < period.closesAt.getTime() && voters.some((voter) => voter.pinVersion > 0 && !voter.pinIssued && !voter.credentialEnabled));
+---
+
+<AdminLayout title="PIN E-Voting" user={{ role: Astro.locals.session?.role ?? '' }}>
+  <a href={`/admin/e-voting/${periodId}`} style="display:inline-flex;margin-bottom:14px;text-decoration:none;font-size:13px">â† Konfigurasi periode</a>
+  <div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800">Penerbitan PIN</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">{period.name} · {period.academicYear} · maksimal 25 slip setiap cetak.</p></div>
+  <p id="pin-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
+  {!editable && <div class="card" style="margin-bottom:16px;color:#991b1b">Periode sudah dibuka atau ditutup; PIN tidak dapat diterbitkan.</div>}
+  <section class="card" style="margin-bottom:16px">
+    <form id="pin-form" data-editable={editable}>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px">
+        <label class="pin-field">Aksi<select name="mode" id="pin-mode" disabled={!editable}><option value="issue" disabled={!canIssue}>Terbitkan PIN</option><option value="reset">Reset PIN</option></select></label>
+        <label class="pin-field">Alasan reset<select name="reasonCode" id="pin-reason" disabled={!editable}><option value="">Pilih alasan</option><option value="LOST_SLIP">Slip hilang</option><option value="COMPROMISED">PIN diketahui orang lain</option><option value="PRINT_FAILURE">Cetak gagal</option><option value="ADMIN_CORRECTION">Koreksi administrasi</option></select></label>
+        <label class="pin-field">Kata sandi admin<input name="adminPassword" type="password" autocomplete="current-password" required disabled={!editable}/></label>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:13px">Pilih pemilih</strong><span id="pin-selected-count" style="font-size:12px;color:var(--color-muted)">0/25 dipilih</span></div>
+      <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th><input id="pin-select-all" type="checkbox" aria-label="Pilih maksimal 25 pemilih yang memenuhi mode aktif" disabled={!editable}/></th><th>NISN</th><th>Nama</th><th>Kelas</th><th>Kredensial</th></tr></thead><tbody>
+        {voters.length === 0 ? <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--color-muted)">Roster belum diisi.</td></tr> : voters.map((voter) => <tr>
+          <td><input class="pin-target" type="checkbox" value={voter.id} data-version={voter.pinVersion} data-issued={voter.pinIssued} data-enabled={voter.credentialEnabled} disabled={!editable} aria-label={`Pilih ${voter.name}`}/></td>
+          <td>{voter.nisn}</td><td style="font-weight:600">{voter.name}</td><td>{voter.className}</td><td>{voter.pinIssued && voter.credentialEnabled ? 'PIN aktif' : 'Belum diterbitkan'}</td>
+        </tr>)}
+      </tbody></table></div>
+      <div style="margin-top:14px"><button id="pin-submit" class="btn btn-primary" type="submit" disabled={!editable}>Buat slip PIN</button></div>
+    </form>
+  </section>
+  <p style="font-size:12px;color:var(--color-muted)">PIN hanya ditampilkan sekali pada slip cetak. Setelah koreksi NISN, terbitkan PIN baru dengan mode Terbitkan PIN. Simpan hasil cetak dengan aman; jangan menyimpan foto, PDF atau salinan digital.</p>
+</AdminLayout>
+
+<style>
+  .pin-field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700}
+  @media(max-width:700px){#pin-form>div:first-child{grid-template-columns:1fr!important}}
+</style>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#pin-form')!;
+  const mode = document.querySelector<HTMLSelectElement>('#pin-mode')!;
+  const selectAll = document.querySelector<HTMLInputElement>('#pin-select-all')!;
+  const reason = document.querySelector<HTMLSelectElement>('#pin-reason')!;
+  const targets = [...document.querySelectorAll<HTMLInputElement>('.pin-target')];
+  const count = document.querySelector<HTMLElement>('#pin-selected-count')!;
+  const submit = document.querySelector<HTMLButtonElement>('#pin-submit')!;
+  const message = document.querySelector<HTMLElement>('#pin-message')!;
+  const editable = form.dataset.editable === 'true';
+  const periodId = location.pathname.split('/')[3];
+  let csrf = '';
+  fetch(`/api/admin/e-voting/${periodId}/voters?limit=1`).then((response) => { csrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+  const update = () => {
+    if (mode.selectedOptions[0]?.disabled) mode.value = 'reset';
+    for (const target of targets) {
+      const validForAction = mode.value === 'issue' ? target.dataset.issued === 'false' : target.dataset.issued === 'true' && target.dataset.enabled === 'true';
+      if (!validForAction) target.checked = false;
+    }
+    const eligible = targets.filter((target) => mode.value === 'issue' ? target.dataset.issued === 'false' : target.dataset.issued === 'true' && target.dataset.enabled === 'true');
+    const selected = targets.filter((target) => target.checked);
+    count.textContent = `${selected.length}/25 dipilih`;
+    for (const target of targets) {
+      const validForAction = mode.value === 'issue' ? target.dataset.issued === 'false' : target.dataset.issued === 'true' && target.dataset.enabled === 'true';
+      target.disabled = !editable || !validForAction || (!target.checked && selected.length >= 25);
+    }
+    const bulkSelection = eligible.slice(0, 25);
+    selectAll.disabled = !editable || bulkSelection.length === 0;
+    selectAll.checked = bulkSelection.length > 0 && bulkSelection.every((target) => target.checked) && selected.length === bulkSelection.length;
+    selectAll.indeterminate = selected.length > 0 && !selectAll.checked;
+    reason.disabled = !editable || mode.value !== 'reset'; reason.required = mode.value === 'reset';
+  };
+  selectAll.addEventListener('change', () => {
+    const eligible = targets.filter((target) => mode.value === 'issue' ? target.dataset.issued === 'false' : target.dataset.issued === 'true' && target.dataset.enabled === 'true');
+    const bulkSelection = eligible.slice(0, 25);
+    for (const target of targets) target.checked = selectAll.checked && bulkSelection.includes(target);
+    update();
+  });
+  mode.addEventListener('change', update); targets.forEach((target) => target.addEventListener('change', update)); update();
+  const show = (text: string, ok = false) => { message.textContent = text; message.style.display = 'block'; message.style.background = ok ? '#eef5ef' : '#fff1f0'; message.style.color = ok ? '#31573c' : '#991b1b'; };
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const selected = targets.filter((target) => target.checked);
+    if (!csrf) { show('Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'); return; }
+    if (!editable || !selected.length || selected.length > 25) { show('Pilih 1 sampai 25 pemilih pada periode yang masih menerima kredensial.'); return; }
+    const printWindow = window.open('about:blank', '_blank');
+    if (!printWindow) { show('Izinkan tab baru untuk menampilkan slip cetak.'); return; }
+    submit.disabled = true;
+    try {
+      const response = await fetch(`/api/admin/e-voting/${periodId}/pins`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({
+        targets: selected.map((target) => ({ voterId: target.value, pinVersion: Number(target.dataset.version) })),
+        mode: mode.value, ...(mode.value === 'reset' ? { reasonCode: reason.value } : {}), adminPassword: new FormData(form).get('adminPassword'),
+      }) });
+      const contentType = response.headers.get('content-type') ?? '';
+      if (!response.ok || !contentType.includes('text/html')) {
+        const result = await response.json().catch(() => null); printWindow.close();
+        show(result?.error?.code === 'COMPLETED_VOTER' ? 'PIN tidak dapat direset setelah siswa menyelesaikan pemilihan.' : result?.error?.code === 'INVALID_REAUTH' ? 'Kata sandi admin tidak cocok.' : result?.error?.code === 'STALE_CREDENTIALS' ? 'Data PIN berubah. Muat ulang halaman sebelum mencoba lagi.' : result?.error?.code === 'RATE_LIMITED' ? 'Batas penerbitan ulang tercapai. Coba lagi setelah 15 menit.' : `PIN gagal diproses: ${result?.error?.code ?? 'kesalahan'}.`);
+        submit.disabled = false; return;
+      }
+      const html = await response.text(); printWindow.document.open(); printWindow.document.write(html); printWindow.document.close();
+      show('Slip PIN terbuka di tab baru. Kredensial sudah berubah; muat ulang halaman sebelum tindakan berikutnya.', true);
+    } catch { printWindow.close(); show('Koneksi terputus. Muat ulang roster untuk memeriksa status kredensial.'); submit.disabled = false; }
+  });
+</script>

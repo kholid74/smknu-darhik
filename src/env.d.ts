@@ -10,6 +10,8 @@ declare global {
       principal?: Principal;
       // Diisi middleware untuk request /alumni/portal: id alumni realm terpisah.
       alumniId?: string;
+      // Sesi E-Voting saja; tidak memberi akses ke layanan siswa lain.
+      votingSession?: { id: string; scope: string; voterId: string; periodId: string; createdAt: Date; lastSeenAt: Date; expiresAt: Date };
     }
   }
 }

@@ -9,39 +9,77 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ElectionState {
+  DRAFT
+  SCHEDULED
+  CLOSED
+  ARCHIVED
+}
+
+enum VotingOrganization {
+  OSIS
+  DEWAN_AMBALAN
+  IPNU
+  IPPNU
+}
+
+enum CandidatePosition {
+  CHAIR
+  VICE_CHAIR
+}
+
+enum VotingSessionScope {
+  ELECTION_VOTING
+}
+
 // ──── KONTEN ────
 
 model Article {
-  id        String   @id @default(cuid())
-  slug      String   @unique
-  title     String
-  excerpt   String?
-  body      String // HTML dari Tiptap
-  category  String // Prestasi | Keagamaan | Akademik | Ekstrakurikuler | PPDB
-  imageUrl  String?
-  published Boolean  @default(false)
-  featured  Boolean  @default(false) // tampil di homepage
-  authorId  String? // akun pengusul (guru); null = dibuat staf langsung
+  id           String   @id @default(cuid())
+  slug         String   @unique
+  title        String
+  excerpt      String?
+  body         String // HTML dari Tiptap
+  category     String // Prestasi | Keagamaan | Akademik | Ekstrakurikuler | PPDB
+  imageUrl     String?
+  published    Boolean  @default(false)
+  featured     Boolean  @default(false) // tampil di homepage
+  authorId     String? // akun pengusul (guru); null = dibuat staf langsung
   reviewStatus String? // null = konten staf; pending | approved | rejected untuk usulan guru
   reviewNote   String? // alasan penolakan (diisi staf)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  author    Account? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  author       Account? @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
   @@index([authorId])
   @@index([reviewStatus])
 }
 
 model Department {
-  id          String  @id @default(cuid())
-  slug        String  @unique
+  id          String        @id @default(cuid())
+  slug        String        @unique
   name        String // "Perbankan Syariah" | "DKV (Desain Komunikasi Visual)"
   icon        String? // material symbol name
   description String
   kompetensi  String // JSON string[]
   karir       String // JSON string[]
   imageUrl    String?
-  order       Int     @default(0)
+  order       Int           @default(0)
+  classes     SchoolClass[]
+}
+
+model SchoolClass {
+  id           String     @id @default(cuid())
+  academicYear String     @db.VarChar(20)
+  name         String     @db.VarChar(40)
+  departmentId String
+  createdAt    DateTime   @default(now())
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  students     Student[]
+
+  @@unique([academicYear, name, departmentId])
+  @@index([departmentId])
+  @@index([academicYear, name])
 }
 
 model Page {
@@ -142,17 +180,17 @@ model Announcement {
 }
 
 model Alumni {
-  id        String   @id @default(cuid())
-  nama      String
-  angkatan  Int // tahun lulus (2010 = angkatan pertama)
-  jurusan   String // Department live | Multimedia | Lainnya
-  status    String   @default("Bekerja") // Bekerja | Kuliah | Wirausaha | Lainnya
-  pekerjaan String?
-  instansi  String?
-  domisili  String? // kota/kabupaten saat ini — untuk stat persebaran (publik)
-  cerita    String? // pendek, 1 paragraf
-  email     String? @unique // PRIVAT — jangkar login (magic-link); unik cegah dup (NULL boleh banyak di Postgres)
-  wa        String? @unique // PRIVAT — kontak/recovery; unik cegah dup (NULL boleh banyak)
+  id          String   @id @default(cuid())
+  nama        String
+  angkatan    Int // tahun lulus (2010 = angkatan pertama)
+  jurusan     String // Department live | Multimedia | Lainnya
+  status      String   @default("Bekerja") // Bekerja | Kuliah | Wirausaha | Lainnya
+  pekerjaan   String?
+  instansi    String?
+  domisili    String? // kota/kabupaten saat ini — untuk stat persebaran (publik)
+  cerita      String? // pendek, 1 paragraf
+  email       String?  @unique // PRIVAT — jangkar login (magic-link); unik cegah dup (NULL boleh banyak di Postgres)
+  wa          String?  @unique // PRIVAT — kontak/recovery; unik cegah dup (NULL boleh banyak)
   photoUrl    String? // admin isi saat verifikasi
   alumniId    String?  @unique // ID kartu alumni (SMKSDH-0001), diberi saat approve; permanen
   verifyToken String?  @unique // token acak untuk QR/URL verify publik (anti-enumerasi); diberi saat approve
@@ -167,6 +205,7 @@ model Alumni {
   @@index([angkatan])
   @@index([featured])
 }
+
 model AlumniLoginToken {
   id        String    @id @default(cuid())
   alumniId  String
@@ -202,16 +241,190 @@ model Download {
 // ──── RBAC (realm Internal) ────
 
 model Account {
-  id           String            @id @default(cuid())
-  email        String            @unique
-  username     String?           @unique
-  passwordHash String
-  active       Boolean           @default(true)
-  createdAt    DateTime          @default(now())
-  roles        AccountRole[]
-  overrides    AccountOverride[]
-  teacher      Teacher?
-  articles     Article[]
+  id                 String              @id @default(cuid())
+  email              String              @unique
+  username           String?             @unique
+  passwordHash       String
+  active             Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  roles              AccountRole[]
+  overrides          AccountOverride[]
+  teacher            Teacher?
+  articles           Article[]
+  votingAuditEvents  VotingAuditEvent[]
+  studentAuditEvents StudentAuditEvent[]
+}
+
+// E-Voting student master is independent from internal Account credentials.
+model Student {
+  id                   String              @id @default(uuid()) @db.Uuid
+  nisn                 String              @unique @db.VarChar(10)
+  name                 String              @db.VarChar(120)
+  className            String              @db.VarChar(40)
+  schoolClassId        String?
+  schoolClass          SchoolClass?        @relation(fields: [schoolClassId], references: [id], onDelete: Restrict)
+  voters               ElectionVoter[]
+  candidateMemberships CandidateMember[]
+  auditEvents          StudentAuditEvent[]
+
+  @@index([schoolClassId])
+}
+
+model StudentAuditEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  studentId      String   @db.Uuid
+  actorAccountId String
+  event          String   @db.VarChar(32)
+  changedFields  Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actor          Account  @relation(fields: [actorAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([studentId, createdAt])
+  @@index([actorAccountId, createdAt])
+}
+
+model ElectionPeriod {
+  id              String             @id @default(uuid()) @db.Uuid
+  slug            String             @unique @db.VarChar(64)
+  name            String             @db.VarChar(120)
+  academicYear    String             @db.VarChar(20)
+  state           ElectionState      @default(DRAFT)
+  opensAt         DateTime           @db.Timestamptz(3)
+  closesAt        DateTime           @db.Timestamptz(3)
+  extensionUsedAt DateTime?          @db.Timestamptz(3)
+  closedAt        DateTime?          @db.Timestamptz(3)
+  publishedAt     DateTime?          @db.Timestamptz(3)
+  resultSnapshot  Json?
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  contests        ElectionContest[]
+  voters          ElectionVoter[]
+  auditEvents     VotingAuditEvent[]
+}
+
+model ElectionContest {
+  periodId      String               @db.Uuid
+  organization  VotingOrganization
+  period        ElectionPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  candidates    CandidatePair[]
+  participation VoterParticipation[]
+
+  @@id([periodId, organization])
+}
+
+model CandidatePair {
+  id           String             @id @default(uuid()) @db.Uuid
+  periodId     String             @db.Uuid
+  organization VotingOrganization
+  ballotNumber Int
+  vision       String             @db.VarChar(2000)
+  mission      String             @db.VarChar(2000)
+  contest      ElectionContest    @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+  members      CandidateMember[]
+  ballots      Ballot[]
+
+  @@unique([periodId, organization, ballotNumber])
+  @@unique([id, periodId, organization])
+}
+
+model CandidateMember {
+  candidatePairId String             @db.Uuid
+  periodId        String             @db.Uuid
+  organization    VotingOrganization
+  studentId       String             @db.Uuid
+  position        CandidatePosition
+  nameSnapshot    String             @db.VarChar(120)
+  classSnapshot   String             @db.VarChar(40)
+  photoUrl        String?            @db.VarChar(1024)
+  pair            CandidatePair      @relation(fields: [candidatePairId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+  student         Student            @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([candidatePairId, position])
+  @@unique([periodId, organization, studentId])
+  @@index([studentId, periodId])
+}
+
+model ElectionVoter {
+  id                String               @id @default(uuid()) @db.Uuid
+  studentId         String               @db.Uuid
+  periodId          String               @db.Uuid
+  nisn              String               @db.VarChar(10)
+  name              String               @db.VarChar(120)
+  className         String               @db.VarChar(40)
+  credentialEnabled Boolean              @default(true)
+  pinHash           String?              @db.VarChar(60)
+  pinFingerprint    String?              @db.Char(64)
+  pinVersion        Int                  @default(0)
+  period            ElectionPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  student           Student              @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  participation     VoterParticipation[]
+  session           VotingSession?
+
+  @@unique([periodId, nisn])
+  @@unique([periodId, studentId])
+  @@unique([periodId, pinFingerprint])
+  @@unique([id, periodId])
+  @@index([studentId])
+  @@index([periodId, className])
+}
+
+model VoterParticipation {
+  voterId      String             @db.Uuid
+  periodId     String             @db.Uuid
+  organization VotingOrganization
+  hasVoted     Boolean            @default(false)
+  voter        ElectionVoter      @relation(fields: [voterId, periodId], references: [id, periodId], onDelete: Restrict, onUpdate: Restrict)
+  contest      ElectionContest    @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([voterId, organization])
+  @@index([periodId, organization, hasVoted])
+}
+
+model Ballot {
+  id           String             @id @default(uuid()) @db.Uuid
+  periodId     String             @db.Uuid
+  organization VotingOrganization
+  candidateId  String             @db.Uuid
+  candidate    CandidatePair      @relation(fields: [candidateId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([periodId, organization, candidateId])
+}
+
+model VotingSession {
+  id         String             @id @default(uuid()) @db.Uuid
+  scope      VotingSessionScope @default(ELECTION_VOTING)
+  voterId    String             @unique @db.Uuid
+  tokenHash  String             @unique @db.Char(64)
+  createdAt  DateTime           @default(now()) @db.Timestamptz(3)
+  lastSeenAt DateTime           @db.Timestamptz(3)
+  expiresAt  DateTime           @db.Timestamptz(3)
+  voter      ElectionVoter      @relation(fields: [voterId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+
+  @@index([expiresAt])
+}
+
+model VotingRateBucket {
+  key       String   @id @db.Char(64)
+  attempts  Int      @default(0)
+  expiresAt DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+}
+
+model VotingAuditEvent {
+  id             String          @id @default(uuid()) @db.Uuid
+  periodId       String?         @db.Uuid
+  actorAccountId String?
+  event          String          @db.VarChar(64)
+  targetId       String?         @db.VarChar(64)
+  reasonCode     String?         @db.VarChar(64)
+  detail         Json?
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  period         ElectionPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actor          Account?        @relation(fields: [actorAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([periodId, createdAt])
+  @@index([actorAccountId, createdAt])
 }
 
 model AccountRole {

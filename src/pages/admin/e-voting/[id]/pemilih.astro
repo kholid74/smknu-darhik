@@ -1,0 +1,153 @@
+---
+export const prerender = false;
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { db } from '../../../../lib/prisma';
+import { can } from '../../../../lib/rbac';
+import { listVoters } from '../../../../lib/voting/voters';
+
+const periodId = Astro.params.id ?? '';
+if (!/^[0-9a-f-]{36}$/i.test(periodId)) return Astro.redirect('/admin/e-voting');
+const period = await db.electionPeriod.findUnique({ where: { id: periodId }, select: { id: true, name: true, academicYear: true, state: true, opensAt: true, closesAt: true } });
+if (!period) return Astro.redirect('/admin/e-voting');
+Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+const voters = await listVoters(periodId, null, 100, null);
+const editable = ['DRAFT', 'SCHEDULED'].includes(period.state) && Date.now() < period.opensAt.getTime();
+const postOpenCorrectable = period.state === 'SCHEDULED' && Date.now() >= period.opensAt.getTime() && Date.now() < period.closesAt.getTime();
+const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, 'student.kelola') : false;
+---
+
+<AdminLayout title="Kelola Pemilih" user={{ role: Astro.locals.session?.role ?? '' }}>
+  <a href={`/admin/e-voting/${periodId}`} style="display:inline-flex;margin-bottom:14px;text-decoration:none;font-size:13px">â† Konfigurasi periode</a>
+  <div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800">Kelola Pemilih</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">{period.name} · {period.academicYear} · {voters.length}/99 pemilih</p></div>
+  <p id="roster-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
+  {postOpenCorrectable && canSyncFromMaster && <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Koreksi NISN setelah pembukaan</h3>
+    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Hanya untuk siswa yang belum memilih dan jika nama/kelas tetap sama dengan master. Perlu dua admin berbeda dengan izin roster dan master siswa; koreksi mencabut PIN serta sesi lama.</p>
+    <form id="post-open-correction" style="display:grid;gap:10px;max-width:620px">
+      <label>Pemilih<select id="correction-voter" required><option value="">Pilih siswa</option>{voters.map((voter) => <option value={voter.id} data-snapshot={JSON.stringify({ nisn: voter.nisn, name: voter.name, className: voter.className })}>{voter.name} · {voter.nisn} · {voter.className}</option>)}</select></label>
+      <label>ID akun admin pemeriksa kedua<input id="correction-reviewer" required maxlength="128" autocomplete="off"/></label>
+      <label>Kata sandi admin yang sedang masuk<input id="correction-password" type="password" required maxlength="256" autocomplete="current-password"/></label>
+      <label>Kata sandi pemeriksa kedua<input id="correction-reviewer-password" type="password" required maxlength="256" autocomplete="off"/></label>
+      <button class="btn btn-primary" type="submit">Koreksi NISN dan cabut PIN lama</button>
+    </form>
+  </section>}
+  {editable && <section class="card" style="margin-bottom:18px">
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Pemilih dari master siswa</h3>
+    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Semua siswa yang terhubung ke kelas tahun ajaran {period.academicYear} akan menjadi pemilih. Siswa yang sudah ada di roster tidak diduplikasi. Maksimal 99 pemilih.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="preview-master-roster" class="btn btn-outline" type="button">Pratinjau sinkronisasi</button><button id="sync-master-roster" class="btn btn-primary" type="button" disabled>Tambahkan pemilih dari master</button></div>
+    <div id="master-roster-preview" style="display:none;margin-top:16px"></div>
+  </section>}
+  <section aria-labelledby="roster-list-title">
+    <h3 id="roster-list-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Pemilih terdaftar ({voters.length})</h3>
+    <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>Kredensial PIN</th>{editable && <th>Aksi</th>}</tr></thead><tbody>
+      {voters.length === 0 ? <tr><td colspan={editable ? 5 : 4} style="text-align:center;padding:32px;color:var(--color-muted)">Belum ada pemilih.</td></tr> : voters.map((voter) => <tr>
+        <td>{voter.nisn}</td><td style="font-weight:600">{voter.name}</td><td>{voter.className}</td><td>{voter.pinIssued && voter.credentialEnabled ? 'PIN diterbitkan' : 'Belum diterbitkan'}</td>
+        {editable && <td><div style="display:flex;gap:6px;flex-wrap:wrap">
+          {canSyncFromMaster && <button class="btn btn-outline roster-action" type="button" data-action="sync" data-voter-id={voter.id} data-snapshot={JSON.stringify({ nisn: voter.nisn, name: voter.name, className: voter.className })}>Sinkronkan dari master</button>}
+          <button class="btn btn-outline roster-action" type="button" data-action="delete" data-voter-id={voter.id} data-snapshot={JSON.stringify({ nisn: voter.nisn, name: voter.name, className: voter.className })}>Hapus dari roster</button>
+        </div></td>}
+      </tr>)}
+    </tbody></table></div>
+  </section>
+</AdminLayout>
+
+<script>
+  const periodId = location.pathname.split('/')[3];
+  const previewButton = document.querySelector<HTMLButtonElement>('#preview-master-roster');
+  const syncButton = document.querySelector<HTMLButtonElement>('#sync-master-roster');
+  const previewBox = document.querySelector<HTMLElement>('#master-roster-preview');
+  const message = document.querySelector<HTMLElement>('#roster-message')!;
+  let csrf = '';
+  let preview: { academicYear: string; eligibleCount: number; currentCount: number; alreadyPresent: number; additions: number; projectedCount: number; canSync: boolean } | null = null;
+  const showMessage = (text: string, ok = false) => { message.textContent = text; message.style.display = 'block'; message.style.background = ok ? '#eef5ef' : '#fff1f0'; message.style.color = ok ? '#31573c' : '#991b1b'; };
+  if (previewButton && syncButton && previewBox) {
+    previewButton.addEventListener('click', async () => {
+      syncButton.disabled = true; preview = null;
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}/voters/master-preview`);
+        const result = await response.json();
+        if (!response.ok) { showMessage(`Pratinjau gagal: ${result?.error?.code ?? 'kesalahan'}.`); return; }
+        csrf = response.headers.get('x-csrf-token') ?? '';
+        preview = result.data;
+        previewBox.textContent = `Tahun ajaran ${preview!.academicYear}: ${preview!.eligibleCount} siswa memenuhi syarat; ${preview!.alreadyPresent} sudah ada; ${preview!.additions} akan ditambahkan. Jumlah roster berubah dari ${preview!.currentCount} menjadi ${preview!.projectedCount} dari batas 99.`;
+        previewBox.style.display = 'block';
+        syncButton.disabled = !preview!.canSync || preview!.additions === 0;
+        showMessage(preview!.canSync ? 'Pratinjau berasal dari master siswa. Periksa jumlah sebelum menambahkan.' : 'Roster melewati batas 99 atau ada NISN yang bertabrakan.', preview!.canSync);
+      } catch { showMessage('Koneksi terputus. Periksa koneksi lalu coba lagi.'); }
+    });
+    syncButton.addEventListener('click', async () => {
+      if (!preview?.canSync || !preview.additions || !csrf || !confirm(`Tambahkan ${preview.additions} siswa tahun ajaran ${preview.academicYear} ke roster?`)) return;
+      syncButton.disabled = true;
+      try {
+        const response = await fetch(`/api/admin/e-voting/${periodId}/voters`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: '{}' });
+        const result = await response.json();
+        if (!response.ok) { showMessage(`Sinkronisasi ditolak: ${result?.error?.code ?? 'kesalahan'}. Buat pratinjau baru.`); return; }
+        showMessage(`${result.data.added} pemilih ditambahkan; ${result.data.alreadyPresent} sudah terdaftar.`, true); location.reload();
+      } catch { showMessage('Koneksi terputus. Buat pratinjau baru untuk memeriksa roster.'); }
+    });
+  }
+</script><script>
+  const correctionForm = document.querySelector<HTMLFormElement>('#post-open-correction');
+  if (correctionForm) {
+    const correctionPeriodId = location.pathname.split('/')[3];
+    const correctionMessage = document.querySelector<HTMLElement>('#roster-message')!;
+    const correctionSelect = document.querySelector<HTMLSelectElement>('#correction-voter')!;
+    let correctionCsrf = '';
+    fetch(`/api/admin/e-voting/${correctionPeriodId}/voters?limit=1`).then((response) => { correctionCsrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+    correctionForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const selected = correctionSelect.selectedOptions[0];
+    if (!correctionCsrf || !selected?.value) { correctionMessage.textContent = 'Pilih siswa dan tunggu sesi keamanan siap.'; correctionMessage.style.display = 'block'; return; }
+    if (!confirm(`Koreksi NISN ${selected.textContent}? PIN lama dan sesi siswa akan dicabut.`)) return;
+    const button = correctionForm.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/admin/e-voting/${correctionPeriodId}/voters/${selected.value}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': correctionCsrf },
+        body: JSON.stringify({ syncFromMaster: true, expectedSnapshot: JSON.parse(selected.dataset.snapshot!),
+          adminPassword: (document.querySelector<HTMLInputElement>('#correction-password')!).value,
+          reviewerAccountId: (document.querySelector<HTMLInputElement>('#correction-reviewer')!).value,
+          reviewerPassword: (document.querySelector<HTMLInputElement>('#correction-reviewer-password')!).value }),
+      });
+      if (!response.ok) {
+        const code = (await response.json().catch(() => null))?.error?.code;
+        const messages: Record<string, string> = { TWO_REVIEWERS_REQUIRED: 'Diperlukan dua admin aktif berbeda dengan izin roster dan master.', POSTOPEN_NISN_ONLY: 'Hanya NISN yang boleh berubah; nama dan kelas harus tetap sama dengan master.', VOTER_ALREADY_PARTICIPATED: 'Siswa sudah memilih dan tidak dapat dikoreksi.', INVALID_REAUTH: 'Kata sandi salah atau akun admin tidak aktif.', STALE_ROSTER: 'Roster berubah; muat ulang halaman.', NISN_ALREADY_ROSTERED: 'NISN baru sudah dipakai siswa lain pada periode ini.', INVALID_STATE: 'Koreksi hanya dapat dilakukan selama periode sedang berlangsung.' };
+        correctionMessage.textContent = messages[code] ?? `Koreksi ditolak: ${code ?? 'kesalahan'}.`;
+        correctionMessage.style.display = 'block'; correctionMessage.style.background = '#fff1f0'; correctionMessage.style.color = '#991b1b'; button.disabled = false; return;
+      }
+      location.reload();
+    } catch { correctionMessage.textContent = 'Koneksi terputus. Muat ulang roster sebelum mencoba kembali.'; correctionMessage.style.display = 'block'; button.disabled = false; }
+    });
+  }
+</script>
+
+<script>
+  const periodIdForRoster = location.pathname.split('/')[3];
+  const rosterMessage = document.querySelector<HTMLElement>('#roster-message');
+  const notifyRoster = (text: string) => { if (rosterMessage) { rosterMessage.textContent = text; rosterMessage.style.display = 'block'; rosterMessage.style.background = '#fff1f0'; rosterMessage.style.color = '#991b1b'; } };
+  let rosterCsrf = '';
+  fetch(`/api/admin/e-voting/${periodIdForRoster}/voters?limit=1`).then((response) => { rosterCsrf = response.headers.get('x-csrf-token') ?? ''; }).catch(() => {});
+  document.querySelectorAll<HTMLButtonElement>('.roster-action').forEach((button) => button.addEventListener('click', async () => {
+    if (!rosterCsrf) { notifyRoster('Sesi keamanan belum siap. Muat ulang halaman lalu coba lagi.'); return; }
+    const voterId = button.dataset.voterId!;
+    const expectedSnapshot = JSON.parse(button.dataset.snapshot!) as { nisn: string; name: string; className: string };
+    const sync = button.dataset.action === 'sync';
+    const prompt = sync ? 'Sinkronkan data pemilih dari master? Jika ada perubahan, PIN lama akan dicabut dan harus diterbitkan ulang.' : 'Hapus pemilih ini dari roster? Tindakan hanya tersedia sebelum periode dibuka dan sebelum pemilih memberi suara.';
+    if (!confirm(prompt)) return;
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/admin/e-voting/${periodIdForRoster}/voters/${voterId}`, {
+        method: sync ? 'PATCH' : 'DELETE', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': rosterCsrf },
+        body: JSON.stringify(sync ? { syncFromMaster: true, expectedSnapshot } : { expectedSnapshot }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        const code = result?.error?.code;
+        notifyRoster(code === 'STALE_ROSTER' ? 'Data roster berubah. Muat ulang sebelum melanjutkan.' : code === 'VOTER_ALREADY_PARTICIPATED' ? 'Pemilih sudah memberi suara dan tidak dapat diubah atau dihapus.' : code === 'NISN_ALREADY_ROSTERED' ? 'NISN master sudah dipakai pemilih lain di periode ini.' : code === 'INVALID_STATE' ? 'Roster terkunci setelah waktu pembukaan.' : `Perubahan ditolak: ${code ?? 'kesalahan'}.`);
+        button.disabled = false; return;
+      }
+      location.reload();
+    } catch { notifyRoster('Koneksi terputus. Muat ulang daftar sebelum mencoba lagi.'); button.disabled = false; }
+  }));
+</script>

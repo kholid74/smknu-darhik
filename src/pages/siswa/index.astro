@@ -1,0 +1,116 @@
+---
+import StudentPortalLayout from '../../layouts/StudentPortalLayout.astro';
+import { getStudentDashboard } from '../../lib/voting/student-dashboard';
+import { createStudentSessionCsrfToken } from '../../lib/voting/security';
+import { votingCsrfSecret } from '../../lib/voting/student-auth';
+
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
+Astro.response.headers.set('X-Frame-Options', 'DENY');
+
+const session = Astro.locals.votingSession;
+if (!session) return Astro.redirect('/siswa/masuk');
+const dashboard = await getStudentDashboard(session.periodId, session.voterId);
+if (!dashboard) return Astro.redirect('/siswa/masuk');
+const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
+const organizations = [
+  ['OSIS', 'OSIS'],
+  ['DEWAN_AMBALAN', 'Dewan Ambalan'],
+  ['IPNU', 'IPNU'],
+  ['IPPNU', 'IPPNU'],
+] as const;
+const completedCount = organizations.filter(([key]) => dashboard.participation[key]).length;
+---
+<StudentPortalLayout title="Beranda" csrfToken={csrfToken} periodId={dashboard.period.id}>
+  <section class="intro">
+    <p class="eyebrow">DASHBOARD</p>
+    <h1>Selamat datang di Portal Siswa</h1>
+    <p class="muted">Akses layanan pemilihan untuk periode yang sedang berlangsung.</p>
+  </section>
+
+  <section class="election-card" aria-labelledby="election-title">
+    <div class="election-copy">
+      <p class="eyebrow light">PEMILIHAN AKTIF</p>
+      <h2 id="election-title">{dashboard.period.name}</h2>
+      <p>{completedCount} dari 4 pemilihan selesai</p>
+      <div class="progress-track" role="progressbar" aria-label="Kemajuan pemilihan" aria-valuemin="0" aria-valuemax="4" aria-valuenow={completedCount}>
+        <span style={`width:${completedCount * 25}%`}></span>
+      </div>
+      {dashboard.complete
+        ? <a class="button pale" href="/siswa/selesai">Lihat status selesai</a>
+        : <a class="button pale" href={dashboard.services[0].href}>{completedCount ? `Lanjutkan · ${dashboard.nextOrganization}` : 'Mulai memilih'}</a>}
+    </div>
+    <div class="election-status" aria-label="Status partisipasi">
+      {organizations.map(([key, label]) => <div class="status-row">
+        <span>{label}</span>
+        <strong class={dashboard.participation[key] ? 'done' : ''}>{dashboard.participation[key] ? 'Selesai' : 'Belum memilih'}</strong>
+      </div>)}
+    </div>
+  </section>
+
+  <section class="services" aria-labelledby="services-title">
+    <div class="section-heading"><div><p class="eyebrow">LAYANAN</p><h2 id="services-title">Layanan Portal</h2></div></div>
+    <div class="service-grid">
+      <article class="service available">
+        <span class="icon" aria-hidden="true">✓</span>
+        <h3>E-Voting</h3>
+        <p>{dashboard.complete ? 'Partisipasi untuk periode ini sudah lengkap.' : 'Pilih atau lanjutkan empat pemilihan organisasi.'}</p>
+        {dashboard.complete
+          ? <span class="service-state">Selesai</span>
+          : <a href={dashboard.services[0].href}>Buka E-Voting <span aria-hidden="true">→</span></a>}
+      </article>
+      {dashboard.services.slice(1).map((service) => <article class="service coming" aria-label={`${service.label}, segera hadir`}>
+        <span class="icon muted-icon" aria-hidden="true">◷</span>
+        <h3>{service.label}</h3>
+        <p>Layanan ini belum tersedia.</p>
+        <span class="service-state">Segera hadir</span>
+      </article>)}
+    </div>
+  </section>
+
+  <section class="session-box" aria-labelledby="session-title">
+    <div><h2 id="session-title">Sesi perangkat ini</h2><p class="muted">Sesi berakhir setelah tidak aktif. Perpanjang hanya saat masih menggunakan portal.</p><p class="expiry">Berakhir pukul <time id="session-expiry">{session.expiresAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB</time></p></div>
+    <button class="secondary" id="extend-session" type="button">Perpanjang sesi</button>
+  </section>
+  <p id="portal-feedback" role="status" aria-live="polite"></p>
+</StudentPortalLayout>
+
+<style>
+  .intro { margin-bottom: 28px; }
+  h1, h2, h3, p { margin-top: 0; }
+  h1 { margin-bottom: 8px; font-size: clamp(1.8rem, 3vw, 2.35rem); letter-spacing: -.03em; }
+  h2 { font-size: 1.35rem; }
+  .muted { color: #58685e; line-height: 1.55; }
+  .eyebrow { margin-bottom: 8px; color: #27714b; font-size: .75rem; letter-spacing: .12em; font-weight: 800; }
+  .light { color: #d0ead9; }
+  .election-card { display: grid; grid-template-columns: 1.1fr .9fr; gap: 30px; padding: 30px; border-radius: 18px; background: #145c3b; color: white; box-shadow: 0 14px 35px #145c3b20; }
+  .election-copy h2 { margin-bottom: 8px; font-size: 1.6rem; }
+  .election-copy p:not(.eyebrow) { color: #e2eee6; }
+  .progress-track { height: 8px; max-width: 420px; margin: 16px 0 22px; overflow: hidden; border-radius: 99px; background: #ffffff45; }
+  .progress-track span { display: block; height: 100%; border-radius: inherit; background: #f4c95d; transition: width .2s ease; }
+  .button.pale { background: #fff; color: #145c3b; }
+  .election-status { align-self: center; padding: 8px 18px; border: 1px solid #ffffff40; border-radius: 12px; }
+  .status-row { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid #ffffff30; font-size: .9rem; }
+  .status-row:last-child { border-bottom: 0; }
+  .status-row strong { color: #f9e6a8; font-size: .82rem; }
+  .status-row strong.done { color: #d6f5df; }
+  .services { margin-top: 42px; }
+  .section-heading { display: flex; align-items: end; justify-content: space-between; margin-bottom: 18px; }
+  .section-heading h2 { margin-bottom: 0; }
+  .service-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .service { min-height: 210px; padding: 22px; border: 1px solid #dce5df; border-radius: 14px; background: white; }
+  .service.available { border-color: #a8cbb5; }
+  .service h3 { margin: 14px 0 8px; font-size: 1.05rem; }
+  .service p { min-height: 44px; margin-bottom: 14px; color: #58685e; line-height: 1.5; font-size: .92rem; }
+  .service a { color: #145c3b; font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  .icon { display: inline-grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #e5f2e9; color: #17643f; font-weight: 800; }
+  .muted-icon { background: #f0f2f0; color: #758078; }
+  .service-state { color: #65736a; font-size: .85rem; font-weight: 700; }
+  .session-box { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-top: 30px; padding: 20px 22px; border: 1px solid #dce5df; border-radius: 14px; background: #fff; }
+  .session-box h2 { margin-bottom: 6px; font-size: 1rem; }
+  .session-box p { margin-bottom: 4px; font-size: .9rem; }
+  .expiry { color: #33463a; font-weight: 700; }
+  @media (max-width: 760px) { .election-card { grid-template-columns: 1fr; padding: 22px; gap: 20px; } .service-grid { grid-template-columns: 1fr; } .service { min-height: 0; } .service p { min-height: auto; } .session-box { align-items: flex-start; flex-direction: column; } }
+</style>

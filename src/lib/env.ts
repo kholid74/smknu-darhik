@@ -7,6 +7,9 @@
 const metaEnv: Record<string, string | undefined> = {
   DATABASE_URL: import.meta.env.DATABASE_URL,
   JWT_SECRET: import.meta.env.JWT_SECRET,
+  VOTING_CSRF_SECRET: import.meta.env.VOTING_CSRF_SECRET,
+  VOTING_PIN_SECRET: import.meta.env.VOTING_PIN_SECRET,
+  VOTING_RATE_SECRET: import.meta.env.VOTING_RATE_SECRET,
   R2_ENDPOINT: import.meta.env.R2_ENDPOINT,
   R2_ACCESS_KEY: import.meta.env.R2_ACCESS_KEY,
   R2_SECRET_KEY: import.meta.env.R2_SECRET_KEY,
