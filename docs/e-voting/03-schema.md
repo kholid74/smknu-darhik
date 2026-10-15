@@ -1,6 +1,6 @@
 # Proposal Prisma dan invariant database
 
-Status: fondasi schema dan migration additive sudah diterapkan di `prisma/schema.prisma` dan `prisma/migrations/20261011090000_e_voting_foundation`; `prisma validate`, `format`, dan `generate` lulus. Constraint SQL belum diuji pada PostgreSQL dan layanan/route belum diterapkan. Generator/provider yang ada dipertahankan. Perubahan tidak mengubah Alumni menjadi Student atau menjadikan role siswa internal sebagai daftar pemilih.
+Status: fondasi schema dan migration additive sudah diterapkan di `prisma/schema.prisma` dan `prisma/migrations/20261011090000_e_voting_foundation`; `prisma validate`, `format`, dan `generate` lulus. Seluruh migrasi dan cleanup sampel diuji pada PostgreSQL dalam memori; pengujian transaksi suara end-to-end pada Neon belum dilakukan. Generator/provider yang ada dipertahankan. Perubahan tidak mengubah Alumni menjadi Student atau menjadikan role siswa internal sebagai daftar pemilih.
 
 ## Model yang diusulkan
 
@@ -44,6 +44,7 @@ model ElectionPeriod {
   slug           String        @unique @db.VarChar(64)
   name           String        @db.VarChar(120)
   academicYear   String        @db.VarChar(20)
+  isTest         Boolean       @default(false)
   state          ElectionState @default(DRAFT)
   opensAt        DateTime       @db.Timestamptz(3)
   closesAt       DateTime       @db.Timestamptz(3)
@@ -54,7 +55,6 @@ model ElectionPeriod {
   createdAt      DateTime       @default(now()) @db.Timestamptz(3)
   contests       ElectionContest[]
   voters         ElectionVoter[]
-  auditEvents    VotingAuditEvent[]
 }
 
 model ElectionContest {
@@ -175,7 +175,6 @@ model VotingAuditEvent {
   reasonCode     String?         @db.VarChar(64)
   detail         Json?
   createdAt      DateTime         @default(now()) @db.Timestamptz(3)
-  period         ElectionPeriod? @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   actor          Account?        @relation(fields: [actorAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([periodId, createdAt])
@@ -250,4 +249,8 @@ Penutupan, pencabutan PIN, cleanup sesi atau penghapusan roster sebelum buka tid
 
 Migrasi awal hanya membuat enum/tabel/index/constraint/trigger serta relasi Account balik pada client; tidak ada backfill wajib pada data website. Tidak menjalankan seed demo untuk membuat periode produksi. Fixture sintetis berada di test terpisah.
 
-Hapus sesi kedaluwarsa dan bucket limiter lewat cleanup berkala. Tidak ada cascade dari periode/candidate/voter ke ballot. Setelah masa retensi disahkan, penghapusan PII/ledger memerlukan prosedur offline terpisah beserta penyesuaian trigger/constraint yang direview; jangan menambahkan tombol hapus permanen sebelum kebijakan tersebut ada. Snapshot aggregate dan periode tahunan dapat dipertahankan tanpa menyimpan PIN mentah (yang memang tidak pernah disimpan).
+Hapus sesi kedaluwarsa dan bucket limiter lewat cleanup berkala. Tidak ada cascade dari periode/candidate/voter ke ballot. Setelah masa retensi disahkan, penghapusan PII/ledger memerlukan prosedur offline terpisah beserta penyesuaian trigger/constraint yang direview; untuk periode biasa tidak tersedia tombol hapus permanen. Pengecualian periode uji yang diotorisasi dijelaskan pada bagian berikut. Snapshot aggregate dan periode tahunan dapat dipertahankan tanpa menyimpan PIN mentah (yang memang tidak pernah disimpan).
+
+## Migrasi pembersihan data uji ? 15 Oktober 2026
+
+20261015140000_test_period_cleanup menambah ElectionPeriod.isTest (default false, immutable), menandai dua sampel legacy berdasarkan UUID+slug yang disetujui operator, dan mencatat klasifikasinya. FK VotingAuditEvent.periodId diganti trigger validasi INSERT; UUID audit tetap tersimpan sesudah periode uji dihapus, tanpa mengubah baris audit lama. FK aktor dan append-only tetap aktif. Fungsi cleanup bertransaksi menghapus hanya satu periode uji yang belum dipublikasikan; DELETE biasa maupun UPDATE ballot tetap ditolak. [Aturan dan urutan penghapusan](08-pembersihan-data-uji.md).

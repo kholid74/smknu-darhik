@@ -1,5 +1,6 @@
 ---
 export const prerender = false;
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import UploadWidget from '../../../components/UploadWidget.astro';
 import { verifyToken } from '../../../lib/auth';
@@ -31,6 +32,7 @@ const fileIcon = (name: string) => FILE_ICON[name.split('.').pop()?.toLowerCase(
 ---
 
 <AdminLayout title="Pustaka Media" user={{ role: session.role }}>
+  <PageHeader title="Pustaka Media"/>
   <div class="card" style="margin-bottom:20px">
     <h3 style="font-size:15px;font-weight:700;margin-bottom:4px">Unggah Gambar</h3>
     <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">File yang diunggah tersimpan di pustaka dan bisa dipakai ulang di form mana pun.</p>

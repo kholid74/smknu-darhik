@@ -1,0 +1,19 @@
+---
+interface Props { id:string; label:string; mode?:'client'|'server'; filterColumn?:number; filterLabel?:string }
+const {id,label,mode='client',filterColumn=-1,filterLabel='Filter'}=Astro.props;
+---
+<section class="data-table" data-ui-table data-mode={mode} data-filter-column={filterColumn} aria-label={label}>
+  {mode==='client' && <div class="table-toolbar" data-table-controls hidden>
+    <label for={id+'-q'}>Cari {label.toLowerCase()}<input id={id+'-q'} type="search" data-table-search placeholder="Ketik untuk mencari…" autocomplete="off"/></label>
+    {filterColumn>=0 && <label for={id+'-filter'}>{filterLabel}<select id={id+'-filter'} data-table-filter><option value="">Semua</option></select></label>}
+    <label for={id+'-size'}>Per halaman<select id={id+'-size'} data-table-size><option>10</option><option>25</option><option>50</option></select></label>
+  </div>}
+  <slot name="toolbar"/>
+  <div class="table-region" role="region" aria-label={label+' — geser untuk melihat seluruh kolom'} tabindex="0"><slot/></div>
+  {mode==='client' && <><p class="table-empty" data-table-empty hidden>Tidak ada data yang cocok. Ubah pencarian atau filter.</p><div class="table-footer" data-table-controls hidden><span data-table-count role="status" aria-live="polite"></span><div class="table-footer-actions"><button type="button" class="btn btn-outline" data-table-prev>Sebelumnya</button><span data-table-page></span><button type="button" class="btn btn-outline" data-table-next>Berikutnya</button></div></div></>}
+  <slot name="footer"/>
+</section>
+<script>
+import { initDataTables } from '../../lib/ui/data-table';
+initDataTables();
+</script>

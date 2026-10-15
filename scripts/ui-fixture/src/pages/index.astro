@@ -1,0 +1,28 @@
+---
+import AdminLayout from '../../../../src/layouts/AdminLayout.astro';
+import PageHeader from '../../../../src/components/ui/PageHeader.astro';
+import DataTable from '../../../../src/components/ui/DataTable.astro';
+import FormSection from '../../../../src/components/ui/FormSection.astro';
+import FormField from '../../../../src/components/ui/FormField.astro';
+import Feedback from '../../../../src/components/ui/Feedback.astro';
+import EmptyState from '../../../../src/components/ui/EmptyState.astro';
+import LoadingState from '../../../../src/components/ui/LoadingState.astro';
+import RowActions from '../../../../src/components/ui/RowActions.astro';
+import TestPeriodCleanup from '../../../../src/components/voting/TestPeriodCleanup.astro';
+// Synthetic navigation fixture only; it creates no account, cookie or permissions on API requests.
+Astro.locals.principal={roles:['superadmin']};
+const rows=Array.from({length:31},(_,i)=>({id:i+1,name:'Siswa Simulasi '+(i+1),className:i%2?'X LPS':'X DKV'}));
+---
+<AdminLayout title="Pratinjau UI" user={{role:'superadmin'}}>
+  <PageHeader title="Pratinjau komponen" description="Data sintetis untuk QA lokal. Halaman ini tidak tersedia pada build produksi."><button slot="actions" id="qa-confirm" class="btn btn-primary" type="button">Uji konfirmasi</button></PageHeader>
+  <Feedback id="qa-feedback"/>
+  <DataTable id="qa-students" label="Siswa simulasi" filterColumn={2} filterLabel="Kelas"><table><thead><tr><th>Pilih</th><th>Nama</th><th>Kelas</th><th>Aksi</th></tr></thead><tbody>{rows.map(row=><tr><td><input type="checkbox" value={row.id} aria-label={'Pilih '+row.name}/></td><td>{row.name}</td><td>{row.className}</td><td><RowActions label={'Aksi '+row.name}><button type="button" class="btn btn-outline">Lihat fixture</button></RowActions></td></tr>)}</tbody></table></DataTable>
+  <FormSection title="Form contoh" description="Kontrol form dan feedback menggunakan token bersama."><FormField id="qa-name" label="Nama" hint="Hanya contoh sintetis."><input id="qa-name" value="Siswa Simulasi" aria-describedby="qa-name-hint"/></FormField></FormSection>
+  <section class="card"><EmptyState title="Belum ada data" description="State kosong menggunakan tindakan yang sesuai konteks."/></section>
+  <LoadingState label="Contoh state loading"/>
+  <TestPeriodCleanup periodId="10000000-0000-4000-8000-000000000001" name="Periode Uji Sintetis" slug="periode-uji"/>
+</AdminLayout>
+<script>
+import {confirmAction} from '../../../../src/lib/ui/confirm';
+document.querySelector('#qa-confirm')?.addEventListener('click',async()=>{const confirmed=await confirmAction('Lanjutkan uji komponen? Tidak ada data yang diubah.');document.querySelector('#qa-feedback')!.textContent=confirmed?'Dikonfirmasi':'Dibatalkan'});
+</script>

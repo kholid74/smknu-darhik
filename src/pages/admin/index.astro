@@ -1,5 +1,7 @@
 ---
 export const prerender = false;
+import PageHeader from '../../components/ui/PageHeader.astro';
+import { can } from '../../lib/rbac';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import ChartCard from '../../components/ChartCard.astro';
 import { verifyToken } from '../../lib/auth';
@@ -73,6 +75,7 @@ const teacherByLevel = await db.teacher.groupBy({ by: ['level'], _count: { _all:
 // ─── Recent activity ───
 const recent = await db.article.findMany({ orderBy: { createdAt: 'desc' }, take: 6, select: { id: true, title: true, createdAt: true, published: true } });
 
+const allow=(cap:string)=>!!Astro.locals.principal&&can(Astro.locals.principal,cap);
 const kpis = [
   { label: 'Alumni', value: alumniTotal, icon: 'diversity_3', href: '/admin/alumni' },
   { label: 'Artikel', value: articleCount, icon: 'article', href: '/admin/artikel' },
@@ -93,11 +96,13 @@ const ringkasan = [
 ---
 
 <AdminLayout title="Dashboard" user={{ role: session.role }}>
+  <PageHeader title="Dashboard sekolah" description="Kelola layanan siswa, kegiatan pemilihan, dan konten sekolah dari satu tempat."/>
+  <section class="dashboard-modules" aria-label="Pintasan modul">{allow('evoting.lihat')&&<a class="card" href="/admin/e-voting" style="text-decoration:none"><span class="material-symbols-outlined">how_to_vote</span><h2 style="margin:12px 0 8px;font-size:18px">Pemilihan siswa</h2><p style="font-size:13px;color:var(--color-muted)">Siapkan periode, calon, pemilih, dan pantau partisipasi.</p></a>}{allow('student.kelola')&&<a class="card" href="/admin/siswa" style="text-decoration:none"><span class="material-symbols-outlined">school</span><h2 style="margin:12px 0 8px;font-size:18px">Master siswa</h2><p style="font-size:13px;color:var(--color-muted)">Tambah, impor, dan perbarui data siswa beserta kelas.</p></a>}<article class="card" aria-disabled="true"><span class="material-symbols-outlined">event_available</span><h2 style="margin:12px 0 8px;font-size:18px">Absensi</h2><p style="font-size:13px;color:var(--color-muted)">Segera hadir</p></article></section>
   {isStaffLevel ? (
   <Fragment>
   <!-- Ringkasan KPI -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
-    {kpis.map(s => (
+    {kpis.filter(s=>allow(s.href==='/admin/alumni'?'alumni.moderasi':s.href.split('/')[2]+'.kelola')).map(s => (
       <a href={s.href} class="card" style="display:flex;align-items:center;gap:14px;color:inherit;text-decoration:none">
         <span class="material-symbols-outlined" style="font-size:30px;color:#1B7A3D;background:#e8f5e9;padding:12px;border-radius:12px">{s.icon}</span>
         <div>
@@ -109,6 +114,7 @@ const ringkasan = [
   </div>
 
   <!-- SECTION 1: ALUMNI -->
+  {allow('alumni.moderasi')&&<Fragment>
   <div class="dash-section">
     <span class="material-symbols-outlined">diversity_3</span>
     <h2>Statistik Alumni</h2>
@@ -136,6 +142,8 @@ const ringkasan = [
   )}
 
   <!-- SECTION 2: KONTEN -->
+  </Fragment>}
+  {allow('artikel.kelola')&&<Fragment>
   <div class="dash-section">
     <span class="material-symbols-outlined">article</span>
     <h2>Statistik Konten</h2>
@@ -154,6 +162,8 @@ const ringkasan = [
   </div>
 
   <!-- SECTION 3: PRESTASI -->
+  </Fragment>}
+  {allow('prestasi.kelola')&&<Fragment>
   <div class="dash-section">
     <span class="material-symbols-outlined">emoji_events</span>
     <h2>Statistik Prestasi</h2>
@@ -172,6 +182,8 @@ const ringkasan = [
   )}
 
   <!-- SECTION 4: GURU -->
+  </Fragment>}
+  {allow('guru.kelola')&&<Fragment>
   <div class="dash-section">
     <span class="material-symbols-outlined">group</span>
     <h2>Statistik Guru & Staf</h2>
@@ -195,12 +207,13 @@ const ringkasan = [
   )}
 
   <!-- SECTION 5: RINGKASAN SEKOLAH -->
+  </Fragment>}
   <div class="dash-section">
     <span class="material-symbols-outlined">dashboard</span>
     <h2>Ringkasan Sekolah</h2>
   </div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px">
-    {ringkasan.map(s => (
+    {ringkasan.filter(s=>allow(s.href.split('/')[2]+'.kelola')).map(s => (
       <a href={s.href} class="card" style="display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none">
         <span class="material-symbols-outlined" style="font-size:24px;color:#1B7A3D;background:#e8f5e9;padding:10px;border-radius:10px">{s.icon}</span>
         <div>
@@ -217,7 +230,7 @@ const ringkasan = [
     <h2>Aktivitas & Pintasan</h2>
   </div>
   <div class="dash-grid-2">
-    <div class="card">
+    {allow('artikel.kelola')&&<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <h3 style="font-size:15px;font-weight:700">Artikel Terbaru</h3>
         <a href="/admin/artikel" style="font-size:12px;font-weight:600">Lihat semua</a>
@@ -238,13 +251,13 @@ const ringkasan = [
           ))}
         </div>
       )}
-    </div>
+    </div>}
     <div class="card">
       <h3 style="font-size:15px;font-weight:700;margin-bottom:12px">Pintasan</h3>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <a href="/admin/artikel/new" class="btn btn-primary" style="justify-content:flex-start"><span class="material-symbols-outlined">add</span> Tulis Artikel</a>
-        <a href="/admin/alumni" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">diversity_3</span> Kelola Alumni</a>
-        <a href="/admin/galeri" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">add_photo_alternate</span> Upload Foto</a>
+        {allow('artikel.kelola')&&<a href="/admin/artikel/new" class="btn btn-primary" style="justify-content:flex-start"><span class="material-symbols-outlined">add</span> Tulis Artikel</a>}
+        {allow('alumni.moderasi')&&<a href="/admin/alumni" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">diversity_3</span> Kelola Alumni</a>}
+        {allow('galeri.kelola')&&<a href="/admin/galeri" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">add_photo_alternate</span> Upload Foto</a>}
         <a href="/" target="_blank" class="btn btn-outline" style="justify-content:flex-start"><span class="material-symbols-outlined">open_in_new</span> Lihat Website</a>
       </div>
     </div>

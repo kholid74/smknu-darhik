@@ -1,4 +1,6 @@
 ---
+import '../../styles/portal-tokens.css';
+import PortalHead from '../../components/ui/PortalHead.astro';
 import { db } from '../../lib/prisma';
 
 export const prerender = false;
@@ -12,6 +14,7 @@ const periods = await db.electionPeriod.findMany({ where: { state: 'SCHEDULED', 
   orderBy: { opensAt: 'asc' }, select: { id: true, slug: true, name: true, opensAt: true } });
 const requestedSlug = Astro.url.searchParams.get('periode');
 const selectedId = periods.find((period) => period.slug === requestedSlug)?.id ?? (periods.length === 1 ? periods[0].id : '');
+const selectedPeriod=periods.find(period=>period.id===selectedId);
 const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(date);
 ---
 <!doctype html>
@@ -21,9 +24,10 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="referrer" content="no-referrer" />
+    <PortalHead/>
     <title>Masuk · Portal Siswa SMKS NU Darul Hikam</title>
     <style>
-      :root { font-family: Arial, Helvetica, sans-serif; color: #18231e; background: #f4f7f4; }
+      :root { font-family: var(--font-portal); color: var(--color-ink); background: var(--color-paper); }
       * { box-sizing: border-box; }
       body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; }
       main { width: min(100%, 460px); padding: 34px; border: 1px solid #dce5df; border-radius: 18px; background: white; box-shadow: 0 18px 50px #153e2812; }
@@ -46,8 +50,10 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
     <main>
       <div class="brand">SMKS NU Darul Hikam<small>Portal Siswa</small></div>
       <h1>Masuk ke Portal Siswa</h1>
+      {Astro.url.searchParams.has('expired')&&<p class="feedback" data-tone="info" role="status">Sesi Anda telah berakhir. Masuk kembali dengan PIN yang sama untuk melanjutkan pemilihan.</p>}
+      {selectedPeriod&&<p class="unavailable" style="font-size:13px;margin-bottom:18px"><strong>{selectedPeriod.name}</strong><br/>Dibuka {dateLabel(selectedPeriod.opensAt)} WIB</p>}
       <p class="intro">Gunakan NISN dan PIN pemilihan yang diberikan panitia. PIN hanya berlaku untuk periode pemilihan ini.</p>
-      {periods.length ? <form id="login-form" data-period-id={selectedId}>
+      {periods.length ? <form id="login-form" method="post" data-period-id={selectedId}>
         {periods.length > 1 && <>
           <label for="period">Periode pemilihan</label>
           <select id="period" required>
@@ -59,7 +65,7 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
         <input id="nisn" name="nisn" type="text" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" required />
         <label for="pin">PIN pemilihan</label>
         <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" required />
-        <button id="submit" type="submit">Masuk</button>
+        <button id="submit" type="submit" disabled>Masuk</button>
         <p id="message" role="status" aria-live="polite"></p>
       </form> : <p class="unavailable">Saat ini tidak ada periode pemilihan yang sedang dibuka. Hubungi panitia jika jadwal seharusnya berlangsung.</p>}
       <p class="help">Jangan simpan PIN pada perangkat bersama. Setelah selesai, tekan Keluar dan pastikan layar kembali ke halaman masuk.</p>
@@ -72,7 +78,9 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
       const periodSelect = document.getElementById('period');
       let csrfToken = '';
       let phase = 'CLOSED';
+      let prepareTimer=0;
       async function prepareSession() {
+        window.clearTimeout(prepareTimer);
         const periodId = periodSelect instanceof HTMLSelectElement ? periodSelect.value : form?.dataset.periodId;
         if (!periodId) { phase = 'CLOSED'; if (submit instanceof HTMLButtonElement) submit.disabled = true; return; }
         form.dataset.periodId = periodId;
@@ -85,6 +93,8 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
             if (message) message.textContent = phase === 'BEFORE_OPEN' ? 'Periode pemilihan belum dibuka.' : 'Periode pemilihan tidak sedang dibuka.';
           } else if (message) message.textContent = '';
           if (submit instanceof HTMLButtonElement) submit.disabled = phase !== 'OPEN';
+          form?.querySelectorAll<HTMLInputElement>('input').forEach(input=>input.disabled=phase!=='OPEN');
+          if(phase==='BEFORE_OPEN')prepareTimer=window.setTimeout(prepareSession,15000);
         } catch {
           if (message) message.textContent = 'Layanan belum dapat dihubungi. Muat ulang halaman untuk mencoba kembali.';
         }

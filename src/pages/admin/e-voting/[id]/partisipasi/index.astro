@@ -1,5 +1,6 @@
 ---
 export const prerender = false;
+import DataTable from '../../../../../components/ui/DataTable.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
 import { can } from '../../../../../lib/rbac';
 import { getParticipation, getParticipationVoters } from '../../../../../lib/voting/participation';
@@ -41,9 +42,9 @@ const percent = (n: number, d: number) => d ? Math.round(n * 100 / d) : 0;
   {canViewVoters && voterPage && <section class="card" style="margin-top:18px">
     <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Status pemilih</h3>
     <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Hanya tersedia bagi pemegang izin partisipasi dan pemilih. Pilihan kandidat dan waktu suara tidak ditampilkan.</p>
-    <div class="table-wrap"><table id="voter-status-table"><thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>OSIS</th><th>Dewan Ambalan</th><th>IPNU</th><th>IPPNU</th></tr></thead><tbody>
+    <div class="table-wrap"><DataTable id="table-e-voting" label="Status pemilih yang dimuat" filterColumn={2} filterLabel="Filter"><table id="voter-status-table"><thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>OSIS</th><th>Dewan Ambalan</th><th>IPNU</th><th>IPPNU</th></tr></thead><tbody>
       {voterPage.data.map((voter) => <tr><td>{voter.nisn}</td><td>{voter.name}</td><td>{voter.className}</td><td>{voter.participation.OSIS ? 'Sudah' : 'Belum'}</td><td>{voter.participation.DEWAN_AMBALAN ? 'Sudah' : 'Belum'}</td><td>{voter.participation.IPNU ? 'Sudah' : 'Belum'}</td><td>{voter.participation.IPPNU ? 'Sudah' : 'Belum'}</td></tr>)}
-    </tbody></table></div>
+    </tbody></table></DataTable></div>
     {voterPage.data.length === 0 && <p style="color:var(--color-muted)">Roster belum tersedia.</p>}
     <button id="more-voters" class="btn btn-outline" type="button" data-cursor={voterPage.nextCursor ?? ''} hidden={!voterPage.nextCursor}>Muat berikutnya</button>
     <p id="voter-status-message" role="status" aria-live="polite" style="font-size:12px;margin-top:8px"></p>

@@ -1,0 +1,5 @@
+---
+interface Props { id:string; title:string; message:string; confirmLabel?:string; danger?:boolean }
+const {id,title,message,confirmLabel='Lanjutkan',danger=false}=Astro.props;
+---
+<dialog id={id} class="ui-dialog" aria-labelledby={id+'-title'} aria-describedby={id+'-description'}><form method="dialog"><h2 id={id+'-title'}>{title}</h2><p id={id+'-description'}>{message}</p><div class="dialog-actions"><button class="btn btn-outline" value="cancel" autofocus>Batal</button><button class:list={['btn',danger?'btn-danger':'btn-primary']} value="confirm">{confirmLabel}</button></div></form></dialog>

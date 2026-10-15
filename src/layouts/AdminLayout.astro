@@ -1,4 +1,9 @@
 ---
+import '../styles/portal-tokens.css';
+import '../styles/admin.css';
+import Breadcrumbs from '../components/ui/Breadcrumbs.astro';
+import ConfirmDialog from '../components/ui/ConfirmDialog.astro';
+import Icon from '../components/ui/Icon.astro';
 import { site } from '../data/site';
 import { can } from '../lib/rbac';
 
@@ -92,6 +97,8 @@ const groups = allGroups
   .map((g) => ({ ...g, items: g.items.filter((i) => i.comingSoon || (i.cap && allow(i.cap))) }))
   .filter((g) => g.items.length > 0);
 
+const currentModule = groups.flatMap(group=>group.items).find(item=>item.href && currentPath.startsWith(item.href));
+const breadcrumbItems = [{label:'Dashboard',href:currentPath==='/admin'?undefined:'/admin'}, ...(currentModule ? [{label:currentModule.label,href:currentPath===currentModule.href?undefined:currentModule.href!}] : []), ...(currentPath!=='/admin' && title!==currentModule?.label ? [{label:title}] : [])];
 const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'Staf', guru: 'Guru', siswa: 'Siswa' };
 ---
 
@@ -104,86 +111,10 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
   <link rel="icon" type="image/png" href="/assets/logo.png"/>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-  <style is:global>
-    /* Design tokens — single source for brand colour + contrast-safe neutrals.
-       Values kept as source hex to preserve exact brand green; only the washed
-       grey (#6f7a6e) is darkened to --color-muted to clear WCAG AA. */
-    :root{
-      --color-brand:#00602b; --color-accent:#1B7A3D; --color-accent-dark:#145a2d;
-      --color-ink:#1c1b1b; --color-muted:#5a6459; --color-muted-strong:#3f493f;
-      --color-paper:#f6f3f2; --color-line:rgba(0,0,0,0.08); --color-danger:#dc2626;
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{overflow-x:clip}
-    body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;background:var(--color-paper);color:var(--color-ink);min-height:100vh}
-    /* Keyboard focus — visible ring on every interactive element, shown instantly. */
-    :focus-visible{outline:2px solid var(--color-accent);outline-offset:2px;border-radius:4px}
-    .sidebar a:focus-visible,.sidebar button:focus-visible{outline-color:#fff}
-    /* Contrast backfill: darken washed grey wherever it was hardcoded inline. */
-    [style*="color:#6f7a6e"]{color:var(--color-muted)!important}
-    .material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:400;font-style:normal;font-size:20px;line-height:1;display:inline-block}
-    .sidebar{width:240px;background:#00602b;color:white;position:fixed;top:0;left:0;bottom:0;z-index:40;overflow-y:auto;display:flex;flex-direction:column}
-    .sidebar a,.sidebar button{color:white;background:transparent;border:none;text-decoration:none;display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;transition:background .15s}
-    .sidebar a:hover,.sidebar button:hover{background:rgba(255,255,255,0.1)}
-    .sidebar a.active{background:rgba(255,255,255,0.2);font-weight:700}
-    .sidebar-group-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,0.72);padding:16px 16px 6px;font-weight:700}
-    /* Accordion group: header toggles a collapsible panel of items. */
-    .sidebar-group{margin-top:4px}
-    .sidebar button.sidebar-group-toggle{width:100%;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,0.72);padding:11px 16px}
-    .sidebar button.sidebar-group-toggle:hover{color:#fff}
-    .sidebar-group-toggle .sidebar-chevron{margin-left:auto;font-size:18px;transition:transform .2s ease}
-    .sidebar-group-toggle[aria-expanded="true"] .sidebar-chevron{transform:rotate(180deg)}
-    /* grid 0fr->1fr gives a smooth height animation without measuring. */
-    .sidebar-group-items{display:grid;grid-template-rows:0fr;transition:grid-template-rows .2s ease}
-    .sidebar-group-items[data-open="true"]{grid-template-rows:1fr}
-    .sidebar-group-inner{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:2px;padding-left:6px}
-    .sidebar-group-inner a{font-size:13px}
-    .sidebar-coming-soon{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 16px;color:rgba(255,255,255,.68);font-size:13px;cursor:default}
-    .sidebar-coming-soon small{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.28);border-radius:99px;padding:3px 6px}
-    .main-content{margin-left:240px;min-height:100vh}
-    .topbar{background:white;border-bottom:1px solid rgba(0,0,0,0.06);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
-    .page-body{padding:24px}
-    a{color:#1B7A3D}
-    button{cursor:pointer}
-    input,select,textarea{border:1px solid rgba(0,0,0,0.12);border-radius:8px;padding:10px 14px;font-size:14px;font-family:inherit;width:100%}
-    input:focus,select:focus,textarea:focus{outline:none;border-color:#1B7A3D;box-shadow:0 0 0 2px rgba(27,122,61,0.15)}
-    .btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;border:none;transition:all .15s}
-    .btn-primary{background:#1B7A3D;color:white}.btn-primary:hover{background:#145a2d}
-    .btn-outline{background:white;border:1px solid rgba(0,0,0,0.12);color:#3f493f}.btn-outline:hover{background:#f0f7f1}
-    .card{background:white;border-radius:12px;border:1px solid rgba(0,0,0,0.06);padding:20px}
-    table{width:100%;border-collapse:collapse}
-    th,td{text-align:left;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,0.06);font-size:13px}
-    th{font-weight:700;color:var(--color-muted);font-size:12px;text-transform:uppercase}
-    /* Sortable table headers (SortTh + tableSort) */
-    .th-sort{display:inline-flex;align-items:center;gap:4px;color:inherit;text-decoration:none;cursor:pointer;user-select:none;white-space:nowrap}
-    .th-sort:hover{color:var(--color-accent)}
-    .th-sort .material-symbols-outlined{font-size:15px;opacity:.35}
-    .th-sort[data-active]{color:var(--color-accent)}
-    .th-sort[data-active] .material-symbols-outlined{opacity:1}
-    .menu-btn{display:none}
-    .badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:700}
-    .badge-green{background:#e8f5e9;color:#1B7A3D}
-    .badge-gold{background:#fdf6e8;color:#7e5700}
-    .badge-gray{background:#f0f0f0;color:var(--color-muted)}
-    .sidebar-overlay{display:none}
-    /* Mobile: sidebar becomes an off-canvas drawer, tables scroll, grids stack. */
-    @media (max-width:768px){
-      .main-content{margin-left:0}
-      .menu-btn{display:inline-flex}
-      .sidebar{transform:translateX(-100%);transition:transform .2s var(--ease,ease);box-shadow:0 0 40px rgba(0,0,0,0.35)}
-      .sidebar.open{transform:translateX(0)}
-      .sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:39;opacity:0;pointer-events:none;transition:opacity .2s}
-      .sidebar-overlay.open{opacity:1;pointer-events:auto}
-      table{min-width:620px}
-      .card{overflow-x:auto}
-      [style*="grid-template-columns"]{grid-template-columns:1fr!important}
-    }
-    @media (prefers-reduced-motion:reduce){
-      *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
-    }
-  </style>
+
 </head>
 <body>
+  <a class="skip-link" href="#admin-main">Lewati navigasi</a>
   <!-- Sidebar -->
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
   <aside class="sidebar" id="sidebar">
@@ -194,21 +125,22 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
     </div>
     <nav style="flex:1;padding:8px">
       <a href="/admin" class:list={['', { active: currentPath === '/admin' }]}>
-        <span class="material-symbols-outlined">dashboard</span> Dashboard
+        <Icon name="dashboard"/> Dashboard
       </a>
       {groups.map(g => {
         const groupActive = g.items.some(i => i.href && currentPath.startsWith(i.href));
+        const groupId='sidebar-group-'+g.label.toLowerCase().replace(/[^a-z]+/g,'-');
         return (
           <div class="sidebar-group" data-group={g.label} data-active={String(groupActive)}>
-            <button type="button" class="sidebar-group-toggle" aria-expanded={groupActive ? 'true' : 'false'}>
-              <span class="material-symbols-outlined" style="font-size:18px">{g.icon}</span>
+            <button type="button" class="sidebar-group-toggle" aria-controls={groupId} aria-expanded={groupActive ? 'true' : 'false'}>
+              <Icon name={g.icon} size={18}/>
               <span>{g.label}</span>
-              <span class="material-symbols-outlined sidebar-chevron">expand_more</span>
+              <Icon name="expand_more" class="sidebar-chevron" size={18}/>
             </button>
-            <div class="sidebar-group-items" data-open={String(groupActive)}>
+            <div class="sidebar-group-items" id={groupId} data-open={String(groupActive)}>
               <div class="sidebar-group-inner">
                 {g.items.map(i => i.href ? (
-                  <a href={i.href} class:list={[{ active: currentPath.startsWith(i.href) }]}>
+                  <a href={i.href} aria-current={currentPath.startsWith(i.href)?'page':undefined} class:list={[{ active: currentPath.startsWith(i.href) }]}>
                     {i.label}
                   </a>
                 ) : (
@@ -224,45 +156,22 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
     </nav>
     <div style="padding:16px;border-top:1px solid rgba(255,255,255,0.1)">
       <a href="/" target="_blank" style="font-size:12px;color:rgba(255,255,255,0.78)">
-        <span class="material-symbols-outlined" style="font-size:16px">open_in_new</span> Lihat Website
+        <Icon name="open_in_new" size={16}/> Lihat Website
       </a>
       <a href="/admin/logout" id="logout-link" style="font-size:12px;color:rgba(255,255,255,0.78);margin-top:4px;cursor:pointer">
-        <span class="material-symbols-outlined" style="font-size:16px">logout</span> Keluar
+        <Icon name="logout" size={16}/> Keluar
       </a>
     </div>
   </aside>
 
-  <!-- Custom Logout Modal — kept at body level: nesting it inside the sidebar
-       trapped position:fixed inside the sidebar's mobile transform. -->
-  <div id="logout-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;align-items:center;justify-content:center;padding:16px">
-    <div style="background:white;border-radius:16px;padding:32px;max-width:360px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
-      <span class="material-symbols-outlined" style="font-size:48px;color:#C8963E;margin-bottom:12px">logout</span>
-      <h3 style="font-size:18px;font-weight:800;margin-bottom:8px;color:#1c1b1b">Yakin ingin keluar?</h3>
-      <p style="font-size:14px;color:#6f7a6e;margin-bottom:24px">Kamu akan diarahkan ke halaman login.</p>
-      <div style="display:flex;gap:10px;justify-content:center">
-        <button onclick="document.getElementById('logout-modal').style.display='none'" style="padding:10px 24px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:#3f493f">Batal</button>
-        <a href="/admin/logout" style="padding:10px 24px;border-radius:10px;background:#dc2626;color:white;font-size:14px;font-weight:700;text-decoration:none;display:inline-block">Keluar</a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Shared Delete Confirm Modal -->
-  <div id="delete-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:110;align-items:center;justify-content:center">
-    <div style="background:white;border-radius:16px;padding:32px;max-width:380px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
-      <span class="material-symbols-outlined" style="font-size:48px;color:#dc2626;margin-bottom:12px">delete_forever</span>
-      <h3 style="font-size:18px;font-weight:800;margin-bottom:8px;color:#1c1b1b">Hapus data ini?</h3>
-      <p style="font-size:14px;color:#6f7a6e;margin-bottom:24px">Tindakan ini tidak dapat dibatalkan.</p>
-      <div style="display:flex;gap:10px;justify-content:center">
-        <button onclick="document.getElementById('delete-modal').style.display='none'" style="padding:10px 24px;border:1px solid #d1d5db;border-radius:10px;background:white;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:#3f493f">Batal</button>
-        <button id="delete-confirm-btn" style="padding:10px 24px;border-radius:10px;background:#dc2626;color:white;font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:inherit">Hapus</button>
-      </div>
-    </div>
-  </div>
+  <ConfirmDialog id="logout-modal" title="Keluar dari dashboard?" message="Anda akan kembali ke halaman masuk." confirmLabel="Keluar" />
+  <ConfirmDialog id="delete-modal" title="Hapus data ini?" message="Tindakan ini tidak dapat dibatalkan." confirmLabel="Hapus" danger />
+  <ConfirmDialog id="action-confirm-dialog" title="Konfirmasi tindakan" message="Periksa sebelum melanjutkan." />
 
   <!-- Flash Message -->
   {Astro.url.searchParams.get('saved') && (
-    <div id="flash-msg" style="position:fixed;top:16px;right:16px;z-index:120;background:#1B7A3D;color:white;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.15);display:flex;align-items:center;gap:8px;animation:fadeIn 0.3s">
-      <span class="material-symbols-outlined">check_circle</span> Berhasil disimpan
+    <div id="flash-msg" role="status" aria-live="polite" style="position:fixed;top:16px;right:16px;z-index:120;background:#1B7A3D;color:white;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.15);display:flex;align-items:center;gap:8px;animation:fadeIn 0.3s">
+      <Icon name="check_circle"/> Berhasil disimpan
     </div>
   )}
 
@@ -271,7 +180,7 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
     <div class="topbar">
       <div style="display:flex;align-items:center;gap:8px;min-width:0">
         <button class="menu-btn" id="menu-btn" aria-label="Buka menu" aria-controls="sidebar" aria-expanded="false" style="background:none;border:none;padding:6px;color:var(--color-ink);align-items:center">
-          <span class="material-symbols-outlined">menu</span>
+          <Icon name="menu"/>
         </button>
         <div style="font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{title}</div>
       </div>
@@ -280,9 +189,9 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
         <span style="background:#e8f5e9;color:#1B7A3D;padding:2px 10px;border-radius:100px;font-weight:600">{roleLabel[user?.role || ''] || user?.role || 'Pengguna'}</span>
       </div>
     </div>
-    <div class="page-body">
-      <slot />
-    </div>
+    <main class="page-body" id="admin-main" tabindex="-1">
+      <Breadcrumbs items={breadcrumbItems}/><slot/>
+    </main>
   </div>
 
   <style>
@@ -292,25 +201,16 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
   </style>
 
   <script>
-    // Intercept all delete forms — show custom modal
     let pendingForm: HTMLFormElement | null = null;
-    document.addEventListener('submit', function(e) {
-      const form = e.target as HTMLFormElement;
-      if (form.method.toLowerCase() === 'post' && form.action.includes('/delete')) {
-        e.preventDefault();
-        pendingForm = form;
-        document.getElementById('delete-modal')!.style.display = 'flex';
-      }
+    const deleteDialog=document.querySelector<HTMLDialogElement>('#delete-modal')!;
+    document.addEventListener('submit',event=>{
+      const form=event.target;
+      if(!(form instanceof HTMLFormElement)||form.method.toLowerCase()!=='post'||!form.action.includes('/delete'))return;
+      event.preventDefault();pendingForm=form;deleteDialog.returnValue='cancel';deleteDialog.showModal();
     });
-    document.getElementById('delete-confirm-btn')!.addEventListener('click', function() {
-      if (pendingForm) {
-        document.getElementById('delete-modal')!.style.display = 'none';
-        pendingForm.submit();
-      }
-    });
-    // Auto-hide flash message
-    const flash = document.getElementById('flash-msg');
-    if (flash) setTimeout(() => flash.remove(), 3000);
+    deleteDialog.addEventListener('close',()=>{if(deleteDialog.returnValue==='confirm')pendingForm?.submit();pendingForm=null});
+    const flash=document.getElementById('flash-msg');
+    if(flash)setTimeout(()=>flash.remove(),5000);
 
     // Mobile drawer sidebar
     const sidebar = document.getElementById('sidebar');
@@ -320,9 +220,20 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
       sidebar?.classList.toggle('open', open);
       overlay?.classList.toggle('open', open);
       menuBtn?.setAttribute('aria-expanded', String(open));
+      if(window.matchMedia('(max-width:768px)').matches){
+        if(sidebar)sidebar.inert=!open;
+        document.querySelector<HTMLElement>('.main-content')!.inert=open;
+        document.body.style.overflow=open?'hidden':'';
+        if(open)sidebar?.querySelector<HTMLAnchorElement>('a')?.focus();else menuBtn?.focus();
+      }
     }
     menuBtn?.addEventListener('click', () => setDrawer(!sidebar?.classList.contains('open')));
     overlay?.addEventListener('click', () => setDrawer(false));
+    const mobile=window.matchMedia('(max-width:768px)');
+    const resetDrawer=()=>{setDrawer(false);if(sidebar)sidebar.inert=mobile.matches;document.querySelector<HTMLElement>('.main-content')!.inert=false;document.body.style.overflow=''};
+    mobile.addEventListener('change',resetDrawer);resetDrawer();
+    sidebar?.addEventListener('keydown',event=>{if(event.key!=='Tab'||!mobile.matches)return;const items=[...sidebar.querySelectorAll<HTMLElement>('a,button')].filter(el=>!el.closest('[inert]'));const first=items[0],last=items.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus()}});
+
     sidebar?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setDrawer(false)));
 
     // Accordion groups: multi-open, active group forced open, rest from localStorage.
@@ -337,6 +248,7 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
       const isActive = group.dataset.active === 'true';
       const apply = (open: boolean) => {
         panel.dataset.open = String(open);
+        panel.inert=!open;
         toggle.setAttribute('aria-expanded', String(open));
       };
       // Active group always opens; others restore their saved state.
@@ -351,19 +263,17 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
 
     // Logout confirmation modal (lives at body level, opened from the sidebar link)
     const logoutLink = document.getElementById('logout-link');
-    const logoutModal = document.getElementById('logout-modal');
+    const logoutModal = document.querySelector<HTMLDialogElement>('#logout-modal');
     logoutLink?.addEventListener('click', e => {
       e.preventDefault();
       setDrawer(false);
-      if (logoutModal) logoutModal.style.display = 'flex';
+      if(logoutModal){logoutModal.returnValue='cancel';logoutModal.showModal()}
     });
-    logoutModal?.addEventListener('click', e => {
-      if (e.target === logoutModal) logoutModal.style.display = 'none';
-    });
+    logoutModal?.addEventListener('close',()=>{if(logoutModal.returnValue==='confirm')location.assign('/admin/logout')});
     document.addEventListener('keydown', e => {
       if (e.key !== 'Escape') return;
       setDrawer(false);
-      if (logoutModal) logoutModal.style.display = 'none';
+      logoutModal?.close('cancel');
     });
 
     // Accessible-name backfill: label icon-only buttons/links that ship no text.

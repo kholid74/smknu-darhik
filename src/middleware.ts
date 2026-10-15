@@ -49,6 +49,7 @@ function apiCapability(path: string, method: string): string | undefined {
   const exactOrPrefix = Object.entries(API_CAP).find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1];
   if (exactOrPrefix) return exactOrPrefix;
   if (path.startsWith('/api/admin/e-voting/')) {
+    if (/\/test-cleanup\/?$/.test(path)) return 'evoting.hapus-uji';
     if (method === 'GET' && /\/participation\/voters\/?$/.test(path)) return 'evoting.partisipasi';
     if (method === 'GET' && /\/participation\/?$/.test(path)) return 'evoting.partisipasi';
     if (method === 'POST' && /\/voters\/?$/.test(path)) return 'evoting.pemilih';

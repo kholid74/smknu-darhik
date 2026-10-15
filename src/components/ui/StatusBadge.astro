@@ -1,0 +1,5 @@
+---
+interface Props { label:string; tone?:'success'|'warning'|'danger'|'info'|'neutral' }
+const {label,tone='neutral'}=Astro.props;
+---
+<span class="status-badge" data-tone={tone}>{label}</span>

@@ -1,0 +1,5 @@
+---
+interface Props { label?:string }
+const {label='Aksi baris'}=Astro.props;
+---
+<details class="row-actions"><summary aria-label={label}>•••</summary><div><slot/></div></details>

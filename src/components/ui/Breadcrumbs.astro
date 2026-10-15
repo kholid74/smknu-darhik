@@ -1,0 +1,5 @@
+---
+interface Props { items: Array<{label:string;href?:string}> }
+const {items}=Astro.props;
+---
+<nav aria-label="Jejak navigasi"><ol class="breadcrumbs">{items.map((item,index)=><li>{item.href ? <a href={item.href}>{item.label}</a> : <span aria-current={index===items.length-1 ? 'page' : undefined}>{item.label}</span>}</li>)}</ol></nav>

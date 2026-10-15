@@ -2,7 +2,7 @@ export class PeriodError extends Error {
   constructor(public code: string) { super(code); }
 }
 
-export type PeriodInput = { slug: string; name: string; academicYear: string; opensAt: Date; closesAt: Date };
+export type PeriodInput = { slug: string; name: string; academicYear: string; opensAt: Date; closesAt: Date; isTest: boolean };
 export type PeriodConfig = { name: string; academicYear: string; opensAt: Date; closesAt: Date };
 export type PeriodExtensionInput = { adminPassword: string; reasonCode: string };
 
@@ -39,7 +39,8 @@ export function validateExpectedPeriodConfig(value: unknown): PeriodConfig {
 export function validatePeriodInput(value: unknown): PeriodInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PeriodError('INVALID_INPUT');
   const v = value as Record<string, unknown>;
-  if (Object.keys(v).some((key) => !['slug', 'name', 'academicYear', 'opensAt', 'closesAt'].includes(key)) ||
+  if (Object.keys(v).some((key) => !['slug', 'name', 'academicYear', 'opensAt', 'closesAt', 'isTest'].includes(key)) ||
+      (v.isTest !== undefined && typeof v.isTest !== 'boolean') ||
       typeof v.slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v.slug) || v.slug.length > 64 ||
       typeof v.name !== 'string' || !v.name.trim() || v.name.trim().length > 120 ||
       typeof v.academicYear !== 'string' || !v.academicYear.trim() || v.academicYear.trim().length > 20 ||
@@ -47,5 +48,5 @@ export function validatePeriodInput(value: unknown): PeriodInput {
   const opensAt = new Date(v.opensAt);
   const closesAt = new Date(v.closesAt);
   if (!Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) throw new PeriodError('INVALID_SCHEDULE');
-  return { slug: v.slug, name: v.name.trim(), academicYear: v.academicYear.trim(), opensAt, closesAt };
+  return { slug: v.slug, name: v.name.trim(), academicYear: v.academicYear.trim(), opensAt, closesAt, isTest: v.isTest === true };
 }

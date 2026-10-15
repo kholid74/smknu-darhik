@@ -1,3 +1,4 @@
+import { electionSetup } from './setup-readiness';
 import { VotingOrganization } from '@prisma/client';
 import { createHmac } from 'node:crypto';
 import { db } from '../prisma';
@@ -7,7 +8,7 @@ import { PeriodError, type PeriodConfig, type PeriodInput } from './period-input
 
 export async function listPeriods() {
   return db.electionPeriod.findMany({
-    select: { id: true, slug: true, name: true, academicYear: true, state: true, opensAt: true, closesAt: true, createdAt: true },
+    select: { id: true, slug: true, name: true, academicYear: true, isTest: true, state: true, opensAt: true, closesAt: true, createdAt: true },
     orderBy: [{ opensAt: 'desc' }, { id: 'desc' }],
   });
 }
@@ -22,7 +23,7 @@ export async function createPeriod(input: PeriodInput, actorAccountId: string) {
     } });
     await tx.votingAuditEvent.create({ data: {
       periodId: period.id, actorAccountId, event: 'PERIOD_CREATED', targetId: period.id,
-      detail: { slug: period.slug, organizations: Object.values(VotingOrganization) },
+      detail: { slug: period.slug, isTest: period.isTest, organizations: Object.values(VotingOrganization) },
     } });
     return period;
   });
@@ -31,8 +32,21 @@ export async function createPeriod(input: PeriodInput, actorAccountId: string) {
 export async function getPeriod(periodId: string) {
   return db.electionPeriod.findUnique({
     where: { id: periodId },
-    select: { id: true, slug: true, name: true, academicYear: true, state: true, opensAt: true, closesAt: true, extensionUsedAt: true, closedAt: true, publishedAt: true,
+    select: { id: true, slug: true, name: true, academicYear: true, isTest: true, state: true, opensAt: true, closesAt: true, extensionUsedAt: true, closedAt: true, publishedAt: true,
       contests: { select: { organization: true, _count: { select: { candidates: true } } }, orderBy: { organization: 'asc' } } },
+  });
+}
+
+export async function getPeriodSetup(periodId:string){
+  return db.$transaction(async tx=>{
+    const period=await tx.electionPeriod.findUnique({where:{id:periodId},select:{
+      opensAt:true,closesAt:true,
+      contests:{select:{organization:true,candidates:{select:{members:{select:{position:true,studentId:true}}}}}},
+      voters:{select:{credentialEnabled:true,pinHash:true,pinFingerprint:true,participation:{select:{organization:true}}}},
+    }});
+    if(!period)return null;
+    const [{now}]=await tx.$queryRaw<[{now:Date}]>`SELECT clock_timestamp() AS "now"`;
+    return electionSetup(period,now);
   });
 }
 
@@ -71,17 +85,7 @@ export async function schedulePeriod(periodId: string, actorAccountId: string) {
     const [{ now }] = await tx.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
     if (period.opensAt <= now || period.closesAt <= period.opensAt) throw new PeriodError('INVALID_SCHEDULE');
     const organizations = Object.values(VotingOrganization);
-    const readyContests = period.contests.length === organizations.length && organizations.every((organization) => {
-      const contest = period.contests.find((item) => item.organization === organization);
-      return !!contest?.candidates.length && contest.candidates.every((candidate) =>
-        candidate.members.length === 2 && candidate.members.some((member) => member.position === 'CHAIR') &&
-        candidate.members.some((member) => member.position === 'VICE_CHAIR') &&
-        candidate.members[0].studentId !== candidate.members[1].studentId);
-    });
-    const readyVoters = period.voters.length > 0 && period.voters.length <= 99 && period.voters.every((voter) =>
-      voter.credentialEnabled && !!voter.pinHash && !!voter.pinFingerprint && voter.participation.length === organizations.length &&
-      organizations.every((organization) => voter.participation.some((item) => item.organization === organization)));
-    if (!readyContests || !readyVoters) throw new PeriodError('NOT_READY');
+    if (!electionSetup(period,now).ready) throw new PeriodError('NOT_READY');
     const otherScheduled = await tx.electionPeriod.findFirst({ where: { id: { not: periodId }, state: 'SCHEDULED' }, select: { id: true } });
     if (otherScheduled) throw new PeriodError('ANOTHER_SCHEDULED_PERIOD');
     await tx.electionPeriod.update({ where: { id: periodId }, data: { state: 'SCHEDULED' } });

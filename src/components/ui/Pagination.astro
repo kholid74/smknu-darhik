@@ -1,0 +1,6 @@
+---
+interface Props { page:number; pageCount:number; total:number; size:number; url:URL }
+const {page,pageCount,total,size,url}=Astro.props;
+const link=(target:number)=>{const query=new URLSearchParams(url.search);query.set('page',String(target));return '?'+query.toString()};
+---
+<nav class="pagination" aria-label="Pagination"><span>{total ? (page-1)*size+1 : 0}–{Math.min(page*size,total)} dari {total} data</span><div class="table-footer-actions">{page>1 ? <a class="btn btn-outline" href={link(page-1)}>Sebelumnya</a> : <button class="btn btn-outline" disabled>Sebelumnya</button>}<span>Halaman {page} / {pageCount}</span>{page<pageCount ? <a class="btn btn-outline" href={link(page+1)}>Berikutnya</a> : <button class="btn btn-outline" disabled>Berikutnya</button>}</div></nav>

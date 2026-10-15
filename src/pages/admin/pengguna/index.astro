@@ -1,5 +1,7 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import SortTh from '../../../components/SortTh.astro';
 import { tableSort } from '../../../lib/tablesort';
@@ -26,6 +28,7 @@ const saved = url.searchParams.get('saved');
 ---
 
 <AdminLayout title="Pengguna" user={{ role: session.role }}>
+  <PageHeader title="Pengguna"/>
   {saved && <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">Perubahan tersimpan.</div>}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <form method="GET" style="display:flex;gap:8px">
@@ -36,7 +39,7 @@ const saved = url.searchParams.get('saved');
   </div>
 
   <div class="card" style="padding:0">
-    <table>
+    <DataTable id="table-pengguna" label="Pengguna" filterColumn={-1} filterLabel="Filter"><table>
       <thead>
         <tr>
           <SortTh label="Email" href={s.sortLink('email')} active={s.sort === 'email'} icon={s.sortIcon('email')} width="30%" />
@@ -72,7 +75,7 @@ const saved = url.searchParams.get('saved');
               <div style="display:flex;gap:4px">
                 <a href={`/admin/pengguna/${a.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
                 {!(primaryRole(a.roles.map((r: any) => r.role)) === 'superadmin') && (
-                  <form method="POST" action="/admin/pengguna/delete" style="display:inline" onsubmit="return confirm('Hapus akun ini?')">
+                  <form method="POST" action="/admin/pengguna/delete" style="display:inline">
                     <input type="hidden" name="id" value={a.id}/>
                     <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button>
                   </form>
@@ -82,7 +85,7 @@ const saved = url.searchParams.get('saved');
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></DataTable>
   </div>
   <p style="font-size:12px;color:#6f7a6e;margin-top:8px">Akun dengan peran superadmin tidak bisa dihapus dari sini.</p>
 </AdminLayout>

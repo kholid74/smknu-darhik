@@ -1,5 +1,9 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import Pagination from '../../../components/ui/Pagination.astro';
+import {pageOptions} from '../../../lib/ui/table-state';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import SortTh from '../../../components/SortTh.astro';
 import { tableSort } from '../../../lib/tablesort';
@@ -14,8 +18,7 @@ if (!session) return Astro.redirect('/admin/login');
 const url = new URL(Astro.request.url);
 const search = url.searchParams.get('q') || '';
 const filter = url.searchParams.get('filter') || '';
-const page = parseInt(url.searchParams.get('page') || '1');
-const limit = 15;
+const {page,size:limit}=pageOptions(url.searchParams);
 
 const where: any = {};
 if (search) where.title = { contains: search };
@@ -28,7 +31,8 @@ const [articles, total] = await Promise.all([
   db.article.count({ where }),
 ]);
 
-const totalPages = Math.ceil(total / limit);
+const totalPages = Math.max(1,Math.ceil(total / limit));
+if(page>totalPages){url.searchParams.set('page',String(totalPages));return Astro.redirect(url.pathname+url.search)}
 
 // Antrean usulan guru menunggu tinjauan (pending). Ditampilkan di atas daftar.
 const pending = await db.article.findMany({
@@ -48,6 +52,7 @@ const catBadge: Record<string, string> = {
 ---
 
 <AdminLayout title="Artikel" user={{ role: session.role }}>
+  <PageHeader title="Artikel"/>
   {reviewedNotice && (
     <div style="background:#f0f7f1;border:1px solid #cfe6d4;color:#1B7A3D;font-size:13px;border-radius:10px;padding:10px 14px;margin-bottom:16px">
       {reviewedNotice === 'approved' ? 'Usulan disetujui dan ditayangkan.' : 'Usulan ditolak. Pengusul dapat merevisi.'}
@@ -85,24 +90,24 @@ const catBadge: Record<string, string> = {
     </div>
   )}
 
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-    <div style="display:flex;gap:10px;align-items:center">
-      <form method="GET" style="display:flex;gap:8px">
-        <input type="text" name="q" value={search} placeholder="Cari judul..." style="width:240px"/>
-        <select name="filter" style="width:150px" onchange="this.form.submit()">
+  <div class="list-toolbar">
+      <form method="GET" class="table-toolbar">
+        <label>Cari artikel<input type="search" name="q" value={search} placeholder="Cari judul..."/></label>
+        <label>Per halaman<select name="size">{[10,25,50].map(size=><option value={size} selected={size===limit}>{size}</option>)}</select></label>
+        <input type="hidden" name="sort" value={url.searchParams.get('sort')??''}/><input type="hidden" name="dir" value={url.searchParams.get('dir')??''}/>
+        <label>Kategori<select name="filter" onchange="this.form.submit()">
           <option value="">Semua Kategori</option>
           {['Prestasi','Keagamaan','Akademik','Ekstrakurikuler','PPDB'].map(c => (
             <option value={c} selected={filter === c}>{c}</option>
           ))}
-        </select>
-        <button type="submit" class="btn btn-outline" style="padding:10px 14px">Cari</button>
+        </select></label>
+        <button type="submit" class="btn btn-outline">Cari</button>
       </form>
-    </div>
     <a href="/admin/artikel/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tulis Artikel</a>
   </div>
 
   <div class="card" style="padding:0">
-    <table>
+    <DataTable id="server-artikel" label="artikel" mode="server"><table>
       <thead>
         <tr>
           <SortTh label="Judul" href={s.sortLink('judul')} active={s.sort === 'judul'} icon={s.sortIcon('judul')} width="45%" />
@@ -139,24 +144,16 @@ const catBadge: Record<string, string> = {
           </tr>
         ))}
       </tbody>
-    </table>
+    </table></DataTable>
   </div>
 
-  {totalPages > 1 && (
-    <div style="display:flex;justify-content:center;gap:6px;margin-top:20px">
-      {Array.from({length: totalPages}, (_, i) => i + 1).map(p => (
-        <a href={s.mkQs({ page: p })} class={`btn ${p === page ? 'btn-primary' : 'btn-outline'}`} style="padding:8px 14px;font-size:13px">{p}</a>
-      ))}
-    </div>
-  )}
+  <Pagination page={page} pageCount={totalPages} total={total} size={limit} url={url}/>
 
   <p style="font-size:12px;color:#6f7a6e;margin-top:12px">Total: {total} artikel</p>
 
   <!-- Modal tolak usulan (isi catatan alasan) -->
-  <div id="reject-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:16px">
-    <div style="background:white;border-radius:14px;padding:22px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-      <h3 style="font-size:16px;font-weight:800;margin:0 0 4px">Tolak usulan</h3>
-      <p id="reject-title" style="font-size:13px;color:var(--color-muted);margin:0 0 14px"></p>
+  <dialog id="reject-modal" class="ui-dialog" aria-labelledby="reject-title">
+      <h2>Tolak usulan</h2><p id="reject-title"></p>
       <form method="POST" action="/admin/artikel/review">
         <input type="hidden" name="id" id="reject-id"/>
         <input type="hidden" name="action" value="reject"/>
@@ -167,19 +164,18 @@ const catBadge: Record<string, string> = {
           <button type="submit" class="btn btn-primary" style="background:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">close</span> Tolak</button>
         </div>
       </form>
-    </div>
-  </div>
+  </dialog>
 
   <script>
-    const modal = document.getElementById('reject-modal')!;
+    const modal = document.querySelector<HTMLDialogElement>('#reject-modal')!;
     document.querySelectorAll<HTMLButtonElement>('.reject-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         (document.getElementById('reject-id') as HTMLInputElement).value = btn.dataset.id || '';
         document.getElementById('reject-title')!.textContent = btn.dataset.title || '';
-        modal.style.display = 'flex';
+        modal.showModal();
       });
     });
-    document.getElementById('reject-cancel')!.addEventListener('click', () => { modal.style.display = 'none'; });
-    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    document.getElementById('reject-cancel')!.addEventListener('click', () => { modal.close(); });
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.close(); });
   </script>
 </AdminLayout>

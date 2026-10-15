@@ -1,5 +1,7 @@
 ---
 export const prerender = false;
+import DataTable from '../../../components/ui/DataTable.astro';
+import PageHeader from '../../../components/ui/PageHeader.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import SortTh from '../../../components/SortTh.astro';
 import { tableSort } from '../../../lib/tablesort';
@@ -15,14 +17,13 @@ const items = await db.extracurricular.findMany({ orderBy: s.orderBy });
 ---
 
 <AdminLayout title="Ekstrakurikuler" user={{ role: session.role }}>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-    <h2 style="font-size:18px;font-weight:800">Ekstrakurikuler</h2>
+  <PageHeader title="Ekstrakurikuler"><Fragment slot="actions">
     <a href="/admin/ekskul/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah</a>
-  </div>
-  <div class="card" style="padding:0"><table><thead><tr><SortTh label="Nama" href={s.sortLink('nama')} active={s.sort==='nama'} icon={s.sortIcon('nama')} /><th>Deskripsi</th><th style="width:80px"></th></tr></thead>
+  </Fragment></PageHeader>
+  <div class="card" style="padding:0"><DataTable id="table-ekskul" label="Ekstrakurikuler" filterColumn={-1} filterLabel="Filter"><table><thead><tr><SortTh label="Nama" href={s.sortLink('nama')} active={s.sort==='nama'} icon={s.sortIcon('nama')} /><th>Deskripsi</th><th style="width:80px"></th></tr></thead>
     <tbody>{items.length===0?(<tr><td colspan="3" style="text-align:center;padding:40px;color:#6f7a6e">Belum ada ekskul.</td></tr>):items.map((p:any)=>(
       <tr><td style="font-weight:600">{p.name}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{p.description||'-'}</td><td><div style="display:flex;gap:4px">
         <a href={`/admin/ekskul/${p.id}`} class="btn btn-outline" style="padding:6px 10px;font-size:11px"><span class="material-symbols-outlined" style="font-size:16px">edit</span></a>
         <form method="POST" action="/admin/ekskul/delete"><input type="hidden" name="id" value={p.id}/><button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:11px;color:#dc2626"><span class="material-symbols-outlined" style="font-size:16px">delete</span></button></form>
-      </div></td></tr>))}</tbody></table></div>
+      </div></td></tr>))}</tbody></table></DataTable></div>
 </AdminLayout>

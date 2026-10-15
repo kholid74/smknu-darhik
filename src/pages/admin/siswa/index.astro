@@ -1,15 +1,21 @@
 ---
 export const prerender = false;
+import PageHeader from '../../../components/ui/PageHeader.astro';
+import DataTable from '../../../components/ui/DataTable.astro';
+import Pagination from '../../../components/ui/Pagination.astro';
+import SortTh from '../../../components/SortTh.astro';
+import { tableSort } from '../../../lib/tablesort';
+import { studentTableOptions } from '../../../lib/ui/student-table-options';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { listSchoolClasses, listStudentsPage } from '../../../lib/students';
 
 const q = Astro.url.searchParams.get('q') ?? '';
-const requestedPage = Number(Astro.url.searchParams.get('page') ?? '1');
-const pageSize = 10;
-const pageNumber = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-const [studentPage, classes] = await Promise.all([listStudentsPage(q, pageNumber, pageSize), listSchoolClasses()]);
+const tableOptions=studentTableOptions(Astro.url.searchParams);
+const pageSize=tableOptions.size;
+const pageNumber=tableOptions.page;
+const sorting=tableSort(Astro.url,{name:'name',nisn:'nisn',className:'className'},[{name:'asc'}]);
+const [studentPage, classes] = await Promise.all([listStudentsPage(q, pageNumber, pageSize, tableOptions), listSchoolClasses()]);
 const { data: students, total, page, pageCount } = studentPage;
-const pageUrl = (target: number) => `?${new URLSearchParams({ ...(q ? { q } : {}), page: String(target) })}`;
 const firstVisible = total ? (page - 1) * pageSize + 1 : 0;
 const lastVisible = Math.min(page * pageSize, total);
 Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
@@ -17,10 +23,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 ---
 
 <AdminLayout title="Data Siswa" user={{ role: Astro.locals.session?.role ?? '' }}>
-  <div class="student-header">
-    <div><h2 style="font-size:20px;font-weight:800">Master Siswa</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">Data identitas permanen. PIN pemilihan dikelola terpisah per periode.</p></div>
-    <button class="btn btn-primary" id="student-add" type="button"><span class="material-symbols-outlined">person_add</span>Tambah siswa</button>
-  </div>
+  <PageHeader title="Master Siswa" description="Kelola identitas siswa, kelas, dan impor dari satu tempat. PIN pemilihan dikelola per periode."><button slot="actions" class="btn btn-primary" id="student-add" type="button"><span class="material-symbols-outlined">person_add</span>Tambah siswa</button></PageHeader>
   <p id="student-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
   <section class="card student-card" id="student-card" hidden>
     <h3 id="student-form-title" style="font-size:16px;font-weight:800">Tambah siswa</h3>
@@ -46,19 +49,19 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
       <div class="import-table"><table><thead><tr><th>Baris</th><th>NISN</th><th>Nama</th><th>Tahun ajaran</th><th>Kelas</th><th>Jurusan</th><th>Validasi</th></tr></thead><tbody id="import-preview-rows"></tbody></table></div>
     </section>
   </section>
-  <form method="GET" class="student-search"><label class="sr-only" for="student-q">Cari siswa</label><input id="student-q" name="q" value={q} placeholder="Cari nama, NISN, atau kelas"/><button class="btn btn-outline">Cari</button></form>
+  <form method="GET" class="table-toolbar">
+    <label for="student-q">Cari siswa<input id="student-q" name="q" value={q} placeholder="Nama, NISN, atau kelas"/></label>
+    <label for="student-size">Per halaman<select id="student-size" name="size">{[10,25,50].map(size=><option value={size} selected={size===pageSize}>{size}</option>)}</select></label>
+    <input type="hidden" name="sort" value={tableOptions.sort}/><input type="hidden" name="dir" value={tableOptions.dir}/><button class="btn btn-primary">Terapkan</button>
+  </form>
   <p class="student-count">Menampilkan {firstVisible}–{lastVisible} dari {total} siswa</p>
-  <div class="card student-table"><table><thead><tr><th>NISN</th><th>Nama</th><th>Tahun ajaran</th><th>Kelas</th><th>Jurusan</th><th style="width:80px"></th></tr></thead><tbody>
+  <DataTable id="students" label="Master siswa" mode="server"><table><thead><tr><SortTh label="NISN" href={sorting.sortLink('nisn')} active={sorting.sort==='nisn'} icon={sorting.sortIcon('nisn')}/><SortTh label="Nama" href={sorting.sortLink('name')} active={sorting.sort==='name'} icon={sorting.sortIcon('name')}/><th>Tahun ajaran</th><SortTh label="Kelas" href={sorting.sortLink('className')} active={sorting.sort==='className'} icon={sorting.sortIcon('className')}/><th>Jurusan</th><th style="width:80px"></th></tr></thead><tbody>
     {students.length === 0 ? <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--color-muted)">Belum ada data siswa.</td></tr> : students.map((student) => <tr>
       <td>{student.nisn}</td><td style="font-weight:600">{student.name}</td><td>{student.schoolClass?.academicYear ?? '—'}</td><td>{student.className}</td><td>{student.schoolClass?.department.name ?? 'Belum ditautkan'}</td>
       <td><button type="button" class="btn btn-outline edit-student" data-student={JSON.stringify({ id: student.id, nisn: student.nisn, name: student.name, className: student.className, schoolClassId: student.schoolClassId })} aria-label={`Edit ${student.name}`}>Edit</button></td>
     </tr>)}
-  </tbody></table></div>
-  {pageCount > 1 && <nav class="student-pagination" aria-label="Halaman siswa">
-    {page > 1 ? <a class="btn btn-outline" href={pageUrl(page - 1)} aria-label="Halaman sebelumnya">Sebelumnya</a> : <span class="btn btn-outline" aria-disabled="true">Sebelumnya</span>}
-    <span class="page-indicator">Halaman {page} dari {pageCount}</span>
-    {page < pageCount ? <a class="btn btn-outline" href={pageUrl(page + 1)} aria-label="Halaman berikutnya">Berikutnya</a> : <span class="btn btn-outline" aria-disabled="true">Berikutnya</span>}
-  </nav>}
+  </tbody></table></DataTable>
+  <Pagination page={page} pageCount={pageCount} total={total} size={pageSize} url={Astro.url}/>
 </AdminLayout>
 
 <style>
@@ -95,6 +98,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 </style>
 
 <script>
+  import { confirmAction } from '../../../lib/ui/confirm';
   const form = document.querySelector<HTMLFormElement>('#student-form')!;
   const message = document.querySelector<HTMLElement>('#student-message')!;
   const title = document.querySelector<HTMLElement>('#student-form-title')!;
@@ -185,7 +189,7 @@ Astro.response.headers.set('Referrer-Policy', 'no-referrer');
     } catch { showImportMessage('Koneksi terputus. Periksa koneksi lalu coba lagi.'); }
   });
   importConfirm.addEventListener('click', async () => {
-    if (!importCount || !window.confirm(`Impor ${importCount} siswa ke master siswa?`)) return;
+    if (!importCount || !await confirmAction(`Impor ${importCount} siswa ke master siswa?`)) return;
     importConfirm.disabled = true;
     try {
       const response = await fetch('/api/admin/students/import/commit', {

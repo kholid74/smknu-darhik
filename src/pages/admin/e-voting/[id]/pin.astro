@@ -1,5 +1,6 @@
 ---
 export const prerender = false;
+import DataTable from '../../../../components/ui/DataTable.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { db } from '../../../../lib/prisma';
 import { listVoters } from '../../../../lib/voting/voters';
@@ -29,12 +30,13 @@ const canIssue = (['DRAFT', 'SCHEDULED'].includes(period.state) && Date.now() < 
         <label class="pin-field">Kata sandi admin<input name="adminPassword" type="password" autocomplete="current-password" required disabled={!editable}/></label>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:13px">Pilih pemilih</strong><span id="pin-selected-count" style="font-size:12px;color:var(--color-muted)">0/25 dipilih</span></div>
-      <div class="card" style="padding:0;overflow:auto"><table><thead><tr><th><input id="pin-select-all" type="checkbox" aria-label="Pilih maksimal 25 pemilih yang memenuhi mode aktif" disabled={!editable}/></th><th>NISN</th><th>Nama</th><th>Kelas</th><th>Kredensial</th></tr></thead><tbody>
+      <p style="font-size:12px;color:var(--color-muted);margin-bottom:10px">Pilihan tetap tersimpan saat berganti halaman atau filter. Pilih semua mencakup maksimal 25 pemilih pada seluruh daftar yang memenuhi aksi.</p>
+      <div class="card" style="padding:0;overflow:auto"><DataTable id="table-e-voting" label="PIN pemilih" filterColumn={4} filterLabel="Filter"><table><thead><tr><th><input id="pin-select-all" type="checkbox" aria-label="Pilih maksimal 25 pemilih yang memenuhi mode aktif" disabled={!editable}/></th><th>NISN</th><th>Nama</th><th>Kelas</th><th>Kredensial</th></tr></thead><tbody>
         {voters.length === 0 ? <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--color-muted)">Roster belum diisi.</td></tr> : voters.map((voter) => <tr>
           <td><input class="pin-target" type="checkbox" value={voter.id} data-version={voter.pinVersion} data-issued={voter.pinIssued} data-enabled={voter.credentialEnabled} disabled={!editable} aria-label={`Pilih ${voter.name}`}/></td>
           <td>{voter.nisn}</td><td style="font-weight:600">{voter.name}</td><td>{voter.className}</td><td>{voter.pinIssued && voter.credentialEnabled ? 'PIN aktif' : 'Belum diterbitkan'}</td>
         </tr>)}
-      </tbody></table></div>
+      </tbody></table></DataTable></div>
       <div style="margin-top:14px"><button id="pin-submit" class="btn btn-primary" type="submit" disabled={!editable}>Buat slip PIN</button></div>
     </form>
   </section>

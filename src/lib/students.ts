@@ -87,7 +87,11 @@ export async function listStudents(q: string, cursor: string | null, limit: numb
   });
 }
 
-export async function listStudentsPage(q: string, requestedPage: number, pageSize: number) {
+export async function listStudentsPage(q: string, requestedPage: number, pageSize: number, sort: {sort:'name'|'nisn'|'className';dir:'asc'|'desc'} = {sort:'name',dir:'asc'}) {
+  pageSize = [10,25,50].includes(pageSize) ? pageSize : 10;
+  requestedPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const sortColumn = ['name','nisn','className'].includes(sort.sort) ? sort.sort : 'name';
+  const direction = sort.dir === 'desc' ? 'desc' : 'asc';
   const where = studentWhere(q);
   const total = await db.student.count({ where });
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
@@ -95,7 +99,7 @@ export async function listStudentsPage(q: string, requestedPage: number, pageSiz
   const data = await db.student.findMany({
     where, skip: (page - 1) * pageSize, take: pageSize,
     include: { schoolClass: { select: { academicYear: true, name: true, department: { select: { name: true } } } } },
-    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    orderBy: [{ [sortColumn]: direction }, { id: 'asc' }],
   });
   return { data, total, page, pageCount };
 }

@@ -21,6 +21,7 @@ catch (error) {
   return Astro.redirect('/siswa');
 }
 const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
+const completed=ORGANIZATIONS.filter(({id})=>data.participation[id]).length;
 const membersOf = (candidate: typeof data.candidates[number]) => ({
   chair: candidate.members.find((member) => member.position === 'CHAIR')!,
   vice: candidate.members.find((member) => member.position === 'VICE_CHAIR')!,
@@ -30,8 +31,9 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
   <a class="back" href={`/siswa/e-voting/${data.period.slug}/pilih`}>← Semua organisasi</a>
   <p class="eyebrow">E-VOTING · {data.period.name}</p>
   <h1>Pemilihan {organization.label}</h1>
+  <div class="voting-progress"><span>{completed} dari 4 organisasi selesai</span><progress aria-label="Kemajuan empat organisasi" value={completed} max="4"></progress></div>
   <p class="intro">Baca visi dan misi, lalu pilih satu pasangan. Pilihan yang dikirim tidak dapat diubah.</p>
-  <form id="vote-form">
+  <form id="vote-form" method="post" data-organization={organization.id} data-slug={data.period.slug}>
     <fieldset>
       <legend class="sr-only">Pilih satu pasangan calon</legend>
       <div class="candidate-grid">
@@ -44,11 +46,11 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
               <div class="pair-head"><span class="number">{candidate.ballotNumber}</span><span class="choose-hint">Pilih pasangan</span></div>
               <div class="members">
                 <div class="member">
-                  {chair.photoUrl && <img src={chair.photoUrl} alt={`Foto ${chair.nameSnapshot}`} loading="lazy" />}
+                  {chair.photoUrl ? <img src={chair.photoUrl} alt={`Foto ${chair.nameSnapshot}`} loading="lazy" /> : <span class="photo-fallback" aria-hidden="true">{chair.nameSnapshot.slice(0,1)}</span>}
                   <div><span class="position">Ketua</span><strong>{chair.nameSnapshot}</strong><small>{chair.classSnapshot}</small></div>
                 </div>
                 <div class="member">
-                  {vice.photoUrl && <img src={vice.photoUrl} alt={`Foto ${vice.nameSnapshot}`} loading="lazy" />}
+                  {vice.photoUrl ? <img src={vice.photoUrl} alt={`Foto ${vice.nameSnapshot}`} loading="lazy" /> : <span class="photo-fallback" aria-hidden="true">{vice.nameSnapshot.slice(0,1)}</span>}
                   <div><span class="position">Wakil Ketua</span><strong>{vice.nameSnapshot}</strong><small>{vice.classSnapshot}</small></div>
                 </div>
               </div>
@@ -58,27 +60,33 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
         })}
       </div>
     </fieldset>
-    <button type="submit" class="review">Tinjau pilihan</button>
+    <button id="review-vote" type="submit" class="review" disabled>Tinjau pilihan</button>
   </form>
   <p id="vote-message" role="status" aria-live="polite"></p>
-  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+  <dialog id="confirm-dialog" class="ui-dialog" aria-labelledby="confirm-title">
     <form method="dialog">
       <h2 id="confirm-title">Konfirmasi pilihan</h2>
       <p>Anda akan memberikan suara untuk:</p>
       <p id="confirm-candidate" class="selected-name"></p>
       <p>Suara yang sudah dikirim tidak dapat diubah.</p>
-      <div class="dialog-actions"><button class="secondary" value="cancel">Periksa lagi</button><button id="confirm-vote" class="review" value="confirm" type="button">Kirim suara</button></div>
+      <div class="dialog-actions"><button class="secondary" value="cancel">Periksa lagi</button><button id="confirm-vote" value="confirm" type="button">Kirim suara</button></div>
     </form>
   </dialog>
   <noscript><p>Pengiriman suara memerlukan JavaScript untuk perlindungan sesi dan konfirmasi.</p></noscript>
 </StudentPortalLayout>
 
-<script define:vars={{ csrfToken, periodId: session.periodId, organizationId: organization.id, slug: data.period.slug }}>
+<script>
   const form = document.getElementById('vote-form');
+  const periodId=document.body.dataset.periodId!;
+  const organizationId=form?.dataset.organization!;
+  const slug=form?.dataset.slug!;
   const dialog = document.getElementById('confirm-dialog');
   const message = document.getElementById('vote-message');
   const confirmName = document.getElementById('confirm-candidate');
   let selectedId = '';
+  let sending=false;
+  dialog?.addEventListener('cancel',event=>{if(sending)event.preventDefault()});
+  form?.addEventListener('change',()=>{form.querySelectorAll<HTMLLabelElement>('.candidate').forEach(card=>{card.querySelector('.choose-hint')!.textContent=card.querySelector<HTMLInputElement>('input')!.checked?'✓ Dipilih':'Pilih pasangan'})});
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!(form instanceof HTMLFormElement) || !form.reportValidity() || !(dialog instanceof HTMLDialogElement)) return;
@@ -92,10 +100,11 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
     const button = document.getElementById('confirm-vote');
     if (!(button instanceof HTMLButtonElement) || !selectedId) return;
     button.disabled = true;
+    sending=true;button.textContent='Mengirim…';
     if (message) message.textContent = 'Mengirim suara…';
     try {
       const response = await fetch(`/api/e-voting/${periodId}/votes`, { method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.body.dataset.csrf ?? '' },
         body: JSON.stringify({ organization: organizationId, candidateId: selectedId }) });
       const payload = await response.json();
       if (!response.ok) {
@@ -119,10 +128,16 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
         : error instanceof Error ? error.message : 'Pengiriman belum dapat dipastikan. Periksa status sebelum mencoba lagi.';
       button.disabled = false;
     }
+    finally {sending=false;button.textContent='Kirim suara'}
   });
+  document.querySelector<HTMLButtonElement>('#review-vote')!.disabled=false;
 </script>
 
 <style>
+  .voting-progress{display:flex;align-items:center;flex-wrap:wrap;gap:14px;margin:16px 0 20px;font-size:13px;font-weight:700;color:var(--color-accent)}
+  .voting-progress progress{width:min(280px,100%);height:9px;accent-color:var(--color-accent)}
+  .photo-fallback{display:grid;place-items:center;width:72px;height:72px;flex-shrink:0;border-radius:14px;background:#e8f4ed;color:var(--color-accent);font-size:26px;font-weight:800}
+  .candidate input:checked+article .choose-hint{font-weight:800;color:var(--color-accent)}
   h1 { margin: 8px 0; font-size: clamp(1.8rem, 3vw, 2.25rem); }
   .back { display: inline-block; margin-bottom: 22px; color: #145c3b; font-weight: 700; }
   .eyebrow { margin: 0 0 8px; color: #27714b; font-size: .74rem; letter-spacing: .1em; font-weight: 800; }
@@ -155,8 +170,7 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
   dialog::backdrop { background: #14231bcc; }
   dialog h2 { margin-top: 0; }
   .selected-name { padding: 12px; border-radius: 8px; background: #f0f5f1; font-weight: 700; }
-  .dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
-  .dialog-actions button { min-height: 44px; padding: 9px 14px; border-radius: 8px; font: inherit; font-weight: 700; cursor: pointer; }
-  .dialog-actions .secondary { border: 1px solid #a8beb0; background: white; color: #145c3b; }
+  .dialog-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .dialog-actions button { flex: 1; min-width: 130px; margin: 0; }
   @media (max-width: 760px) { .candidate-grid { grid-template-columns: 1fr; } }
 </style>

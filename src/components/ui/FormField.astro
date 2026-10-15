@@ -1,0 +1,5 @@
+---
+interface Props { id:string; label:string; hint?:string; error?:string }
+const {id,label,hint,error}=Astro.props;
+---
+<div class="form-field"><label for={id}>{label}</label><slot/>{hint && <small class="field-hint" id={id+'-hint'}>{hint}</small>}{error && <small class="field-error" role="alert" id={id+'-error'}>{error}</small>}</div>

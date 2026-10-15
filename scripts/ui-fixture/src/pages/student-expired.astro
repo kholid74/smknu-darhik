@@ -1,0 +1,5 @@
+---
+import StudentPortalLayout from '../../../../src/layouts/StudentPortalLayout.astro';
+Astro.locals.votingSession={id:'qa-session',scope:'ELECTION_VOTING',voterId:'qa-voter',periodId:'qa-period',createdAt:new Date(0),lastSeenAt:new Date(0),expiresAt:new Date(1)};
+---
+<StudentPortalLayout title="Fixture kedaluwarsa" csrfToken="qa-expired" periodId="qa-period"><h1>Tampilan privat fixture yang harus dibersihkan</h1></StudentPortalLayout>
