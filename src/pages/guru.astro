@@ -3,6 +3,7 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
 import { db } from '../lib/prisma';
+import CmsImage from '../components/ui/CmsImage.astro';
 
 // Append the academic title unless the name already carries it.
 function withTitle(name: string, title: string | null): string {
@@ -55,7 +56,7 @@ const tuList = teachers
         <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow group">
           <div class="h-48 bg-[#f0f7f1] overflow-hidden flex items-center justify-center">
             {g.img ? (
-              <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={g.img} alt={g.name} loading="lazy" onerror="this.style.display='none'" />
+              <CmsImage class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={g.img} sizes="(min-width: 1152px) 258px, (min-width: 1024px) 25vw, (min-width: 640px) 50vw, calc(100vw - 32px)" alt={g.name} onerror="this.style.display='none'" />
             ) : (
               <span class="material-symbols-outlined text-6xl text-[#1B7A3D]/40">person</span>
             )}

@@ -1,4 +1,5 @@
 ---
+import FontHead from '../components/ui/FontHead.astro';
 export interface Props {
   title: string;
   active?: 'beranda' | 'kartu' | 'profil' | 'kontribusi';
@@ -21,9 +22,8 @@ const nav = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
     <title>{title} — Portal Alumni SMKS NU Darul Hikam</title>
-    <link rel="icon" type="image/png" href="/assets/logo.png" />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-v1.png" />
+    <FontHead />
     <style>
       :root { --green: #1B7A3D; --ink: #1c1b1b; --muted: #6f7a6e; }
       * { box-sizing: border-box; margin: 0; }
@@ -46,7 +46,7 @@ const nav = [
   <body>
     <header class="topbar">
       <div class="topbar-in">
-        <img src="/assets/logo.png" alt="Logo" />
+        <img src="/assets/logo-v1.webp" alt="Logo" width="113" height="113" />
         <span class="t">Portal Alumni</span>
         <div class="who">
           <strong>{nama}</strong>{alumniId && <span> · <span style="font-family:monospace">{alumniId}</span></span>}

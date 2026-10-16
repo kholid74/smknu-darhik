@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { db } from '../lib/prisma';
+import CmsImage from '../components/ui/CmsImage.astro';
 
 export const prerender = false;
 
@@ -8,6 +9,7 @@ const articles = await db.article.findMany({
   where: { published: true },
   orderBy: { createdAt: 'desc' },
   take: 12,
+  select: { slug: true, title: true, excerpt: true, category: true, imageUrl: true, createdAt: true },
 });
 
 const catBadge: Record<string, string> = {
@@ -42,7 +44,7 @@ const catBadge: Record<string, string> = {
         <article class="bg-white rounded-2xl border border-black/5 overflow-hidden shadow-[0_2px_8px_rgba(27,122,61,0.04)] hover:shadow-[0_6px_20px_rgba(27,122,61,0.1)] transition-shadow group">
           <a href={`/berita/${a.slug}`} class="block overflow-hidden">
             {a.imageUrl ? (
-              <img class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" src={a.imageUrl} alt={a.title} loading="lazy"/>
+              <CmsImage class="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" src={a.imageUrl} sizes="(min-width: 1152px) 352px, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, calc(100vw - 32px)" alt={a.title}/>
             ) : (
               <div class="w-full h-48 bg-[#e8f5e9] flex items-center justify-center"><span class="material-symbols-outlined text-4xl text-[#1B7A3D]/30">article</span></div>
             )}

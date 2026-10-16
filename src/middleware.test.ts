@@ -48,6 +48,42 @@ async function request(path = '/api/admin/e-voting/10000000-0000-4000-8000-00000
     defaultLocale: 'id', params: {periodId: '10000000-0000-4000-8000-000000000001'}});
 }
 
+test('real middleware caches only anonymous CMS HTML, bypasses preview and preserves timing headers', async () => {
+  for (const path of ['/guru', '/guru?preview=1']) {
+    const context = createContext({request: new Request('http://localhost:4321' + path), params: {}});
+    const response = await onRequest(context, async () => new Response('Public page', {headers: {'Content-Type': 'text/html', 'Server-Timing': 'query;dur=1'}}));
+    assert.equal(response.headers.get('Vercel-CDN-Cache-Control'), path.includes('?') ? 'no-store' : 'public, s-maxage=60, must-revalidate');
+    assert.match(response.headers.get('Server-Timing')!, /query;dur=1/);
+    assert.match(response.headers.get('Server-Timing')!, /app;dur=[\d.]+/);
+    assert.equal(await response.text(), 'Public page');
+  }
+  assert.equal(lookups, 0);
+});
+
+test('pending Astro cookies disable CMS cache before Set-Cookie is serialized', async () => {
+  const context = createContext({request: new Request('http://localhost:4321/guru'), params: {}});
+  const response = await onRequest(context, async () => {
+    context.cookies.set('synthetic', 'test', {path: '/', httpOnly: true});
+    return new Response('Public page', {headers: {'Content-Type': 'text/html'}});
+  });
+  assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+  assert.equal(response.headers.get('Vercel-CDN-Cache-Control'), 'no-store');
+  assert.equal([...context.cookies.headers()].length, 1);
+});
+
+test('early authorization redirects remain private for admin, student, teacher and alumni portals', async () => {
+  for (const path of ['/admin', '/siswa', '/pemilih', '/alumni/portal']) {
+    const context = createContext({request: new Request('http://localhost:4321' + path), params: {}});
+    let called = false;
+    const response = await onRequest(context, async () => {called = true; return new Response('private');});
+    assert.equal(called, false);
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get('Cache-Control'), 'private, no-store');
+    assert.equal(response.headers.get('Vercel-CDN-Cache-Control'), 'no-store');
+    assert.ok(response.headers.get('Location')?.endsWith('/masuk') || response.headers.get('Location')?.endsWith('/login'));
+  }
+});
+
 test('candidate search recovers from one permission DB read failure and still checks current overrides', async () => {
   lookup = async () => {if (lookups === 1) throw Object.assign(new Error(), {clientVersion: '7.9.0'}); return account();};
   const context = await request();

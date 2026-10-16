@@ -4,13 +4,17 @@ import Footer from '../components/Footer.astro';
 import MobileMenu from '../components/MobileMenu.astro';
 import AnnounceBar from '../components/AnnounceBar.astro';
 import WhatsAppFloat from '../components/WhatsAppFloat.astro';
+import FontHead from '../components/ui/FontHead.astro';
+import type { TextAnnouncement } from '../lib/announcements';
 import '../styles/global.css';
 
 export interface Props {
   title: string;
   description?: string;
+  iconNames?: (string | null | undefined)[];
+  announcements?: TextAnnouncement[];
 }
-const { title, description } = Astro.props;
+const { title, description, iconNames, announcements } = Astro.props;
 ---
 
 <!doctype html>
@@ -20,14 +24,11 @@ const { title, description } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} — SMKS NU Darul Hikam Karanggeneng</title>
     {description && <meta name="description" content={description} />}
-    <link rel="icon" type="image/png" href="/assets/logo.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-v1.png" />
+    <FontHead iconNames={iconNames} />
   </head>
   <body class="bg-[#fcf9f8] text-[#1c1b1b] font-sans antialiased">
-    <AnnounceBar />
+    <AnnounceBar announcements={announcements} />
     <Header />
     <MobileMenu />
 

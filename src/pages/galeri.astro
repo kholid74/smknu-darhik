@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { db } from '../lib/prisma';
+import CmsImage from '../components/ui/CmsImage.astro';
 
 export const prerender = false;
 
@@ -50,7 +51,7 @@ const images = album
       {images.map((img: any) => (
         <a href={img.imageUrl} target="_blank" rel="noopener" class="group block rounded-xl overflow-hidden bg-white border border-black/5 shadow-[0_2px_8px_rgba(27,122,61,0.04)] hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow">
           <div class="aspect-square overflow-hidden bg-[#e8f5e9]">
-            <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src={img.imageUrl} alt={img.title || 'Foto'} loading="lazy" onerror="this.style.display='none'"/>
+            <CmsImage class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" src={img.imageUrl} sizes="(min-width: 1152px) 260px, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw" alt={img.title || 'Foto'} onerror="this.style.display='none'"/>
           </div>
           {img.title && (
             <div class="p-3">

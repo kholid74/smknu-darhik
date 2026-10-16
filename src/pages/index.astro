@@ -2,37 +2,51 @@
 export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { db } from '../lib/prisma';
+import { toTextAnnouncements } from '../lib/announcements';
+import ClickToLoadEmbed from '../components/ui/ClickToLoadEmbed.astro';
+import CmsImage from '../components/ui/CmsImage.astro';
 
-// Pengumuman aktif (belum kedaluwarsa). imageUrl terisi -> hero spotlight; kosong -> ribbon teks.
+// Gambar pengumuman menjadi spotlight; teksnya dibagikan ke panel tanpa query/fetch kedua.
 const now = new Date();
-const anns = await db.announcement.findMany({
-  where: { active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-  orderBy: { createdAt: 'desc' },
-});
+const timings: string[] = [];
+async function timed<T>(name: string, read: PromiseLike<T>): Promise<T> {
+  const start = performance.now();
+  try { return await read; }
+  finally { timings.push(`${name};dur=${(performance.now() - start).toFixed(1)}`); }
+}
+const achievementSelect = { id: true, title: true, imageUrl: true, level: true, description: true, student: true, year: true } as const;
+// These reads are independent; only the achievement fill depends on the featured result.
+const [anns, news, featuredAch] = await Promise.all([
+  timed('announcements', db.announcement.findMany({
+    where: { active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, title: true, body: true, imageUrl: true, linkUrl: true, linkLabel: true, expiresAt: true },
+  })),
+  timed('news', db.article.findMany({
+    where: { published: true }, orderBy: { createdAt: 'desc' }, take: 3,
+    select: { slug: true, title: true, excerpt: true, imageUrl: true, createdAt: true },
+  })),
+  timed('achievements', db.achievement.findMany({
+    where: { featured: true }, orderBy: [{ order: 'asc' }, { year: 'desc' }], take: 3, select: achievementSelect,
+  })),
+]);
 const spotlight = anns.find((a) => a.imageUrl);
-// Pengumuman teks (tanpa gambar) ditangani top bar global (AnnounceBar), bukan di sini.
 
 // Berita/kegiatan terbaru
-const news = await db.article.findMany({
-  where: { published: true },
-  orderBy: { createdAt: 'desc' },
-  take: 3,
-});
 const fmtDate = (d: Date) =>
   new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }).format(d);
 const [lead, ...rest] = news;
 
 // Prestasi unggulan: featured dulu, kalau kurang dari 3 dilengkapi dari sisanya
-const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${url}?w=${w}` : url);
-const featuredAch = await db.achievement.findMany({ where: { featured: true }, orderBy: [{ order: 'asc' }, { year: 'desc' }], take: 3 });
 let achievements = featuredAch;
 if (achievements.length < 3) {
-  const fill = await db.achievement.findMany({ where: { id: { notIn: featuredAch.map((a) => a.id) } }, orderBy: [{ order: 'asc' }, { year: 'desc' }], take: 3 - achievements.length });
+  const fill = await timed('achievement_fill', db.achievement.findMany({ where: { id: { notIn: featuredAch.map((a) => a.id) } }, orderBy: [{ order: 'asc' }, { year: 'desc' }], take: 3 - achievements.length, select: achievementSelect }));
   achievements = [...achievements, ...fill];
 }
+Astro.response.headers.set('Server-Timing', timings.join(', '));
 ---
 
-<BaseLayout title="Beranda" description="Sekolah kejuruan berbasis nilai Islam di Karanggeneng Lamongan — terampil, beriman, siap kerja.">
+<BaseLayout title="Beranda" description="Sekolah kejuruan berbasis nilai Islam di Karanggeneng Lamongan — terampil, beriman, siap kerja." announcements={toTextAnnouncements(anns)}>
 
 <!-- ====== HERO — Modern Islamic Vocational ====== -->
 <!-- Arah: ambil energi & palet hijau-NU dari IG, layout bersih, luas, aspiratif -->
@@ -59,7 +73,7 @@ if (achievements.length < 3) {
           <div class="absolute -inset-3 bg-white/[0.06] rounded-3xl -rotate-2"></div>
           {spotlight ? (
             <a href={spotlight.linkUrl || '#'} class="group relative block rounded-2xl overflow-hidden aspect-[4/5] shadow-[0_20px_60px_rgba(0,0,0,0.25)] border-2 border-white/10">
-              <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src={spotlight.imageUrl} alt={spotlight.title} loading="eager"/>
+              <img class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" src={spotlight.imageUrl} alt={spotlight.title} loading="eager" fetchpriority="high"/>
               <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
               <div class="absolute bottom-0 left-0 right-0 p-5">
                 <span class="inline-flex items-center gap-1.5 bg-gold text-white text-[11px] font-bold px-2.5 py-1 rounded-full mb-2">
@@ -76,7 +90,7 @@ if (achievements.length < 3) {
             </a>
           ) : (
             <div class="relative rounded-2xl overflow-hidden aspect-[4/5] shadow-[0_20px_60px_rgba(0,0,0,0.25)] border-2 border-white/10">
-              <img class="w-full h-full object-cover" src="/assets/hero-siswa.png" alt="Siswa SMKS NU Darul Hikam praktik di lab" loading="eager" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,#00602b,#145a2d)'"/>
+              <img class="w-full h-full object-cover" src="/assets/hero-siswa-947-v1.webp" srcset="/assets/hero-siswa-480-v1.webp 480w, /assets/hero-siswa-768-v1.webp 768w, /assets/hero-siswa-947-v1.webp 947w" sizes="(min-width: 1152px) 432px, (min-width: 1024px) calc(41.667vw - 48px), (min-width: 768px) calc(100vw - 48px), calc(100vw - 32px)" width="947" height="1115" alt="Siswa SMKS NU Darul Hikam praktik di lab" loading="eager" fetchpriority="high" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,#00602b,#145a2d)'"/>
               <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gold/80"></div>
             </div>
           )}
@@ -140,7 +154,7 @@ if (achievements.length < 3) {
   <div class="max-w-5xl mx-auto px-4 md:px-6 py-14 md:py-16">
     <div class="grid md:grid-cols-[220px_1fr] gap-8 md:gap-12 items-center">
       <div class="w-40 md:w-full mx-auto md:mx-0 aspect-[4/5] rounded-2xl overflow-hidden bg-green-light border border-black/5 shadow-card">
-        <img class="w-full h-full object-cover" src="/assets/kepala-sekolah.png" alt="Hadi Santoso, S.E.,M.Pd. — Kepala SMKS NU Darul Hikam" loading="lazy" onerror="this.parentElement.style.background='#e8f5e9'"/>
+        <img class="w-full h-full object-cover" src="/assets/kepala-sekolah-440-v1.webp" srcset="/assets/kepala-sekolah-240-v1.webp 240w, /assets/kepala-sekolah-440-v1.webp 440w" sizes="(min-width: 768px) 220px, 160px" width="478" height="561" alt="Hadi Santoso, S.E.,M.Pd. — Kepala SMKS NU Darul Hikam" loading="lazy" onerror="this.parentElement.style.background='#e8f5e9'"/>
       </div>
       <div class="relative min-w-0">
         <span class="material-symbols-outlined text-gold/40 text-6xl absolute -top-8 -left-1 select-none" aria-hidden="true">format_quote</span>
@@ -198,7 +212,7 @@ if (achievements.length < 3) {
         <div class="bg-white/10 backdrop-blur rounded-xl overflow-hidden border border-white/10 flex flex-col">
           <div class="aspect-[4/3] overflow-hidden bg-white/5 relative">
             {a.imageUrl ? (
-              <img class="w-full h-full object-cover" src={thumb(a.imageUrl, 500)} alt={a.title} loading="lazy" onerror="this.style.display='none'"/>
+              <CmsImage class="w-full h-full object-cover" src={a.imageUrl} sizes="(min-width: 1152px) 355px, (min-width: 640px) 33vw, calc(100vw - 32px)" alt={a.title} onerror="this.style.display='none'"/>
             ) : (
               <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-5xl text-gold/50">emoji_events</span></div>
             )}
@@ -230,7 +244,7 @@ if (achievements.length < 3) {
   <div class="grid lg:grid-cols-2 gap-6">
     <a href={`/berita/${lead.slug}`} class="sink block bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline">
       <div class="aspect-[16/9] overflow-hidden bg-green-light">
-        {lead.imageUrl && <img class="w-full h-full object-cover" src={lead.imageUrl} alt={lead.title} loading="lazy" onerror="this.style.display='none'"/>}
+        {lead.imageUrl && <CmsImage class="w-full h-full object-cover" src={lead.imageUrl} sizes="(min-width: 1152px) 540px, (min-width: 1024px) 50vw, calc(100vw - 32px)" alt={lead.title} onerror="this.style.display='none'"/>}
       </div>
       <div class="p-6"><span class="text-xs font-semibold text-gold-deep">{fmtDate(lead.createdAt)}</span><h3 class="font-bold text-lg mt-2 mb-2 text-ink [overflow-wrap:anywhere]">{lead.title}</h3>{lead.excerpt && <p class="text-sm text-muted leading-relaxed line-clamp-3">{lead.excerpt}</p>}</div>
     </a>
@@ -239,7 +253,7 @@ if (achievements.length < 3) {
       {rest.map((a) => (
       <a href={`/berita/${a.slug}`} class="sink flex gap-4 bg-white rounded-2xl border border-black/5 overflow-hidden shadow-card no-underline p-3">
         <div class="w-28 sm:w-36 flex-shrink-0 rounded-xl overflow-hidden aspect-square bg-green-light">
-          {a.imageUrl && <img class="w-full h-full object-cover" src={a.imageUrl} alt={a.title} loading="lazy" onerror="this.style.display='none'"/>}
+          {a.imageUrl && <CmsImage class="w-full h-full object-cover" src={a.imageUrl} widths={[200, 300]} sizes="(min-width: 640px) 144px, 112px" alt={a.title} onerror="this.style.display='none'"/>}
         </div>
         <div class="min-w-0 py-1 pr-2"><span class="text-xs font-semibold text-gold-deep">{fmtDate(a.createdAt)}</span><h3 class="font-bold text-sm sm:text-base mt-1 mb-1 text-ink [overflow-wrap:anywhere]">{a.title}</h3>{a.excerpt && <p class="text-xs sm:text-sm text-muted leading-relaxed line-clamp-2">{a.excerpt}</p>}</div>
       </a>
@@ -262,8 +276,8 @@ if (achievements.length < 3) {
   <div class="relative max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
     <div class="grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
       <!-- Kiri: YouTube Embed -->
-      <div class="rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/10 aspect-video bg-black">
-        <iframe class="w-full h-full" src="https://www.youtube.com/embed/pW8MRWOVfUQ" title="DHTV — SMKS NU Darul Hikam" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+      <div class="rounded-2xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.3)] border border-white/10 bg-black">
+        <ClickToLoadEmbed kind="video" src="https://www.youtube-nocookie.com/embed/pW8MRWOVfUQ" title="DHTV — SMKS NU Darul Hikam" href="https://www.youtube.com/watch?v=pW8MRWOVfUQ" />
       </div>
       <!-- Kanan: Teks -->
       <div>
@@ -288,8 +302,8 @@ if (achievements.length < 3) {
 <!-- LOKASI -->
 <section id="lokasi" class="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-20">
   <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-    <div class="rounded-2xl overflow-hidden border border-black/5 shadow-card h-[300px] md:h-[380px] order-2 lg:order-1">
-      <iframe title="Peta lokasi SMKS NU Darul Hikam" allowfullscreen="" height="100%" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.284752535745!2d112.3370925!3d-6.9834338!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e77eea100a68de7%3A0xa6b58228d3ebab52!2sSMK%20NU%20Darul%20Hikam!5e0!3m2!1sid!2sid!4v1700000000000" style="border:0;" width="100%"></iframe>
+    <div class="rounded-2xl overflow-hidden border border-black/5 shadow-card order-2 lg:order-1">
+      <ClickToLoadEmbed kind="map" title="Peta lokasi SMKS NU Darul Hikam" href={'https://www.google.com/maps/search/?api=1&query=SMK+NU+Darul+Hikam+Karanggeneng'} src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3960.284752535745!2d112.3370925!3d-6.9834338!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e77eea100a68de7%3A0xa6b58228d3ebab52!2sSMK%20NU%20Darul%20Hikam!5e0!3m2!1sid!2sid!4v1700000000000" />
     </div>
     <div class="order-1 lg:order-2">
       <span class="rule-mark mb-5"></span>

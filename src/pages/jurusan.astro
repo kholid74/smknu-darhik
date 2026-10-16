@@ -3,6 +3,7 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site, dummyNote } from '../data/site';
 import { db } from '../lib/prisma';
+import CmsImage from '../components/ui/CmsImage.astro';
 
 // kompetensi/karir are stored as JSON strings in the DB.
 function parseList(raw: string | null | undefined): string[] {
@@ -35,7 +36,7 @@ const jurusan = departments.map((d, i) => ({
 }));
 ---
 
-<BaseLayout title="Program Keahlian" description="Dua program keahlian unggulan SMKS NU Darul Hikam — Perbankan Syariah dan Multimedia.">
+<BaseLayout title="Program Keahlian" description="Dua program keahlian unggulan SMKS NU Darul Hikam — Perbankan Syariah dan Multimedia." iconNames={departments.map(d => d.icon)}>
 
 <!-- PAGE HERO + BREADCRUMB -->
 <section class="relative bg-[#145a2d] overflow-hidden">
@@ -70,9 +71,10 @@ const jurusan = departments.map((d, i) => ({
         <!-- Image -->
         <div class={i % 2 === 1 ? 'lg:col-start-2' : ''}>
           <div class="relative rounded-2xl overflow-hidden shadow-lg">
-            <img
+            <CmsImage
               class="w-full h-72 md:h-96 object-cover"
               src={j.image}
+              sizes="(min-width: 1152px) 524px, (min-width: 1024px) 50vw, calc(100vw - 32px)"
               alt={j.name}
               loading="lazy"
               onerror="this.style.display='none'"

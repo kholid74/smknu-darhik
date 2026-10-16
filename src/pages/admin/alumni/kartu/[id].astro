@@ -1,4 +1,5 @@
 ---
+import FontHead from '../../../../components/ui/FontHead.astro';
 export const prerender = false;
 import { verifyToken } from '../../../../lib/auth';
 import { db } from '../../../../lib/prisma';
@@ -35,8 +36,7 @@ const { svg: cardSvg, filename } = await buildAlumniCard(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kartu {a.alumniId} — {a.nama}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&display=swap" rel="stylesheet" />
+    <FontHead />
     <style>
       * { box-sizing: border-box; margin: 0; }
       body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f1efec; color: #1c1b1b; padding: 24px; }
