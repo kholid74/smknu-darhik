@@ -9,6 +9,7 @@ import EmptyState from '../../../../src/components/ui/EmptyState.astro';
 import LoadingState from '../../../../src/components/ui/LoadingState.astro';
 import RowActions from '../../../../src/components/ui/RowActions.astro';
 import TestPeriodCleanup from '../../../../src/components/voting/TestPeriodCleanup.astro';
+import IconPicker from '../../../../src/components/IconPicker.astro';
 // Synthetic navigation fixture only; it creates no account, cookie or permissions on API requests.
 Astro.locals.principal={roles:['superadmin']};
 const rows=Array.from({length:31},(_,i)=>({id:i+1,name:'Siswa Simulasi '+(i+1),className:i%2?'X LPS':'X DKV'}));
@@ -20,6 +21,7 @@ const rows=Array.from({length:31},(_,i)=>({id:i+1,name:'Siswa Simulasi '+(i+1),c
   <FormSection title="Form contoh" description="Kontrol form dan feedback menggunakan token bersama."><FormField id="qa-name" label="Nama" hint="Hanya contoh sintetis."><input id="qa-name" value="Siswa Simulasi" aria-describedby="qa-name-hint"/></FormField></FormSection>
   <section class="card"><EmptyState title="Belum ada data" description="State kosong menggunakan tindakan yang sesuai konteks."/></section>
   <LoadingState label="Contoh state loading"/>
+  <IconPicker field="qa-icon" value="vacuum" label="Ikon CMS sintetis"/>
   <TestPeriodCleanup periodId="10000000-0000-4000-8000-000000000001" name="Periode Uji Sintetis" slug="periode-uji"/>
 </AdminLayout>
 <script>

@@ -1,0 +1,12 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+import { thumbnailUrl } from '../../lib/image-url';
+import { env } from '../../lib/env';
+
+interface Props extends HTMLAttributes<'img'> { src: string; alt: string; sizes: string; widths?: number[] }
+const { src, alt, sizes, widths = [300, 600, 960], loading = 'lazy', decoding = 'async', ...attrs } = Astro.props;
+const thumb = (width: number) => thumbnailUrl(src, width, Astro.url.origin, env('R2_PUBLIC_URL'));
+const candidates = widths.map(width => ({ src: thumb(width), width }));
+const srcset = candidates.some(candidate => candidate.src !== src) ? candidates.map(candidate => `${candidate.src} ${candidate.width}w`).join(', ') : undefined;
+---
+<img {...attrs} src={srcset ? candidates[Math.floor(candidates.length / 2)].src : src} srcset={srcset} sizes={srcset ? sizes : undefined} alt={alt} loading={loading} decoding={decoding}/>

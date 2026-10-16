@@ -3,8 +3,7 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
 import { db } from '../lib/prisma';
-
-const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${url}?w=${w}` : url);
+import CmsImage from '../components/ui/CmsImage.astro';
 const partners = await db.partner.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }] });
 const typeIcon: Record<string, string> = {
   Industri: 'factory',
@@ -132,7 +131,7 @@ const typeIcon: Record<string, string> = {
               <div class="flex items-center gap-4 bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.04)] p-4 hover:shadow-[0_8px_24px_rgba(27,122,61,0.08)] transition-shadow">
                 {m.logoUrl ? (
                   <div class="w-12 h-12 rounded-lg bg-[#f0f7f1] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    <img class="w-full h-full object-contain" src={thumb(m.logoUrl, 96)} alt={m.name} loading="lazy" onerror="this.style.display='none'"/>
+                    <CmsImage class="w-full h-full object-contain" src={m.logoUrl} widths={[96, 200]} sizes="48px" alt={m.name} onerror="this.style.display='none'"/>
                   </div>
                 ) : (
                   <div class="w-12 h-12 rounded-lg bg-[#f0f7f1] text-[#1B7A3D] flex items-center justify-center flex-shrink-0">

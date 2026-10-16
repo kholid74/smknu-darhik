@@ -1,4 +1,5 @@
-import { defineMiddleware } from 'astro:middleware';
+import { defineMiddleware, sequence } from 'astro:middleware';
+import { applyPageCache } from './lib/page-cache';
 import { verifyToken, getPrincipal } from './lib/auth';
 import { getAlumniSession } from './lib/alumni-auth';
 import { can, type Principal } from './lib/rbac';
@@ -67,7 +68,7 @@ function apiCapability(path: string, method: string): string | undefined {
   return undefined;
 }
 
-export const onRequest = defineMiddleware(async (context, next) => {
+const authorization = defineMiddleware(async (context, next) => {
   const path = context.url.pathname;
 
   // Realm ALUMNI: gerbang portal (sesi terpisah, bukan RBAC internal).
@@ -184,3 +185,14 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.principal = principal;
   return next();
 });
+
+// Run outside authorization so its early redirects/errors also remain private.
+export const onRequest = sequence(defineMiddleware(async (context, next) => {
+  const start = performance.now();
+  const response = await next();
+  const cached = applyPageCache(context.request, response, !context.cookies.headers().next().done);
+  if (cached.headers.get('Content-Type')?.startsWith('text/html')) {
+    cached.headers.append('Server-Timing', `app;dur=${(performance.now() - start).toFixed(1)}`);
+  }
+  return cached;
+}), authorization);

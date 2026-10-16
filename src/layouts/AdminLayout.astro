@@ -4,6 +4,7 @@ import '../styles/admin.css';
 import Breadcrumbs from '../components/ui/Breadcrumbs.astro';
 import ConfirmDialog from '../components/ui/ConfirmDialog.astro';
 import Icon from '../components/ui/Icon.astro';
+import FontHead from '../components/ui/FontHead.astro';
 import { site } from '../data/site';
 import { can } from '../lib/rbac';
 
@@ -108,9 +109,8 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>{title} — Admin {site.shortName}</title>
-  <link rel="icon" type="image/png" href="/assets/logo.png"/>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-v1.png"/>
+  <FontHead symbols="full" />
 
 </head>
 <body>
@@ -119,7 +119,7 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
   <div class="sidebar-overlay" id="sidebar-overlay"></div>
   <aside class="sidebar" id="sidebar">
     <div style="padding:20px 16px;border-bottom:1px solid rgba(255,255,255,0.1);text-align:center">
-      <img src="/assets/logo.png" alt="Logo" style="width:48px;height:48px;margin-bottom:8px"/>
+      <img src="/assets/logo-v1.webp" alt="Logo" width="113" height="113" style="width:48px;height:48px;margin-bottom:8px"/>
       <div style="font-size:15px;font-weight:800">{site.shortName}</div>
       <div style="font-size:11px;color:rgba(255,255,255,0.72)">Admin Panel</div>
     </div>

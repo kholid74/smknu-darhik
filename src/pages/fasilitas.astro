@@ -3,22 +3,20 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
 import { db } from '../lib/prisma';
-
-// Request a resized thumbnail for uploaded images; leave external URLs alone.
-const thumb = (url: string, w: number) => url.startsWith('/api/image/') ? `${url}?w=${w}` : url;
+import CmsImage from '../components/ui/CmsImage.astro';
 
 // Facilities with an image render as full cards (Utama); icon-only ones become
 // the compact support chips (Pendukung). No extra schema field needed.
 const facilities = await db.facility.findMany({ orderBy: [{ order: 'asc' }, { name: 'asc' }] });
 const fasilitasUtama = facilities
   .filter(f => f.imageUrl)
-  .map(f => ({ name: f.name, desc: f.description || '', img: thumb(f.imageUrl!, 600), icon: f.icon || 'apartment' }));
+  .map(f => ({ name: f.name, desc: f.description || '', img: f.imageUrl!, icon: f.icon || 'apartment' }));
 const fasilitasPendukung = facilities
   .filter(f => !f.imageUrl)
   .map(f => ({ icon: f.icon || 'check_circle', name: f.name }));
 ---
 
-<BaseLayout title="Fasilitas" description={`Fasilitas pendukung pembelajaran di ${site.name} — ruang kelas, lab, studio, musholla, dan lainnya.`}>
+<BaseLayout title="Fasilitas" description={`Fasilitas pendukung pembelajaran di ${site.name} — ruang kelas, lab, studio, musholla, dan lainnya.`} iconNames={facilities.map(f => f.icon)}>
 
 <!-- HERO -->
 <section class="relative bg-[#145a2d] overflow-hidden">
@@ -50,7 +48,7 @@ const fasilitasPendukung = facilities
     {fasilitasUtama.map(f => (
       <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden group hover:shadow-[0_8px_24px_rgba(27,122,61,0.12)] transition-shadow">
         <div class="h-44 bg-gray-200 overflow-hidden relative">
-          <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={f.img} alt={f.name} loading="lazy" onerror="this.style.display='none'" />
+          <CmsImage class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={f.img} sizes="(min-width: 1152px) 352px, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, calc(100vw - 32px)" alt={f.name} onerror="this.style.display='none'" />
           <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"></div>
           <div class="absolute top-3 left-3 bg-white/90 backdrop-blur rounded-full p-1.5">
             <span class="material-symbols-outlined text-[#1B7A3D] text-base">{f.icon}</span>

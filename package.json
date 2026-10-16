@@ -11,6 +11,8 @@
     "postinstall": "prisma generate",
     "preview": "astro preview",
     "astro": "astro",
+    "assets:optimize": "node scripts/optimize-static-images.mjs",
+    "assets:fonts": "node scripts/vendor-fonts.mjs",
     "test": "npx tsx --test \"src/**/*.test.ts\"",
     "qa:seed": "tsx scripts/election-simulation.ts seed",
     "qa:reset": "tsx scripts/election-simulation.ts reset",

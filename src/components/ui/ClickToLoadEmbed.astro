@@ -1,0 +1,66 @@
+---
+interface Props {
+  kind: 'video' | 'map';
+  src: string;
+  title: string;
+  href: string;
+}
+const { kind, src, title, href } = Astro.props;
+const source = new URL(src);
+if (source.protocol !== 'https:' || !(kind === 'video'
+  ? ['www.youtube.com', 'www.youtube-nocookie.com'].includes(source.hostname) && source.pathname.startsWith('/embed/')
+  : source.hostname === 'www.google.com' && source.pathname === '/maps/embed')) throw new Error('INVALID_EMBED_SOURCE');
+---
+<div class:list={['embed', `embed-${kind}`]} data-click-embed data-src={src} data-title={title} data-kind={kind}>
+  <div class="embed-stage" data-embed-stage>
+    <button type="button" class="embed-start" data-embed-start disabled aria-label={`${kind === 'video' ? 'Putar video' : 'Tampilkan peta'}: ${title}`}>
+      <img src="/assets/logo-v1.webp" alt="" width="113" height="113" loading="lazy" />
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        {kind === 'video' ? <><circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4z" fill="currentColor" stroke="none"/></> : <><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></>}
+      </svg>
+      <strong>{kind === 'video' ? 'Putar video' : 'Tampilkan peta'}</strong>
+      <span>{title}</span>
+    </button>
+  </div>
+  <a class="embed-fallback" href={href} target="_blank" rel="noopener noreferrer">Buka di {kind === 'video' ? 'YouTube' : 'Google Maps'} ↗</a>
+</div>
+
+<style>
+  .embed { background: #f1f7f3; color: #145c3b; }
+  .embed-stage { position: relative; overflow: hidden; }
+  .embed-video .embed-stage { aspect-ratio: 16 / 9; }
+  .embed-map .embed-stage { height: 300px; }
+  .embed-start { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; border: 0; color: white; font: inherit; text-align: center; background: linear-gradient(140deg, #063d21, #18753d); cursor: pointer; }
+  .embed-map .embed-start { color: #145c3b; background: linear-gradient(140deg, #e8f5e9, #d4e9db); }
+  .embed-start img { width: 48px; height: 48px; object-fit: contain; }
+  .embed-start strong { font-size: 16px; }
+  .embed-start span { font-size: 12px; opacity: .85; }
+  .embed-start:hover { filter: brightness(1.08); }
+  .embed-start:focus-visible { outline: 3px solid #c8963e; outline-offset: -5px; }
+  .embed-fallback { display: block; padding: 9px 16px; color: #145c3b; font-size: 12px; font-weight: 700; text-align: center; text-decoration: underline; text-underline-offset: 3px; }
+  .embed-stage :global(iframe) { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  @media (min-width: 768px) { .embed-map .embed-stage { height: 380px; } }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-click-embed]').forEach(root => {
+    const button = root.querySelector<HTMLButtonElement>('[data-embed-start]');
+    if (!button) return;
+    button.addEventListener('click', () => {
+      const frame = document.createElement('iframe');
+      const source = new URL(root.dataset.src!);
+      if (root.dataset.kind === 'video') {
+        source.searchParams.set('autoplay', '1');
+        frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+      }
+      frame.title = root.dataset.title!;
+      frame.src = source.href;
+      frame.allowFullscreen = true;
+      frame.referrerPolicy = 'strict-origin-when-cross-origin';
+      frame.tabIndex = 0;
+      root.querySelector('[data-embed-stage]')?.replaceChildren(frame);
+      frame.focus();
+    }, { once: true });
+    button.disabled = false;
+  });
+</script>

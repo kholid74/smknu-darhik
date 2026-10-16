@@ -3,8 +3,7 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
 import { db } from '../lib/prisma';
-
-const thumb = (url: string, w: number) => (url.startsWith('/api/image/') ? `${url}?w=${w}` : url);
+import CmsImage from '../components/ui/CmsImage.astro';
 
 // Showcase publik = terverifikasi + opt-in + dipilih admin
 const [showcase, verifiedAll] = await Promise.all([
@@ -86,7 +85,7 @@ const statTiles = showStats ? [
           <article class="al-slide">
             <div class="al-photo">
               {a.photoUrl ? (
-                <img src={thumb(a.photoUrl, 500)} alt={a.nama} loading="lazy" onerror="this.style.display='none'"/>
+                <CmsImage src={a.photoUrl} sizes="(min-width: 768px) 200px, 40vw" alt={a.nama} onerror="this.style.display='none'"/>
               ) : (
                 <div class="al-photo-ph"><span class="material-symbols-outlined">person</span></div>
               )}

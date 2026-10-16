@@ -3,14 +3,13 @@ export const prerender = false;
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { site } from '../data/site';
 import { db } from '../lib/prisma';
-
-const thumb = (url: string, w: number) => url.startsWith('/api/image/') ? `${url}?w=${w}` : url;
+import CmsImage from '../components/ui/CmsImage.astro';
 
 const items = await db.extracurricular.findMany({ orderBy: { name: 'asc' } });
 const ekskulList = items.map(e => ({
   name: e.name,
   desc: e.description || '',
-  img: e.imageUrl ? thumb(e.imageUrl, 500) : '',
+  img: e.imageUrl || '',
 }));
 ---
 
@@ -47,7 +46,7 @@ const ekskulList = items.map(e => ({
         <div class="bg-white rounded-xl border border-black/5 shadow-[0_4px_12px_rgba(27,122,61,0.06)] overflow-hidden hover:shadow-[0_8px_24px_rgba(27,122,61,0.1)] transition-shadow group">
           {e.img ? (
             <div class="h-40 bg-[#f0f7f1] overflow-hidden">
-              <img class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={e.img} alt={e.name} loading="lazy" onerror="this.style.display='none'"/>
+              <CmsImage class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" src={e.img} sizes="(min-width: 1152px) 352px, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, calc(100vw - 32px)" alt={e.name} onerror="this.style.display='none'"/>
             </div>
           ) : (
             <div class="h-40 bg-[#f0f7f1] flex items-center justify-center">
