@@ -6,7 +6,7 @@ import PageHeader from '../../../components/ui/PageHeader.astro';
 const chapters = [
   {id: 'master-siswa', label: 'Siapkan master siswa'},
   {id: 'periode', label: 'Buat periode'},
-  {id: 'calon', label: 'Isi pasangan calon'},
+  {id: 'calon', label: 'Isi calon pemilihan'},
   {id: 'pemilih', label: 'Sinkronkan pemilih'},
   {id: 'pin', label: 'Terbitkan dan cetak PIN'},
   {id: 'jadwal', label: 'Jadwalkan pemilihan'},
@@ -62,9 +62,9 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
 
         <li class="card" id="calon">
           <h2><span class="guide-number" aria-hidden="true">03</span>Isi pasangan calon</h2>
-          <p>Dari konfigurasi periode, buka <strong>Kelola calon</strong>. Pilih organisasi, nomor urut, ketua, wakil ketua, visi, dan misi. Foto masing-masing anggota bersifat opsional dan dapat dipilih dari pustaka media jika akun memiliki izin media.</p>
+          <p>Dari konfigurasi periode, buka <strong>Kelola calon</strong>. Pilih organisasi, nomor urut, ketua, wakil ketua (opsional), visi, dan misi. Foto masing-masing anggota bersifat opsional dan dapat dipilih dari pustaka media jika akun memiliki izin media.</p>
           <p>Ketik minimal dua karakter pada pencarian siswa, lalu <strong>pilih nama dari suggestion</strong>. Mengetik nama saja belum memilih siswa. Periksa nama, NISN, dan kelas sebelum menyimpan pasangan.</p>
-          <p class="guide-note">Ketua dan wakil harus berbeda siswa. Satu siswa tidak boleh masuk dua pasangan pada organisasi dan periode yang sama. Jumlah pasangan boleh berbeda antarorganisasi, tetapi setiap organisasi harus memiliki minimal satu pasangan lengkap.</p>
+          <p class="guide-note">Ketua wajib dipilih. Wakil boleh kosong; gunakan Kosongkan wakil untuk menghapus pilihan wakil. Jika ada wakil, keduanya harus berbeda siswa. Satu siswa tidak boleh masuk dua pasangan pada organisasi dan periode yang sama. Jumlah pasangan boleh berbeda antarorganisasi, tetapi setiap organisasi harus memiliki minimal satu calon ketua; calon dengan wakil maupun tanpa wakil sama-sama sah.</p>
           <p class="guide-result">Simpan seluruh pasangan sebelum waktu mulai. Nama dan kelas disimpan sebagai snapshot historis; perubahan master setelahnya tidak otomatis mengganti snapshot calon. Calon tidak dapat diedit setelah pemilihan dibuka.</p>
         </li>
 
@@ -86,7 +86,7 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
 
         <li class="card" id="jadwal">
           <h2><span class="guide-number" aria-hidden="true">06</span>Jadwalkan pemilihan</h2>
-          <p>Kembali ke <strong>Konfigurasi</strong> dan periksa <strong>Pratinjau kesiapan</strong>: jadwal valid, pasangan lengkap pada empat organisasi, pemilih sesuai, serta PIN aktif untuk setiap pemilih.</p>
+          <p>Kembali ke <strong>Konfigurasi</strong> dan periksa <strong>Pratinjau kesiapan</strong>: jadwal valid, calon ketua pada empat organisasi (wakil opsional), pemilih sesuai, serta PIN aktif untuk setiap pemilih.</p>
           <p>Pilih <strong>Jadwalkan periode</strong>. Server memeriksa kesiapan sekali lagi. Hanya satu periode dapat berstatus SCHEDULED pada satu waktu.</p>
           <p class="guide-note">SCHEDULED belum berarti siswa dapat langsung masuk. Form login tersedia ketika waktu mulai tercapai dan sebelum waktu selesai. Tidak ada tombol buka manual. Nama, tahun ajaran, dan jadwal masih dapat disunting sebelum waktu mulai.</p>
           <p class="guide-result">Bagikan tautan <code>/siswa/masuk?periode=&lt;slug&gt;</code>, misalnya <code>/siswa/masuk?periode=pem-osis-2026</code>. Siswa masuk memakai NISN dan PIN.</p>
@@ -114,7 +114,7 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
       <section class="card guide-help" id="bantuan" aria-labelledby="help-title">
         <h2 id="help-title">Kendala yang sering ditemui</h2>
         <details><summary>Kelola Pemilih masih 0 padahal siswa sudah diimpor</summary><p>Impor mengisi master siswa. Buka Kelola Pemilih pada periode yang dipilih, jalankan pratinjau, lalu tambahkan pemilih dari master. Jika pratinjau kosong, cocokkan tahun ajaran periode dengan kelas siswa.</p></details>
-        <details><summary>Periode gagal dijadwalkan atau siswa belum bisa login</summary><p>Periksa empat organisasi, pasangan lengkap, 1–99 pemilih, PIN aktif, dan jadwal mulai yang masih di masa depan saat dijadwalkan. Pastikan tidak ada periode SCHEDULED lain. Untuk login, waktu mulai harus sudah tercapai dan periode belum ditutup atau melewati waktu selesai.</p></details>
+        <details><summary>Periode gagal dijadwalkan atau siswa belum bisa login</summary><p>Periksa empat organisasi, calon ketua (wakil opsional), 1–99 pemilih, PIN aktif, dan jadwal mulai yang masih di masa depan saat dijadwalkan. Pastikan tidak ada periode SCHEDULED lain. Untuk login, waktu mulai harus sudah tercapai dan periode belum ditutup atau melewati waktu selesai.</p></details>
         <details><summary>Hasil belum tersedia setelah siswa selesai memilih</summary><p>Selesainya seluruh siswa tidak otomatis menutup atau menerbitkan hasil. Tutup dan rekonsiliasi dahulu, lalu publikasikan hasil. Bila belum seluruh siswa lengkap, tunggu deadline untuk penutupan normal.</p></details>
         <details><summary>Menu atau tombol tertentu tidak terlihat</summary><p>Aksi mengikuti izin akun: pengelolaan periode, siswa, calon/pemilih, PIN, partisipasi, penutupan, dan publikasi dapat diberikan terpisah. Hubungi superadmin untuk memeriksa izin akun panitia.</p></details>
         <details><summary>Bagaimana membersihkan pemilihan simulasi?</summary><p>Untuk periode yang ditandai Periode uji sejak dibuat dan belum dipublikasikan, superadmin dapat memakai Hapus data uji pada konfigurasi. Periksa pratinjau, lanjutkan popup konfirmasi, lalu ketik HAPUS diikuti slug dan password login. Data turunan periode dihapus; master siswa dan audit tetap disimpan. Hasil uji yang sudah dipublikasikan tidak dapat dibersihkan lewat fitur ini.</p></details>

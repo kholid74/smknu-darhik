@@ -18,7 +18,7 @@ _Hindari_: Tahun sebagai satu-satunya identitas pemilihan.
 
 **Organisasi**: Salah satu dari OSIS, Dewan Ambalan, IPNU, atau IPPNU yang dipilih setiap siswa terdaftar.
 
-**Pasangan calon**: Satu pilihan pada satu organisasi/periode yang memiliki tepat satu ketua dan satu wakil; keduanya adalah Student berbeda yang dipilih dari master persistent.
+**Pasangan calon**: Satu pilihan pada satu organisasi/periode yang memiliki tepat satu ketua dan wakil opsional (nol atau satu). Setiap anggota adalah Student berbeda yang dipilih dari master persistent. Tanpa wakil tetap merupakan satu pilihan calon yang sah.
 _Hindari_: Nama bebas yang tidak terhubung ke Student master.
 
 **Anggota pasangan calon**: Student yang ditugaskan pada posisi `CHAIR` atau `VICE_CHAIR` di CandidatePair. `studentId` dipertahankan untuk riwayat pencalonan, sedangkan nama dan kelas disimpan sebagai snapshot historis; perubahan data master tidak menulis ulang snapshot.

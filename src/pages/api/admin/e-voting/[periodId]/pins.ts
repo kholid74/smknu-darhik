@@ -7,7 +7,7 @@ import { renderPinSlips } from '../../../../../lib/voting/pin-slips';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ params, request, locals, cookies }) => {
+export const POST: APIRoute = async ({ params, request, locals, cookies, url }) => {
   if (!params.periodId || !UUID.test(params.periodId)) return json({ error: { code: 'INVALID_INPUT' } }, 400);
   const actorId = locals.session!.sub;
   if (!validMutation(request, actorId, cookies.get('smkdh_token')?.value ?? '')) return json({ error: { code: 'CSRF_REJECTED' } }, 403);
@@ -16,7 +16,7 @@ export const POST: APIRoute = async ({ params, request, locals, cookies }) => {
     const period = await db.electionPeriod.findUnique({ where: { id: params.periodId }, select: { name: true, slug: true, opensAt: true, closesAt: true } });
     if (!period) return json({ error: { code: 'NOT_FOUND' } }, 404);
     const slips = await issuePins(params.periodId, input, actorId);
-    return new Response(renderPinSlips(period, slips), { status: 200, headers: {
+    return new Response(renderPinSlips(period, slips, url.origin), { status: 200, headers: {
       'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store, max-age=0',
       'Pragma': 'no-cache', 'Expires': '0', 'Referrer-Policy': 'no-referrer',
       'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY',

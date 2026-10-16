@@ -33,7 +33,7 @@ Fondasi keamanan belum cukup untuk langsung membuka pemilihan: origin check dima
 - Setelah empat suara tersimpan, cabut sesi dan tampilkan layar selesai. Pemilih parsial dapat masuk lagi memakai PIN valid yang sama selama periode masih dibuka.
 - Master `Student` persisten tidak menyimpan PIN/password/sesi; snapshot pemilih, kredensial dan sesi terbatas periode. Akun permanen di luar MVP.
 - Roster periode disinkronkan dari master siswa berdasarkan tahun ajaran kelas; data siswa diimpor satu kali ke master, tidak diimpor ulang ke setiap pemilihan.
-- Pasangan calon hanya memakai `Student` master, dengan satu CHAIR dan satu VICE_CHAIR dari siswa berbeda. Nama/kelas snapshot dan foto opsional per anggota; visi/misi dan nomor ballot ada pada pasangan. Jumlah pasangan fleksibel, tetapi satu siswa tidak dapat ditugaskan dua kali pada organisasi/periode yang sama. Perubahan kandidat diaudit dan terkunci setelah pembukaan; Ballot tetap anonim. Riwayat pencalonan dapat dicari lewat studentId, tanpa riwayat jabatan/masa kerja di MVP.
+- Pasangan calon hanya memakai `Student` master, dengan tepat satu CHAIR dan VICE_CHAIR opsional (nol atau satu) dari siswa berbeda. Nama/kelas snapshot dan foto opsional per anggota; visi/misi dan nomor ballot ada pada pasangan. Jumlah pasangan fleksibel, tetapi satu siswa tidak dapat ditugaskan dua kali pada organisasi/periode yang sama. Perubahan kandidat diaudit dan terkunci setelah pembukaan; Ballot tetap anonim. Riwayat pencalonan dapat dicari lewat studentId, tanpa riwayat jabatan/masa kerja di MVP.
 - Tiga Chromebook bersama disediakan saat pemilihan. Maksimal tiga akun siswa aktif bersamaan, satu siswa per Chromebook; siswa bergantian memakai perangkat. Tidak ada mode perangkat pribadi serentak untuk MVP. Sesi terputus dapat dilanjutkan tanpa kehilangan suara yang sudah tersimpan.
 - Riwayat dan identitas periode mendukung pemilihan tahun berikutnya.
 
@@ -54,6 +54,8 @@ Sesi: 5 menit idle, 15 menit absolut. Jumlah pemilih kurang dari 100. Pelaksanaa
 Rincian teknis ada di dokumen desain, schema, API, pengujian, dan operasional berikut. Kesepakatan desain ini tetap tidak memberi izin implementasi kode.
 
 ## Verifikasi audit
+
+Pembaruan 16 Oktober 2026: wakil calon bersifat opsional; ketua tetap wajib dari Student master. Slip PIN memakai URL portal lengkap dari origin lingkungan cetak. Keikutsertaan guru pada keempat organisasi telah dikonfirmasi, dengan [usulan alur pemilih guru](09-usulan-pemilih-guru.md); dukungan pemilih guru belum diimplementasikan.
 
 Source, lockfile, 19 direktori migrasi, konfigurasi, pola route/admin, dan tiga file unit test diperiksa pada audit awal. Setelah seluruh keputusan dikonfirmasi, 11 dokumen diperiksa: 51 tautan lokal valid. Revisi kandidat ditinjau lintas tujuh dokumen terkait: 18 tautan lokal valid, kontrak nama-bebas sudah dihapus dan relasi Ballot tetap anonim. Kode aplikasi tidak diubah. Build, test aplikasi, validasi Prisma, migrasi aktual, dan uji browser belum dijalankan dalam pekerjaan dokumentasi ini. Proposal schema belum dikompilasi oleh Prisma; validasi dan integrasi adapter Neon adalah pekerjaan implementasi, bukan dianggap selesai oleh audit. Referensi eksternal ditautkan dekat keputusan yang menggunakannya.
 

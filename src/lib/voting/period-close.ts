@@ -38,10 +38,10 @@ export async function closePeriodTransaction(tx: Prisma.TransactionClient, perio
     const candidates = contest.candidates.map((candidate) => {
       const chair = candidate.members.find((member) => member.position === 'CHAIR');
       const viceChair = candidate.members.find((member) => member.position === 'VICE_CHAIR');
-      if (candidate.members.length !== 2 || !chair || !viceChair) throw new PeriodError('RECONCILIATION_FAILED');
+      if (!chair || candidate.members.length !== (viceChair ? 2 : 1)) throw new PeriodError('RECONCILIATION_FAILED');
       return { candidateId: candidate.id, ballotNumber: candidate.ballotNumber, vision: candidate.vision, mission: candidate.mission,
         chair: { name: chair.nameSnapshot, className: chair.classSnapshot, photoUrl: chair.photoUrl },
-        viceChair: { name: viceChair.nameSnapshot, className: viceChair.classSnapshot, photoUrl: viceChair.photoUrl },
+        viceChair: viceChair ? { name: viceChair.nameSnapshot, className: viceChair.classSnapshot, photoUrl: viceChair.photoUrl } : null,
         votes: ballots.get(`${contest.organization}:${candidate.id}`) ?? 0 };
     });
     const votesCast = candidates.reduce((total, candidate) => total + candidate.votes, 0);

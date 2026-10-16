@@ -35,3 +35,16 @@ test('candidate edits require the old slate values to reject stale admin forms',
   assert.throws(() => validateExpectedCandidate({ ...expected, viceChairStudentId: valid.chair.studentId }), CandidateError);
   assert.throws(() => validateExpectedCandidate({ ...expected, oldName: 'free text' }), CandidateError);
 });
+
+test('chair remains required, vice chair may be omitted or null but never malformed', () => {
+  const {viceChair, ...chairOnly} = valid;
+  assert.equal(validateCandidateInput(chairOnly).viceChair, null);
+  assert.equal(validateCandidateInput({...valid, viceChair: null}).viceChair, null);
+  for (const value of [{}, {studentId: ''}, {studentId: 'invalid'}, 'free text']) {
+    assert.throws(() => validateCandidateInput({...valid, viceChair: value}), CandidateError);
+  }
+  assert.throws(() => validateCandidateInput({...valid, chair: null}), CandidateError);
+  const expected = {ballotNumber: 1, chairStudentId: valid.chair.studentId, viceChairStudentId: null, vision: 'Visi', mission: 'Misi'};
+  assert.deepEqual(validateExpectedCandidate(expected), expected);
+  assert.throws(() => validateExpectedCandidate({...expected, viceChairStudentId: undefined}), CandidateError);
+});
