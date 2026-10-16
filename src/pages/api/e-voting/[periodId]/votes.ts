@@ -6,6 +6,7 @@ import { VOTING_SESSION_COOKIE } from '../../../../lib/voting/student-session';
 import { submitVote, VoteError } from '../../../../lib/voting/votes';
 import { validateVoteInput, VoteInputError } from '../../../../lib/voting/vote-input';
 
+import { voterPortal } from '../../../../lib/voting/voter-identity';
 export const prerender = false;
 const production = process.env.NODE_ENV === 'production';
 
@@ -20,7 +21,7 @@ export const POST: APIRoute = async ({ request, params, locals, cookies }) => {
     const input = validateVoteInput(await readJson(request));
     const data = await submitVote(session.id, session.voterId, session.periodId, input);
     if (data.complete) cookies.delete(VOTING_SESSION_COOKIE, { path: '/', httpOnly: true, secure: production, sameSite: 'strict' });
-    return json({ data: { ...data, ...(data.complete ? { redirectTo: '/siswa/selesai' } : {}) } }, 201);
+    return json({ data: { ...data, ...(data.complete ? { redirectTo: `${voterPortal(session.voterType)}/selesai` } : {}) } }, 201);
   } catch (error) {
     if (error instanceof VoteInputError) return json({ error: { code: error.code } }, 400);
     if (error instanceof VoteError) {

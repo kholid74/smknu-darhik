@@ -35,16 +35,16 @@ export async function getParticipationVoters(periodId: string, cursor: string | 
   if (!period) return null;
   const rows = await db.electionVoter.findMany({ where: { periodId, ...(afterId ? { id: { gt: afterId } } : {}) },
     orderBy: { id: 'asc' }, take: limit + 1,
-    select: { id: true, nisn: true, name: true, className: true, participation: { select: { organization: true, hasVoted: true } } },
+    select: { id: true, voterType: true, loginCode: true, nisn: true, name: true, className: true, participation: { select: { organization: true, hasVoted: true } } },
   });
   const hasMore = rows.length > limit;
   const page = rows.slice(0, limit);
   const organizations = Object.values(VotingOrganization);
-  const data = page.map(({ id, nisn, name, className, participation }) => {
+  const data = page.map(({ id, voterType, loginCode, nisn, name, className, participation }) => {
     if (participation.length !== organizations.length || organizations.some((organization) => !participation.some((row) => row.organization === organization))) {
       throw new ParticipationError('RECONCILIATION_FAILED');
     }
-    return { nisn, name, className, participation: Object.fromEntries(participation.map((row) => [row.organization, row.hasVoted])) };
+    return { voterType, loginCode, nisn, name, className, participation: Object.fromEntries(participation.map((row) => [row.organization, row.hasVoted])) };
   });
   return { data, nextCursor: hasMore && page.length ? encodeVoterCursor(page[page.length - 1].id) : null };
 }

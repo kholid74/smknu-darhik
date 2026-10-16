@@ -4,7 +4,9 @@ import DataTable from '../../../../components/ui/DataTable.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { db } from '../../../../lib/prisma';
 import { can } from '../../../../lib/rbac';
+import { csrfHeader } from '../../../../lib/voting/admin-http';
 import { listVoters } from '../../../../lib/voting/voters';
+import { canEditElectionSetup } from '../../../../lib/voting/setup-readiness';
 
 const periodId = Astro.params.id ?? '';
 if (!/^[0-9a-f-]{36}$/i.test(periodId)) return Astro.redirect('/admin/e-voting');
@@ -13,7 +15,13 @@ if (!period) return Astro.redirect('/admin/e-voting');
 Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 const voters = await listVoters(periodId, null, 100, null);
-const editable = ['DRAFT', 'SCHEDULED'].includes(period.state) && Date.now() < period.opensAt.getTime();
+const editable = canEditElectionSetup(period, new Date());
+const students = editable ? await db.student.findMany({where: {schoolClass: {academicYear: period.academicYear}}, select: {id: true, nisn: true, name: true, className: true}, orderBy: [{className: 'asc'}, {name: 'asc'}, {id: 'asc'}]}) : [];
+const registeredStudents = new Set(voters.map(voter => voter.studentId));
+const teachers = editable ? await db.teacher.findMany({select: {id: true, name: true, position: true, level: true}, orderBy: [{name: 'asc'}, {id: 'asc'}]}) : [];
+const registeredTeachers = new Set(voters.map(voter => voter.teacherId));
+const selectionCsrf = csrfHeader(Astro.locals.session!.sub, Astro.cookies.get('smkdh_token')?.value ?? '');
+const snapshotOf = (voter: typeof voters[number]) => voter.voterType === 'TEACHER' ? {loginCode: voter.loginCode, name: voter.name, className: voter.className} : {nisn: voter.nisn, name: voter.name, className: voter.className};
 const postOpenCorrectable = period.state === 'SCHEDULED' && Date.now() >= period.opensAt.getTime() && Date.now() < period.closesAt.getTime();
 const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, 'student.kelola') : false;
 ---
@@ -22,31 +30,46 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
   <a href={`/admin/e-voting/${periodId}`} style="display:inline-flex;margin-bottom:14px;text-decoration:none;font-size:13px">â† Konfigurasi periode</a>
   <div style="margin-bottom:18px"><h2 style="font-size:20px;font-weight:800">Kelola Pemilih</h2><p style="font-size:13px;color:var(--color-muted);margin-top:4px">{period.name} · {period.academicYear} · {voters.length}/99 pemilih</p></div>
   <p id="roster-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
+  {period.state === 'DRAFT' && period.opensAt <= new Date() && <p class="feedback" data-tone="warning">Periode masih DRAFT; pemilih tetap dapat disiapkan. Jadwal awal sudah lewat. <a href={`/admin/e-voting/${periodId}`}>Ubah jadwal ke waktu mendatang</a> sebelum menjadwalkan pemilihan.</p>}
+  {!editable && <p class="feedback" data-tone="info">Daftar pemilih terkunci karena pemilihan sudah dibuka atau ditutup. Penambahan dan penghapusan pemilih tidak tersedia. Data kosong berarti belum ada pemilih yang terdaftar pada periode ini.</p>}
   {postOpenCorrectable && canSyncFromMaster && <section class="card" style="margin-bottom:18px">
     <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Koreksi NISN setelah pembukaan</h3>
     <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Hanya untuk siswa yang belum memilih dan jika nama/kelas tetap sama dengan master. Perlu dua admin berbeda dengan izin roster dan master siswa; koreksi mencabut PIN serta sesi lama.</p>
     <form id="post-open-correction" style="display:grid;gap:10px;max-width:620px">
-      <label>Pemilih<select id="correction-voter" required><option value="">Pilih siswa</option>{voters.map((voter) => <option value={voter.id} data-snapshot={JSON.stringify({ nisn: voter.nisn, name: voter.name, className: voter.className })}>{voter.name} · {voter.nisn} · {voter.className}</option>)}</select></label>
+      <label>Pemilih<select id="correction-voter" required><option value="">Pilih siswa</option>{voters.filter(voter => voter.voterType === 'STUDENT').map((voter) => <option value={voter.id} data-snapshot={JSON.stringify(snapshotOf(voter))}>{voter.name} · {voter.nisn} · {voter.className}</option>)}</select></label>
       <label>ID akun admin pemeriksa kedua<input id="correction-reviewer" required maxlength="128" autocomplete="off"/></label>
       <label>Kata sandi admin yang sedang masuk<input id="correction-password" type="password" required maxlength="256" autocomplete="current-password"/></label>
       <label>Kata sandi pemeriksa kedua<input id="correction-reviewer-password" type="password" required maxlength="256" autocomplete="off"/></label>
       <button class="btn btn-primary" type="submit">Koreksi NISN dan cabut PIN lama</button>
     </form>
   </section>}
-  {editable && <section class="card" style="margin-bottom:18px">
-    <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Pemilih dari master siswa</h3>
-    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Semua siswa yang terhubung ke kelas tahun ajaran {period.academicYear} akan menjadi pemilih. Siswa yang sudah ada di roster tidak diduplikasi. Maksimal 99 pemilih.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="preview-master-roster" class="btn btn-outline" type="button">Pratinjau sinkronisasi</button><button id="sync-master-roster" class="btn btn-primary" type="button" disabled>Tambahkan pemilih dari master</button></div>
-    <div id="master-roster-preview" style="display:none;margin-top:16px"></div>
+  {editable && <section class="card" style="margin-bottom:18px" id="student-roster" data-csrf={selectionCsrf} data-current-count={voters.length}>
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Pilih pemilih siswa dari master</h3>
+    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Pilih siswa tahun ajaran {period.academicYear} yang berhak ikut. Tidak harus seluruh siswa. Gunakan pencarian atau filter kelas, lalu centang nama. Siswa yang sudah terdaftar tetap dipertahankan; penghapusan dilakukan lewat daftar pemilih di bawah. Batas 99 mencakup siswa dan guru.</p>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px"><input id="student-select-all" type="checkbox" disabled={students.every(student => registeredStudents.has(student.id))}/>Pilih semua siswa yang belum terdaftar (semua kelas dan halaman)</label>
+    <DataTable id="table-student-selection" label="Siswa calon pemilih" filterColumn={3} filterLabel="Kelas"><table><thead><tr><th>Pilih</th><th>NISN</th><th>Nama</th><th>Kelas</th></tr></thead><tbody>
+      {students.length ? students.map(student => <tr><td><input type="checkbox" class="student-choice" value={student.id} data-name={student.name} disabled={registeredStudents.has(student.id)} aria-label={'Pilih ' + student.name}/>{registeredStudents.has(student.id) && 'Sudah terdaftar'}</td><td>{student.nisn}</td><td>{student.name}</td><td>{student.className}</td></tr>) : <tr><td colspan="4">Belum ada siswa yang terhubung ke kelas pada tahun ajaran periode ini. Periksa master siswa dan kelas.</td></tr>}
+    </tbody></table></DataTable>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px"><button id="preview-student-roster" class="btn btn-outline" type="button">Pratinjau siswa terpilih</button><button id="sync-student-roster" class="btn btn-primary" type="button" disabled>Tambahkan pemilih siswa</button><span id="student-selected-count" role="status" style="font-size:13px">0 siswa dipilih</span></div>
+    <p id="student-roster-preview" role="status" style="margin-top:12px;font-size:13px"></p>
+  </section>}
+  {editable && <section class="card" style="margin-bottom:18px" id="teacher-roster" data-csrf={selectionCsrf} data-current-count={voters.length}>
+    <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Pemilih dari master guru</h3>
+    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Pilih guru yang berhak. Guru tidak otomatis menjadi pemilih. Masing-masing memperoleh empat suara dengan bobot sama, kode guru, dan PIN periode. Maksimal 99 pemilih gabungan.</p>
+    <DataTable id="table-teacher-selection" label="Guru"><table><thead><tr><th>Pilih</th><th>Nama guru</th><th>Jabatan / kelompok</th></tr></thead><tbody>
+      {teachers.length ? teachers.map(teacher => <tr><td><input type="checkbox" class="teacher-choice" value={teacher.id} data-name={teacher.name} disabled={registeredTeachers.has(teacher.id)} aria-label={'Pilih ' + teacher.name}/>{registeredTeachers.has(teacher.id) && 'Sudah terdaftar'}</td><td>{teacher.name}</td><td>{teacher.position} / {teacher.level}</td></tr>) : <tr><td colspan="3">Belum ada data guru di master.</td></tr>}
+    </tbody></table></DataTable>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"><button id="preview-teacher-roster" class="btn btn-outline" type="button">Pratinjau guru terpilih</button><button id="sync-teacher-roster" class="btn btn-primary" type="button" disabled>Tambahkan pemilih guru</button></div>
+    <p id="teacher-roster-preview" role="status" style="margin-top:12px;font-size:13px"></p>
   </section>}
   <section aria-labelledby="roster-list-title">
     <h3 id="roster-list-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Pemilih terdaftar ({voters.length})</h3>
-    <div class="card" style="padding:0;overflow:auto"><DataTable id="table-e-voting" label="Pemilih" filterColumn={2} filterLabel="Filter"><table><thead><tr><th>NISN</th><th>Nama</th><th>Kelas</th><th>Kredensial PIN</th>{editable && <th>Aksi</th>}</tr></thead><tbody>
+    <div class="card" style="padding:0;overflow:auto"><DataTable id="table-e-voting" label="Pemilih" filterColumn={2} filterLabel="Filter"><table><thead><tr><th>NISN / kode guru</th><th>Nama</th><th>Kelas / kelompok</th><th>Kredensial PIN</th>{editable && <th>Aksi</th>}</tr></thead><tbody>
       {voters.length === 0 ? <tr><td colspan={editable ? 5 : 4} style="text-align:center;padding:32px;color:var(--color-muted)">Belum ada pemilih.</td></tr> : voters.map((voter) => <tr>
-        <td>{voter.nisn}</td><td style="font-weight:600">{voter.name}</td><td>{voter.className}</td><td>{voter.pinIssued && voter.credentialEnabled ? 'PIN diterbitkan' : 'Belum diterbitkan'}</td>
+        <td>{voter.loginCode ?? voter.nisn}</td><td style="font-weight:600">{voter.name}</td><td>{voter.className}</td><td>{voter.pinIssued && voter.credentialEnabled ? 'PIN diterbitkan' : 'Belum diterbitkan'}</td>
         {editable && <td><div style="display:flex;gap:6px;flex-wrap:wrap">
-          {canSyncFromMaster && <button class="btn btn-outline roster-action" type="button" data-action="sync" data-voter-id={voter.id} data-snapshot={JSON.stringify({ nisn: voter.nisn, name: voter.name, className: voter.className })}>Sinkronkan dari master</button>}
-          <button class="btn btn-outline roster-action" type="button" data-action="delete" data-voter-id={voter.id} data-snapshot={JSON.stringify({ nisn: voter.nisn, name: voter.name, className: voter.className })}>Hapus dari roster</button>
+          {canSyncFromMaster && voter.voterType === 'STUDENT' && <button class="btn btn-outline roster-action" type="button" data-action="sync" data-voter-id={voter.id} data-snapshot={JSON.stringify(snapshotOf(voter))}>Sinkronkan dari master</button>}
+          <button class="btn btn-outline roster-action" type="button" data-action="delete" data-voter-id={voter.id} data-snapshot={JSON.stringify(snapshotOf(voter))}>Hapus dari roster</button>
         </div></td>}
       </tr>)}
     </tbody></table></DataTable></div>
@@ -54,39 +77,45 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
 </AdminLayout>
 
 <script>
-  import { confirmAction } from '../../../../lib/ui/confirm';
-  const periodId = location.pathname.split('/')[3];
-  const previewButton = document.querySelector<HTMLButtonElement>('#preview-master-roster');
-  const syncButton = document.querySelector<HTMLButtonElement>('#sync-master-roster');
-  const previewBox = document.querySelector<HTMLElement>('#master-roster-preview');
-  const message = document.querySelector<HTMLElement>('#roster-message')!;
-  let csrf = '';
-  let preview: { academicYear: string; eligibleCount: number; currentCount: number; alreadyPresent: number; additions: number; projectedCount: number; canSync: boolean } | null = null;
-  const showMessage = (text: string, ok = false) => { message.textContent = text; message.style.display = 'block'; message.style.background = ok ? '#eef5ef' : '#fff1f0'; message.style.color = ok ? '#31573c' : '#991b1b'; };
-  if (previewButton && syncButton && previewBox) {
-    previewButton.addEventListener('click', async () => {
-      syncButton.disabled = true; preview = null;
-      try {
-        const response = await fetch(`/api/admin/e-voting/${periodId}/voters/master-preview`);
-        const result = await response.json();
-        if (!response.ok) { showMessage(`Pratinjau gagal: ${result?.error?.code ?? 'kesalahan'}.`); return; }
-        csrf = response.headers.get('x-csrf-token') ?? '';
-        preview = result.data;
-        previewBox.textContent = `Tahun ajaran ${preview!.academicYear}: ${preview!.eligibleCount} siswa memenuhi syarat; ${preview!.alreadyPresent} sudah ada; ${preview!.additions} akan ditambahkan. Jumlah roster berubah dari ${preview!.currentCount} menjadi ${preview!.projectedCount} dari batas 99.`;
-        previewBox.style.display = 'block';
-        syncButton.disabled = !preview!.canSync || preview!.additions === 0;
-        showMessage(preview!.canSync ? 'Pratinjau berasal dari master siswa. Periksa jumlah sebelum menambahkan.' : 'Roster melewati batas 99 atau ada NISN yang bertabrakan.', preview!.canSync);
-      } catch { showMessage('Koneksi terputus. Periksa koneksi lalu coba lagi.'); }
+  import {confirmAction} from '../../../../lib/ui/confirm';
+  const section = document.querySelector<HTMLElement>('#student-roster');
+  if(section) {
+    const button = section.querySelector<HTMLButtonElement>('#sync-student-roster')!;
+    const preview = section.querySelector<HTMLElement>('#student-roster-preview')!;
+    const count = section.querySelector<HTMLElement>('#student-selected-count')!;
+    const selectAll = section.querySelector<HTMLInputElement>('#student-select-all')!;
+    const choices = [...section.querySelectorAll<HTMLInputElement>('.student-choice:not(:disabled)')];
+    let selected: string[] = [];
+    section.addEventListener('change', event => {
+      if(event.target === selectAll) choices.forEach(input => input.checked = selectAll.checked);
+      const checked = choices.filter(input => input.checked);
+      selectAll.checked = choices.length > 0 && checked.length === choices.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < choices.length;
+      count.textContent = checked.length + ' siswa dipilih';
+      selected = []; button.disabled = true; preview.textContent = 'Pilihan berubah. Buat pratinjau baru.';
     });
-    syncButton.addEventListener('click', async () => {
-      if (!preview?.canSync || !preview.additions || !csrf || !await confirmAction(`Tambahkan ${preview.additions} siswa tahun ajaran ${preview.academicYear} ke roster?`)) return;
-      syncButton.disabled = true;
+    section.querySelector('#preview-student-roster')!.addEventListener('click', () => {
+      const checked = choices.filter(input => input.checked);
+      selected = checked.map(input => input.value);
+      const total = Number(section.dataset.currentCount) + selected.length;
+      preview.textContent = checked.length ? checked.map(input => input.dataset.name).join(', ') + '. Akan ditambahkan: ' + selected.length + ' siswa. Total setelah penambahan: ' + total + '/99.' : 'Pilih setidaknya satu siswa.';
+      button.disabled = !selected.length || total > 99;
+      if(total > 99) preview.textContent += ' Melebihi batas gabungan. Kurangi pilihan.';
+    });
+    button.addEventListener('click', async () => {
+      if(!selected.length || !await confirmAction('Tambahkan hanya ' + selected.length + ' siswa dari pratinjau sebagai pemilih empat organisasi?')) return;
+      button.disabled = true;
       try {
-        const response = await fetch(`/api/admin/e-voting/${periodId}/voters`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: '{}' });
-        const result = await response.json();
-        if (!response.ok) { showMessage(`Sinkronisasi ditolak: ${result?.error?.code ?? 'kesalahan'}. Buat pratinjau baru.`); return; }
-        showMessage(`${result.data.added} pemilih ditambahkan; ${result.data.alreadyPresent} sudah terdaftar.`, true); location.reload();
-      } catch { showMessage('Koneksi terputus. Buat pratinjau baru untuk memeriksa roster.'); }
+        const response = await fetch('/api/admin/e-voting/' + location.pathname.split('/')[3] + '/voters', {
+          method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': section.dataset.csrf!}, body: JSON.stringify({studentIds: selected}),
+        });
+        if(!response.ok) {
+          const code = (await response.json().catch(() => null))?.error?.code;
+          preview.textContent = code === 'ROSTER_LIMIT' ? 'Jumlah gabungan melebihi 99. Muat ulang dan kurangi pilihan.' : code === 'INVALID_STATE' ? 'Daftar pemilih telah terkunci karena pemilihan dibuka atau ditutup.' : code === 'STUDENT_NOT_ELIGIBLE' ? 'Data siswa atau tahun ajaran kelas berubah. Muat ulang dan pilih siswa yang memenuhi syarat.' : 'Penambahan ditolak: ' + (code ?? 'kesalahan') + '. Muat ulang sebelum mencoba lagi.';
+          return;
+        }
+        location.reload();
+      } catch {preview.textContent = 'Koneksi terputus. Muat ulang untuk memeriksa hasil penambahan sebelum mencoba lagi.';}
     });
   }
 </script><script>
@@ -154,4 +183,38 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
       location.reload();
     } catch { notifyRoster('Koneksi terputus. Muat ulang daftar sebelum mencoba lagi.'); button.disabled = false; }
   }));
+</script>
+
+<script>
+  import {confirmAction} from '../../../../lib/ui/confirm';
+  const section = document.querySelector<HTMLElement>('#teacher-roster');
+  if(section) {
+    const button = section.querySelector<HTMLButtonElement>('#sync-teacher-roster')!;
+    const preview = section.querySelector<HTMLElement>('#teacher-roster-preview')!;
+    let selected: string[] = [];
+    section.addEventListener('change', () => {selected = []; button.disabled = true; preview.textContent = 'Pilihan berubah. Buat pratinjau baru.';});
+    section.querySelector('#preview-teacher-roster')!.addEventListener('click', () => {
+      const checked = [...section.querySelectorAll<HTMLInputElement>('.teacher-choice:checked:not(:disabled)')];
+      selected = checked.map(input => input.value);
+      const total = Number(section.dataset.currentCount) + selected.length;
+      preview.textContent = checked.length ? checked.map(input => input.dataset.name).join(', ') + '. Total setelah penambahan: ' + total + '/99.' : 'Pilih setidaknya satu guru.';
+      button.disabled = !selected.length || total > 99;
+      if(total > 99) preview.textContent += ' Melebihi batas gabungan. Kurangi pilihan.';
+    });
+    button.addEventListener('click', async () => {
+      if(!selected.length || !await confirmAction('Tambahkan ' + selected.length + ' guru dari pratinjau sebagai pemilih empat organisasi?')) return;
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/admin/e-voting/' + location.pathname.split('/')[3] + '/voters/teachers', {
+          method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': section.dataset.csrf!}, body: JSON.stringify({teacherIds: selected}),
+        });
+        if(!response.ok) {
+          const code = (await response.json().catch(() => null))?.error?.code;
+          preview.textContent = code === 'ROSTER_LIMIT' ? 'Jumlah gabungan melebihi 99. Muat ulang dan kurangi pilihan.' : code === 'INVALID_STATE' ? 'Daftar pemilih telah terkunci setelah pembukaan.' : code === 'TEACHER_NOT_FOUND' ? 'Master guru berubah. Muat ulang sebelum mencoba lagi.' : 'Penambahan ditolak: ' + (code ?? 'kesalahan') + '. Muat ulang sebelum mencoba lagi.';
+          return;
+        }
+        location.reload();
+      } catch {preview.textContent = 'Koneksi terputus. Muat ulang untuk memeriksa hasil penambahan sebelum mencoba lagi.';}
+    });
+  }
 </script>

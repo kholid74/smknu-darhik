@@ -1,0 +1,15 @@
+---
+import VotingPage from '../../../../siswa/e-voting/[slug]/pilih/index.astro';
+import {BallotPageError, getBallotProgress} from '../../../../../lib/voting/ballot-pages';
+export const prerender = false;
+Astro.response.headers.set('Cache-Control','private, no-store');
+Astro.response.headers.set('Referrer-Policy','no-referrer');
+Astro.response.headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
+Astro.response.headers.set('X-Frame-Options','DENY');
+const session=Astro.locals.votingSession;
+if(!session)return Astro.redirect('/pemilih/masuk');
+let data;
+try {data=await getBallotProgress(session.periodId,Astro.params.slug!,session.voterId);}
+catch(error) {return Astro.redirect(error instanceof BallotPageError && error.code==='UNAUTHENTICATED'?'/pemilih/masuk':'/pemilih');}
+---
+<VotingPage data={data}/>

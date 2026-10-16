@@ -4,21 +4,23 @@ import { votingCsrfSecret } from '../../../../../lib/voting/student-auth';
 import { createStudentSessionCsrfToken } from '../../../../../lib/voting/security';
 import { BallotPageError, getOrganizationCandidates, ORGANIZATIONS } from '../../../../../lib/voting/ballot-pages';
 
+import { voterPortal } from '../../../../../lib/voting/voter-identity';
 export const prerender = false;
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
 Astro.response.headers.set('X-Frame-Options', 'DENY');
 const session = Astro.locals.votingSession;
-if (!session) return Astro.redirect('/siswa/masuk');
+const base = voterPortal(session?.voterType);
+if (!session) return Astro.redirect(`${base}/masuk`);
 const organization = ORGANIZATIONS.find(({ id }) => id === Astro.params.organization);
 if (!organization) return new Response('Not Found', { status: 404 });
 let data;
-try { data = await getOrganizationCandidates(session.periodId, Astro.params.slug!, session.voterId, organization.id); }
+try { data = Astro.props.data ?? await getOrganizationCandidates(session.periodId, Astro.params.slug!, session.voterId, organization.id); }
 catch (error) {
-  if (error instanceof BallotPageError && error.code === 'ALREADY_VOTED') return Astro.redirect(`/siswa/e-voting/${Astro.params.slug}/pilih`);
-  if (error instanceof BallotPageError && error.code === 'UNAUTHENTICATED') return Astro.redirect('/siswa/masuk');
-  return Astro.redirect('/siswa');
+  if (error instanceof BallotPageError && error.code === 'ALREADY_VOTED') return Astro.redirect(`${base}/e-voting/${Astro.params.slug}/pilih`);
+  if (error instanceof BallotPageError && error.code === 'UNAUTHENTICATED') return Astro.redirect(`${base}/masuk`);
+  return Astro.redirect(base);
 }
 const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
 const completed=ORGANIZATIONS.filter(({id})=>data.participation[id]).length;
@@ -28,7 +30,7 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
 });
 ---
 <StudentPortalLayout title={`Pilih ${organization.label}`} csrfToken={csrfToken} periodId={session.periodId}>
-  <a class="back" href={`/siswa/e-voting/${data.period.slug}/pilih`}>← Semua organisasi</a>
+  <a class="back" href={`${base}/e-voting/${data.period.slug}/pilih`}>← Semua organisasi</a>
   <p class="eyebrow">E-VOTING · {data.period.name}</p>
   <h1>Pemilihan {organization.label}</h1>
   <div class="voting-progress"><span>{completed} dari 4 organisasi selesai</span><progress aria-label="Kemajuan empat organisasi" value={completed} max="4"></progress></div>
@@ -76,6 +78,7 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
 </StudentPortalLayout>
 
 <script>
+  const base = document.body.dataset.portalBase!;
   const form = document.getElementById('vote-form');
   const periodId=document.body.dataset.periodId!;
   const organizationId=form?.dataset.organization!;
@@ -108,20 +111,20 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
         body: JSON.stringify({ organization: organizationId, candidateId: selectedId }) });
       const payload = await response.json();
       if (!response.ok) {
-        if (response.status === 409 && payload.error?.code === 'ALREADY_VOTED') { location.assign(`/siswa/e-voting/${slug}/pilih`); return; }
-        if (response.status === 401 || response.status === 409) { location.assign('/siswa/masuk'); return; }
+        if (response.status === 409 && payload.error?.code === 'ALREADY_VOTED') { location.assign(`${base}/e-voting/${slug}/pilih`); return; }
+        if (response.status === 401 || response.status === 409) { location.assign(`${base}/masuk`); return; }
         throw new Error(response.status === 429 ? 'Terlalu banyak permintaan. Tunggu sebentar lalu periksa status pemilihan.' : 'Pengiriman belum dapat dipastikan. Periksa status sebelum mencoba lagi.');
       }
-      location.assign(payload.data.redirectTo ?? `/siswa/e-voting/${slug}/pilih`);
+      location.assign(payload.data.redirectTo ?? `${base}/e-voting/${slug}/pilih`);
     } catch (error) {
       if (dialog instanceof HTMLDialogElement) dialog.close();
       let statusKnown = false;
       try {
         const statusResponse = await fetch(`/api/e-voting/${periodId}/status`, { cache: 'no-store', credentials: 'same-origin' });
-        if (!statusResponse.ok) { location.assign('/siswa/masuk'); return; }
+        if (!statusResponse.ok) { location.assign(`${base}/masuk`); return; }
         const current = await statusResponse.json();
         statusKnown = true;
-        if (current.data.participation[organizationId]) { location.assign(`/siswa/e-voting/${slug}/pilih`); return; }
+        if (current.data.participation[organizationId]) { location.assign(`${base}/e-voting/${slug}/pilih`); return; }
       } catch { /* keep the delivery state unknown while offline */ }
       if (message) message.textContent = statusKnown
         ? 'Suara belum tercatat. Anda dapat meninjau pilihan dan mengirim kembali.'

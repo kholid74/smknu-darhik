@@ -1,8 +1,26 @@
 # Strategi pengujian dan kriteria penerimaan
 
-Status: rencana test, **bukan laporan test yang sudah lulus**. Tidak ada dependency lokal pada audit ini; test/build/browser/database tidak dijalankan. Gunakan `node:test` + `node:assert/strict` yang sudah menjadi pola repo; unit test saja tidak membuktikan transaksi benar.
+Status: matriks penerimaan tetap mencakup rencana pengujian lanjutan. Implementasi saat ini memiliki `node:test`, PostgreSQL PGlite untuk seluruh migrasi/invariant, serta QA browser sintetis. Rincian pengujian guru di bawah; ini tidak menyatakan seluruh matriks race/load/restore pada Neon sudah lulus.
+
+## Regresi pemilih guru yang diimplementasikan
+
+| Kasus | Bukti otomatis |
+| --- | --- |
+| PIN siswa sebelum migrasi tetap, NISN nol di depan, tepat satu Student/Teacher, FK, unique guru/kode, pemilik/kode immutable | `teacher-voters-db.test.ts` menjalankan seluruh migrasi PostgreSQL |
+| Nama master guru berubah, snapshot tetap; roster beku saat pembukaan; cleanup uji mempertahankan kedua master dan audit | `teacher-voters-db.test.ts` |
+| Input login guru/siswa terpisah, ID master eksplisit, ID invalid/duplikat/100 target ditolak | `voter-identity.test.ts`, `middleware.test.ts` |
+| Guru dipilih dari master, empat hak dibuat, pengulangan tidak duplikat; total gabungan 99 dan state terkunci diperiksa | Service aktual dengan DB sintetis di `middleware.test.ts` |
+| Guru tidak mendapat akses siswa/admin/personal; siswa ditolak pada portal guru; periode salah ditolak | Middleware aktual di `middleware.test.ts` |
+| Login guru dengan PIN, pilih parsial, login ulang melanjutkan dan mengganti sesi, duplikat ditolak, suara keempat mencabut sesi; Ballot tanpa identitas | Auth/vote service aktual dengan delegasi DB sintetis di `middleware.test.ts` |
+| Siswa selesai tetapi guru parsial menghalangi early close; selesai keduanya memberi tally gabungan tanpa identitas | PostgreSQL aktual dalam memori, `period-close.test.ts` |
+| Slip campuran memakai NISN/kode dan URL portal masing-masing | `pin-slips.test.ts` |
+| Login, dashboard, tanpa Coming Soon siswa, perpanjangan, logout dan selesai guru | `npm run qa:ui`, komponen portal aktual dengan data/API sintetis dan Chrome headless |
+
+Jangan mengklaim mock sebagai bukti race transaksi pada koneksi Neon independen. Gladi tiga Chromebook campuran siswa/guru, cetak fisik, expiry/bfcache, load dan gangguan jaringan nyata tetap diperlukan sebelum pemilihan resmi.
 
 ## Lingkungan dan fixture
+
+Regresi [DRAFT dan siswa terpilih](10-daftar-pemilih-dan-draft.md) menambahkan uji service/API: reschedule draft lewat, hanya subset yang ditambahkan, ID invalid/tahun ajaran salah/duplikat, CSRF/izin dan batas gabungan. PostgreSQL menguji tiga fungsi trigger baru, termasuk hapus participation false pada DRAFT lewat, tetapi menolak perubahan setelah pembukaan dan tidak membalik participation true. QA browser memeriksa DRAFT kosong tetap punya aksi, pencarian/pagination, pilihan lintas halaman, pilih semua, preview, popup, payload hanya studentIds, dan pesan roster terkunci.
 
 Pin `tsx` di devDependencies saat implementasi. Pisahkan `npm test` untuk unit dari `test:integration` dan `test:http`, agar unit tidak memerlukan secret/database. Gunakan PostgreSQL disposable dengan versi mayor yang sesuai produksi; jangan mengganti concurrency test dengan SQLite atau mock Prisma. Ulangi suite transaksi kritis pada Neon staging melalui **PrismaNeon yang sama dengan runtime**, tidak hanya PrismaPg.
 

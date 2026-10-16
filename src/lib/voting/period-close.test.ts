@@ -30,7 +30,7 @@ beforeEach(async () => {
 });
 afterEach(async () => { await pg.exec('ROLLBACK'); });
 
-async function seed(votes = [4, 4], id = periodId, chairOnly = false) {
+async function seed(votes = [4, 4], id = periodId, chairOnly = false, teacherIndex = -1) {
   await pg.query(`INSERT INTO "ElectionPeriod" (id,slug,name,"academicYear","opensAt","closesAt")
     VALUES ($1,$2,'Synthetic close test','2026/2027',now()+interval '1 day',now()+interval '2 days')`, [id, 'test-' + id]);
   for (const organization of organizations) {
@@ -45,8 +45,13 @@ async function seed(votes = [4, 4], id = periodId, chairOnly = false) {
   }
   for (const [index, voteCount] of votes.entries()) {
     const voterId = randomUUID();
-    await pg.query(`INSERT INTO "ElectionVoter" (id,"studentId","periodId",nisn,name,"className") VALUES ($1,$2,$3,$4,$5,'QA')`,
-      [voterId, studentIds[index], id, '990000000' + index, 'Synthetic Student ' + index]);
+    if(index === teacherIndex) {
+      await pg.query(`INSERT INTO "Teacher" (id,name,position) VALUES ('close-teacher','Synthetic Teacher','Guru')`);
+      await pg.query(`INSERT INTO "ElectionVoter" (id,"teacherId","voterType","periodId","loginCode",name,"className") VALUES ($1,'close-teacher','TEACHER',$2,'GURU-ABCDEF123456','Synthetic Teacher','Guru')`,[voterId,id]);
+    } else {
+      await pg.query(`INSERT INTO "ElectionVoter" (id,"studentId","periodId",nisn,name,"className") VALUES ($1,$2,$3,$4,$5,'QA')`,
+        [voterId, studentIds[index], id, '990000000' + index, 'Synthetic Student ' + index]);
+    }
     for (const [orgIndex, organization] of organizations.entries()) {
       const voted = orgIndex < voteCount;
       await pg.query('INSERT INTO "VoterParticipation" ("voterId","periodId",organization,"hasVoted") VALUES ($1,$2,$3,$4)', [voterId, id, organization, voted]);
@@ -133,6 +138,19 @@ test('all four votes per voter permit early closure; schedule, master, anonymous
   await pg.query('UPDATE "ElectionPeriod" SET state=$2 WHERE id=$1', [periodId, 'ARCHIVED']);
   assert.equal((await close()).state, 'ARCHIVED');
   assert.equal((await pg.query('SELECT * FROM "VotingAuditEvent"')).rows.length, 1);
+});
+
+test('early close waits for teachers as well as students and publishes one combined tally',async()=>{
+  await seed([4,3],periodId,true,1);
+  await assert.rejects(close(),{code:'EARLY_CLOSE_INCOMPLETE'});
+  assert.ok(!queries.some(sql=>sql.includes('FROM "Ballot"')));
+  await pg.query(`UPDATE "VoterParticipation" SET "hasVoted"=true WHERE "periodId"=$1 AND organization='IPPNU'`,[periodId]);
+  await pg.query(`INSERT INTO "Ballot" (id,"periodId",organization,"candidateId") SELECT $1,"periodId",organization,id FROM "CandidatePair" WHERE "periodId"=$2 AND organization='IPPNU'`,[randomUUID(),periodId]);
+  await close();
+  const snapshot=(await storedPeriod()).resultSnapshot!;
+  assert.equal(snapshot.eligibleVoters,2);assert.equal(snapshot.complete,2);
+  assert.ok(snapshot.contests.every(contest=>contest.votesCast===2));
+  assert.doesNotMatch(JSON.stringify(snapshot),/teacherId|studentId|voterType|byType|GURU-/);
 });
 
 for (const votes of [[4, 3], [4, 0], []]) {

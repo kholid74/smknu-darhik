@@ -116,6 +116,7 @@ model Teacher {
   order     Int      @default(0)
   accountId String?  @unique // tautan ke akun guru (realm Internal), opsional
   account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  electionVoters ElectionVoter[]
 }
 
 model Extracurricular {
@@ -344,11 +345,19 @@ model CandidateMember {
   @@index([studentId, periodId])
 }
 
+enum ElectionVoterType {
+  STUDENT
+  TEACHER
+}
+
 model ElectionVoter {
   id                String               @id @default(uuid()) @db.Uuid
-  studentId         String               @db.Uuid
+  voterType         ElectionVoterType    @default(STUDENT)
+  studentId         String?              @db.Uuid
+  teacherId         String?
+  loginCode         String?              @db.VarChar(32)
   periodId          String               @db.Uuid
-  nisn              String               @db.VarChar(10)
+  nisn              String?              @db.VarChar(10)
   name              String               @db.VarChar(120)
   className         String               @db.VarChar(40)
   credentialEnabled Boolean              @default(true)
@@ -356,12 +365,15 @@ model ElectionVoter {
   pinFingerprint    String?              @db.Char(64)
   pinVersion        Int                  @default(0)
   period            ElectionPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  student           Student              @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  student           Student?             @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  teacher           Teacher?             @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   participation     VoterParticipation[]
   session           VotingSession?
 
   @@unique([periodId, nisn])
   @@unique([periodId, studentId])
+  @@unique([periodId, teacherId])
+  @@unique([periodId, loginCode])
   @@unique([periodId, pinFingerprint])
   @@unique([id, periodId])
   @@index([studentId])

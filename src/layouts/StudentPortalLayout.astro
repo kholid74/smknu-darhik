@@ -4,6 +4,8 @@ import PortalHead from '../components/ui/PortalHead.astro';
 import Feedback from '../components/ui/Feedback.astro';
 interface Props { title: string; csrfToken: string; periodId: string }
 const { title, csrfToken, periodId } = Astro.props;
+const base = Astro.locals.votingSession?.voterType === 'TEACHER' ? '/pemilih' : '/siswa';
+const portal = base === '/pemilih' ? 'Portal Pemilih' : 'Portal Siswa';
 const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
 ---
 <!doctype html>
@@ -14,7 +16,7 @@ const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="referrer" content="no-referrer" />
     <PortalHead/>
-    <title>{title} · Portal Siswa SMKS NU Darul Hikam</title>
+    <title>{title} · {portal} SMKS NU Darul Hikam</title>
     <style>
       :root { color-scheme: light; font-family: var(--font-portal); color: var(--color-ink); background: var(--color-paper); }
       * { box-sizing: border-box; }
@@ -36,10 +38,10 @@ const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
       @media (max-width: 600px) { .topbar, main { padding-left: 16px; padding-right: 16px; } main { padding-top: 24px; } }
     </style>
   </head>
-  <body class="student-portal" data-period-id={periodId} data-csrf={csrfToken} data-expires-at={expiresAt}>
+  <body class="student-portal" data-portal-base={base} data-period-id={periodId} data-csrf={csrfToken} data-expires-at={expiresAt}>
     <header>
       <div class="topbar">
-        <div class="brand" style="display:flex;align-items:center;gap:12px"><img src="/assets/logo.png" alt="" width="40" height="40"/><div>SMKS NU Darul Hikam<small>Portal Siswa</small></div></div>
+        <div class="brand" style="display:flex;align-items:center;gap:12px"><img src="/assets/logo.png" alt="" width="40" height="40"/><div>SMKS NU Darul Hikam<small>{portal}</small></div></div>
         <button class="secondary" id="logout-button" type="button">Keluar</button>
       </div>
     </header>
@@ -47,8 +49,9 @@ const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
     <footer>Gunakan tombol Keluar saat selesai, terutama pada perangkat bersama.</footer>
     <script>
       const root = document.body;
+      const base = root.dataset.portalBase!;
       let expiryTimer=0;
-      const expire=()=>{document.querySelector('main')?.replaceChildren();location.replace('/siswa/masuk?expired=1')};
+      const expire=()=>{document.querySelector('main')?.replaceChildren();location.replace(`${base}/masuk?expired=1`)};
       const updateExpiry=()=>{window.clearTimeout(expiryTimer);const expiry=Date.parse(root.dataset.expiresAt??'');if(Number.isFinite(expiry))expiryTimer=window.setTimeout(expire,Math.max(0,expiry-Date.now()))};
       updateExpiry();
       const feedback = document.getElementById('portal-feedback');
@@ -58,7 +61,7 @@ const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
         try {
           const response = await fetch('/api/e-voting/logout', { method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': root.dataset.csrf ?? '' }, body: '{}' });
-          if (response.status === 204) {window.clearTimeout(expiryTimer);document.querySelector('main')?.replaceChildren();location.assign('/siswa/masuk');}
+          if (response.status === 204) {window.clearTimeout(expiryTimer);document.querySelector('main')?.replaceChildren();location.assign(`${base}/masuk`);}
           else throw new Error('Sesi belum dapat ditutup. Coba muat ulang halaman.');
         } catch (error) {
           if (feedback) feedback.textContent = error instanceof Error ? error.message : 'Sesi belum dapat ditutup.';
@@ -72,7 +75,7 @@ const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
         try {
           const response = await fetch(`/api/e-voting/${root.dataset.periodId}/activity`, { method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': root.dataset.csrf ?? '' }, body: '{}' });
-          if (response.status === 401 || response.status === 409) { location.assign('/siswa/masuk'); return; }
+          if (response.status === 401 || response.status === 409) { location.assign(`${base}/masuk`); return; }
           if (!response.ok) throw new Error('Sesi belum dapat diperpanjang.');
           const payload = await response.json();
           root.dataset.csrf = payload.csrfToken;
@@ -87,7 +90,7 @@ const expiresAt=Astro.locals.votingSession?.expiresAt.toISOString()??'';
       window.addEventListener('pageshow', async (event) => {
         if (!event.persisted) return;
         try {
-          const response = await fetch('/api/siswa/dashboard', { cache: 'no-store', credentials: 'same-origin' });
+          const response = await fetch(`/api${base}/dashboard`, { cache: 'no-store', credentials: 'same-origin' });
           if (!response.ok) expire();
         } catch { expire(); }
       });

@@ -4,6 +4,7 @@ import { db } from '../prisma';
 import { verifyPassword } from '../auth';
 import { requireEnv } from '../env';
 import { PinError, generatePin, pinFingerprint, pinHashMaterial, type PinRequest } from './pin-input';
+import { voterIdentifier } from './voter-identity';
 
 function pinSecret() {
   const secret = requireEnv('VOTING_PIN_SECRET');
@@ -26,7 +27,7 @@ async function checkAdminRate(accountId: string) {
   if (attempts > 5) throw new PinError('RATE_LIMITED');
 }
 
-function prepare(targets: Array<{ id: string; nisn: string; name: string; className: string; pinVersion: number }>, periodId: string, secret: string) {
+function prepare(targets: Array<{ id: string; nisn: string | null; voterType: string; loginCode: string | null; name: string; className: string; pinVersion: number }>, periodId: string, secret: string) {
   const used = new Set<string>();
   return Promise.all(targets.map(async (target) => {
     let pin: string;
@@ -38,7 +39,7 @@ function prepare(targets: Array<{ id: string; nisn: string; name: string; classN
     used.add(fingerprint);
     return {
       ...target, pin, pinFingerprint: fingerprint,
-      pinHash: await bcrypt.hash(pinHashMaterial(secret, periodId, target.nisn, pin), 12),
+      pinHash: await bcrypt.hash(pinHashMaterial(secret, periodId, voterIdentifier(target), pin), 12),
     };
   }));
 }
@@ -49,7 +50,7 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
   if (!account?.active || !await verifyPassword(request.adminPassword, account.passwordHash)) throw new PinError('INVALID_REAUTH');
   const voters = await db.electionVoter.findMany({
     where: { periodId, id: { in: request.targets.map((target) => target.voterId) } },
-    select: { id: true, nisn: true, name: true, className: true, pinHash: true, pinVersion: true, credentialEnabled: true,
+    select: { id: true, voterType: true, loginCode: true, nisn: true, name: true, className: true, pinHash: true, pinVersion: true, credentialEnabled: true,
       participation: { where: { hasVoted: true }, select: { organization: true } } },
   });
   if (voters.length !== request.targets.length) throw new PinError('NOT_FOUND');
@@ -66,7 +67,7 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
   for (let attempt = 0; attempt < 3; attempt++) {
     const prepared = await prepare(request.targets.map((target) => {
       const voter = snapshots.get(target.voterId)!;
-      return { id: voter.id, nisn: voter.nisn, name: voter.name, className: voter.className, pinVersion: target.pinVersion };
+      return { id: voter.id, voterType: voter.voterType, loginCode: voter.loginCode, nisn: voter.nisn, name: voter.name, className: voter.className, pinVersion: target.pinVersion };
     }), periodId, secret);
     try {
       await db.$transaction(async (tx) => {
@@ -75,7 +76,6 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
         const [{ now }] = await tx.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
         const beforeOpen = lockedPeriod[0].opensAt > now;
         const beforeClose = lockedPeriod[0].closesAt > now;
-        if (lockedPeriod[0].state === 'DRAFT' && !beforeOpen) throw new PinError('INVALID_STATE');
         if (lockedPeriod[0].state === 'SCHEDULED' && (!beforeClose || (request.mode === 'issue' && !beforeOpen &&
             request.targets.some((target) => target.pinVersion === 0)))) throw new PinError('INVALID_STATE');
         if (!['DRAFT', 'SCHEDULED'].includes(lockedPeriod[0].state)) throw new PinError('INVALID_STATE');
@@ -110,7 +110,7 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
           reasonCode: request.reasonCode ?? null, detail: { pinVersion: row.pinVersion + 1 },
         })) });
       });
-      return prepared.map(({ id, name, nisn, className, pin }) => ({ id, name, nisn, className, pin }));
+      return prepared.map(({ id, voterType, loginCode, name, nisn, className, pin }) => ({ id, voterType, loginCode, name, nisn, className, pin }));
     } catch (error) {
       if (error instanceof PinError && error.code === 'PIN_COLLISION') continue;
       if ((error as { code?: string })?.code === 'P2002') continue;

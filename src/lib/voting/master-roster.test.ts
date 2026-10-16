@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMasterRosterInserts, planMasterRoster } from './master-roster';
+import { buildMasterRosterInserts, planMasterRoster, validateStudentSelection } from './master-roster';
 
 describe('planMasterRoster', () => {
   it('adds only students absent from the period roster and detects NISN collisions', () => {
@@ -27,4 +27,10 @@ describe('planMasterRoster', () => {
     assert.equal(inserts.participation.length, 8);
     assert.equal(new Set(inserts.participation.map(({ voterId, organization }) => `${voterId}:${organization}`)).size, 8);
   });
+});
+
+it('requires explicit bounded distinct student IDs; the previous empty-body all-students request is rejected',()=>{
+  const id='20000000-0000-4000-8000-00000000000a';
+  assert.deepEqual(validateStudentSelection({studentIds:[id.toUpperCase()]}),[id]);
+  for(const input of [{},{studentIds:[]},{studentIds:[id,id]},{studentIds:[id,id.toUpperCase()]},{studentIds:[id],all:true},{studentIds:['Siti']},{studentIds:Array.from({length:100},()=>id)}])assert.throws(()=>validateStudentSelection(input),{code:'INVALID_INPUT'});
 });
