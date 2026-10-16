@@ -1,5 +1,27 @@
 # Checklist deployment, migrasi, backup dan rollback
 
+## Perbaikan DRAFT dan penentuan siswa — 16 Oktober 2026
+
+[Keputusan dan alur](10-daftar-pemilih-dan-draft.md) menggantikan penambahan seluruh siswa otomatis. Panitia memilih subset nama/ID dari master tahun ajaran; roster existing tidak dikurangi/ditulis ulang otomatis. Daftar resmi adalah yang benar-benar terdaftar pada periode, bukan jumlah seluruh master. Cetak PIN dan early close menggunakan daftar terpilih gabungan siswa/guru, maksimal 99.
+
+Migrasi `20261016120000_draft_setup_editability` harus diterapkan sebelum memakai UI/service baru, supaya DRAFT lewat tidak ditolak trigger calon/roster/participation. Tidak mengubah tanggal, state, siswa, PIN atau suara yang sudah tersimpan. Setelah migrasi, operator dapat membuka draft lama dan memperbaiki jadwal sendiri; tidak ada reschedule otomatis. SCHEDULED yang sudah dibuka tetap terkunci. Rollback mengembalikan definisi tiga fungsi lewat migrasi maju; jangan menghapus data untuk memperbaiki draft.
+
+Migrasi berhasil diterapkan ke Neon pada 16 Oktober 2026. Verifikasi baca ulang mengonfirmasi ketiga fungsi diperbarui, kedua draft dapat dikelola, dan roster yang sudah berisi 52 tetap ada. Tidak memasukkan, menghapus, atau menjadwalkan data pemilihan sebagai bagian migrasi. Pengujian lokal: 134 tes, 12 skenario browser dan build lulus.
+
+## Peluncuran pemilih guru — 16 Oktober 2026
+
+Gunakan [alur guru final](09-usulan-pemilih-guru.md) dan panduan `/admin/e-voting/panduan`. Deploy migrasi `20261016100000_teacher_election_voters` sebelum runtime baru. Migrasi additive menambah jenis/Teacher/kode, melonggarkan null hanya untuk identitas guru dengan CHECK eksklusif, dan mengunci identitas/membership. Tidak mengubah hash/PIN/sesi siswa lama atau memasukkan guru otomatis. Siapkan backup/restore point Neon sebelum perubahan; jangan memakai seed/reset simulasi pada database umum.
+
+Migrasi ini berhasil diterapkan ke Neon pada 16 Oktober 2026. Verifikasi baca ulang: migration finished, tiga kolom tambahan tersedia, CHECK dan trigger identitas aktif, jumlah voter TEACHER = 0. Tidak membuat periode, memilih guru atau menerbitkan PIN di Neon. Runtime baru tetap harus dipakai sebelum guru ditambahkan.
+
+Setelah runtime baru siap, panitia memilih guru master secara eksplisit pada Kelola Pemilih, meninjau jumlah siswa+guru (maksimal 99), lalu mencetak PIN dari menu yang sama. Slip guru memakai kode dan URL lengkap `/pemilih/masuk?periode=<slug>`; siswa tetap NISN + `/siswa/masuk`. Verifikasi identitas saat membagikan slip. Semua guru mendapat empat hak dengan bobot sama dan hasil gabungan; tidak ada breakdown jenis. Master guru yang direferensikan periode tidak dapat dihapus.
+
+Jangan menambahkan guru ke periode yang sudah dibuka. Untuk periode mendatang, sahkan daftar guru sebelum menjadwalkan dan beri kesempatan melengkapi sebelum opensAt. Perubahan Teacher master tidak mengubah snapshot pemilih; untuk koreksi guru sebelum buka, hapus dari roster, tambahkan ulang, lalu terbitkan PIN baru. Jangan menggunakan koreksi NISN siswa untuk guru.
+
+Gladi bersih tiga Chromebook harus mencakup perpindahan siswa/guru, slip masing-masing, reauth parsial, logout, expiry dan suara keempat. Sesi internal panitia tetap terpisah. Early close harus menunggu seluruh siswa **dan guru**, termasuk PIN nonaktif, selesai empat suara. Setelah deadline, close normal tetap menerima partisipasi parsial, kemudian publikasi terpisah.
+
+Rollback aplikasi ke versi khusus siswa hanya aman **sebelum ada voter guru**. Setelah guru ditambahkan, perbaiki maju atau siapkan versi kompatibel; runtime lama tidak dapat memproses identitas nullable/kode guru. Jangan menghapus kolom, master atau ballot sah untuk rollback. Cleanup periode uji tetap melalui fitur berlapis yang disetujui dan mempertahankan Student/Teacher master serta audit.
+
 Status: rencana untuk fase implementasi; **tidak ada command di dokumen ini yang dijalankan oleh audit**. Tetapkan penanggung jawab sekolah, operator deploy/database, pengelola PIN dan saksi penutupan. Jangan menempatkan secret, roster atau lembar PIN di issue, repo, chat, R2 publik, atau artefak CI.
 
 ## Sebelum implementasi dan staging

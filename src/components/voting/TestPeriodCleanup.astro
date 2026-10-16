@@ -4,14 +4,14 @@ const {periodId, name, slug} = Astro.props;
 ---
 <section class="card cleanup-card" data-test-cleanup data-period-id={periodId} data-slug={slug}>
   <h3>Hapus data uji</h3>
-  <p>Hapus periode <strong>{name}</strong> beserta calon, daftar pemilih, PIN, sesi, partisipasi, dan suara uji. Master siswa dan catatan audit tetap tersimpan.</p>
+  <p>Hapus periode <strong>{name}</strong> beserta calon, daftar pemilih, PIN, sesi, partisipasi, dan suara uji. Master siswa/guru dan catatan audit tetap tersimpan.</p>
   <button type="button" class="btn btn-danger" data-cleanup-open>Hapus periode uji</button>
   <p data-cleanup-message role="status" aria-live="polite" hidden></p>
   <dialog class="ui-dialog" data-cleanup-preview aria-labelledby="cleanup-preview-title">
     <h2 id="cleanup-preview-title">Konfirmasi penghapusan data uji</h2>
     <p><strong>{name}</strong><br/><code>{slug}</code></p>
     <p data-cleanup-summary></p>
-    <p>Semua sesi siswa pada periode ini akan dicabut. Tindakan ini permanen. Data pada periode lain tetap tersimpan.</p>
+    <p>Semua sesi pemilih pada periode ini akan dicabut. Tindakan ini permanen. Data pada periode lain tetap tersimpan.</p>
     <div class="dialog-actions"><button type="button" class="btn btn-outline" data-cleanup-cancel autofocus>Batal</button><button type="button" class="btn btn-danger" data-cleanup-next>Lanjutkan verifikasi</button></div>
   </dialog>
   <dialog class="ui-dialog" data-cleanup-verify aria-labelledby="cleanup-verify-title">

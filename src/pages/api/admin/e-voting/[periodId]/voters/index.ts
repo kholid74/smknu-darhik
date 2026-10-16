@@ -4,15 +4,16 @@ import { PeriodError } from '../../../../../../lib/voting/period-input';
 import { csrfHeader, json, readJson, validMutation, UUID } from '../../../../../../lib/voting/admin-http';
 import { listVoters, syncMasterRoster } from '../../../../../../lib/voting/voters';
 import { RosterError } from '../../../../../../lib/voting/voter-roster-input';
+import { validateStudentSelection } from '../../../../../../lib/voting/master-roster';
 
 export const prerender = false;
 
 function failure(error: unknown) {
   if (error instanceof PeriodError) return json({ error: { code: error.code } }, error.code === 'NOT_FOUND' ? 404 : 409);
   if (error instanceof RosterError) {
-    const conflict = error.code !== 'INVALID_INPUT';
-    return json({ error: { code: error.code } }, conflict ? 409 : 400);
+    return json({ error: { code: error.code } }, error.code === 'INVALID_INPUT' ? 400 : error.code === 'STUDENT_NOT_ELIGIBLE' ? 404 : 409);
   }
+  if (error instanceof Error && ['INVALID_INPUT','BODY_TOO_LARGE','UNSUPPORTED_MEDIA_TYPE'].includes(error.message)) return json({error:{code:error.message}}, error.message === 'BODY_TOO_LARGE' ? 413 : error.message === 'UNSUPPORTED_MEDIA_TYPE' ? 415 : 400);
   const code = typeof error === 'object' && error !== null && 'code' in error ? String((error as { code: unknown }).code) : 'UNKNOWN';
   console.error('E-voting roster sync failed:', error instanceof Error ? error.name : 'UnknownError', code);
   return json({ error: { code: 'TEMPORARILY_UNAVAILABLE' } }, 503);
@@ -38,9 +39,8 @@ export const POST: APIRoute = async ({ params, request, locals, cookies }) => {
   const actorId = locals.session!.sub;
   if (!validMutation(request, actorId, cookies.get('smkdh_token')?.value ?? '')) return json({ error: { code: 'CSRF_REJECTED' } }, 403);
   try {
-    const body = await readJson(request, 1024);
-    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length) return json({ error: { code: 'INVALID_INPUT' } }, 400);
-    const result = await syncMasterRoster(params.periodId, actorId);
+    const studentIds = validateStudentSelection(await readJson(request));
+    const result = await syncMasterRoster(params.periodId, actorId, studentIds);
     return json({ data: result });
   } catch (error) { return failure(error); }
 };

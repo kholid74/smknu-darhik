@@ -1,9 +1,10 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/prisma';
 import { json, readJson, UUID } from '../../../../lib/voting/admin-http';
-import { StudentAuthError, authenticateStudent, newOpaqueToken, preauthCsrf, votingCsrfSecret } from '../../../../lib/voting/student-auth';
+import { StudentAuthError, authenticateVoter, newOpaqueToken, preauthCsrf, votingCsrfSecret } from '../../../../lib/voting/student-auth';
 import { createStudentSessionCsrfToken, isSameOrigin, verifyPreauthCsrfToken } from '../../../../lib/voting/security';
 import { VOTING_SESSION_COOKIE } from '../../../../lib/voting/student-session';
+import { validateVoterLogin, voterPortal } from '../../../../lib/voting/voter-identity';
 
 export const prerender = false;
 const production = process.env.NODE_ENV === 'production';
@@ -29,18 +30,16 @@ export const POST: APIRoute = async ({ request, params, cookies }) => {
   }
   if (!params.periodId || !UUID.test(params.periodId)) return json({ error: { code: 'NOT_FOUND' } }, 404);
   try {
-    const value = await readJson(request);
-    if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).length !== 2) throw new Error('INVALID_INPUT');
-    const { nisn, pin } = value as Record<string, unknown>;
-    if (typeof nisn !== 'string' || !/^\d{10}$/.test(nisn) || typeof pin !== 'string' || !/^\d{10}$/.test(pin)) throw new Error('INVALID_INPUT');
-    const result = await authenticateStudent(params.periodId, nisn, pin);
+    const { voterType, identifier, pin } = validateVoterLogin(await readJson(request));
+    const base = voterPortal(voterType);
+    const result = await authenticateVoter(params.periodId, identifier, pin, voterType);
     cookies.delete(preauthCookie, { path: '/', httpOnly: true, secure: production, sameSite: 'strict' });
     if (result.complete) {
       cookies.delete(VOTING_SESSION_COOKIE, { path: '/', httpOnly: true, secure: production, sameSite: 'strict' });
-      return json({ complete: true, redirectTo: '/siswa/selesai' });
+      return json({ complete: true, redirectTo: `${base}/selesai` });
     }
     cookies.set(VOTING_SESSION_COOKIE, result.token, { httpOnly: true, secure: production, sameSite: 'strict', path: '/' });
-    return json({ complete: false, redirectTo: '/siswa', csrfToken: createStudentSessionCsrfToken(votingCsrfSecret(), result.sessionId) });
+    return json({ complete: false, redirectTo: base, csrfToken: createStudentSessionCsrfToken(votingCsrfSecret(), result.sessionId) });
   } catch (error) {
     if (error instanceof StudentAuthError) {
       if (error.code === 'ELECTION_NOT_OPEN') return json({ error: { code: error.code } }, 409);

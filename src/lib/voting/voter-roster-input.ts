@@ -30,3 +30,13 @@ export function validatePostOpenRosterCorrection(value: unknown) {
   return { expectedSnapshot: validateRosterSnapshot(input.expectedSnapshot), adminPassword: input.adminPassword,
     reviewerAccountId: input.reviewerAccountId, reviewerPassword: input.reviewerPassword };
 }
+
+export type RosterVoterSnapshot = RosterStudentInput | { loginCode: string; name: string; className: string };
+export function validateVoterSnapshot(value: unknown): RosterVoterSnapshot {
+  if (!value || typeof value !== 'object' || !('loginCode' in value)) return validateRosterSnapshot(value);
+  const v = value as Record<string, unknown>;
+  if (Object.keys(v).length !== 3 || Object.keys(v).some(key => !['loginCode', 'name', 'className'].includes(key)) ||
+      typeof v.loginCode !== 'string' || !/^GURU-[A-F0-9]{12}$/.test(v.loginCode) ||
+      typeof v.name !== 'string' || !v.name.trim() || v.name.length > 120 || v.className !== 'Guru') throw new RosterError('INVALID_INPUT');
+  return {loginCode: v.loginCode, name: v.name, className: 'Guru'};
+}

@@ -1,5 +1,5 @@
 import { closePeriodTransaction } from './period-close';
-import { electionSetup } from './setup-readiness';
+import { canEditElectionSetup, electionSetup } from './setup-readiness';
 import { VotingOrganization } from '@prisma/client';
 import { createHmac } from 'node:crypto';
 import { db } from '../prisma';
@@ -61,7 +61,7 @@ export async function updatePeriod(periodId: string, input: PeriodConfig, expect
       throw new PeriodError('STALE_CONFIG');
     }
     const [{ now }] = await tx.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
-    if (!['DRAFT', 'SCHEDULED'].includes(current.state) || current.opensAt <= now) throw new PeriodError('INVALID_STATE');
+    if (!canEditElectionSetup(current, now)) throw new PeriodError('INVALID_STATE');
     if (input.opensAt <= now || input.closesAt <= input.opensAt) throw new PeriodError('INVALID_SCHEDULE');
     const updated = await tx.electionPeriod.update({ where: { id: periodId }, data: input });
     await tx.votingAuditEvent.create({ data: {

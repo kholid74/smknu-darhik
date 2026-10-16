@@ -1,6 +1,8 @@
 ---
 import '../../styles/portal-tokens.css';
 import PortalHead from '../../components/ui/PortalHead.astro';
+const base = Astro.url.pathname.startsWith('/pemilih') ? '/pemilih' : '/siswa';
+const portal = base === '/pemilih' ? 'Portal Pemilih' : 'Portal Siswa';
 export const prerender = false;
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
@@ -15,7 +17,7 @@ Astro.response.headers.set('X-Frame-Options', 'DENY');
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="referrer" content="no-referrer" />
     <PortalHead/>
-    <title>Pemilihan selesai · Portal Siswa</title>
+    <title>Pemilihan selesai · {portal}</title>
     <style>
       :root { font-family: var(--font-portal); color: var(--color-ink); background: var(--color-paper); }
       body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; }
@@ -32,8 +34,8 @@ Astro.response.headers.set('X-Frame-Options', 'DENY');
       <div class="mark" aria-hidden="true">✓</div>
       <h1>Pemilihan Anda telah selesai</h1>
       <p>Terima kasih telah berpartisipasi. Sesi pemilihan pada perangkat ini telah berakhir.</p>
-      <p>Jika perangkat akan digunakan siswa berikutnya, lanjutkan ke halaman masuk.</p>
-      <a href="/siswa/masuk">Siswa berikutnya</a>
+      <p>Jika perangkat akan digunakan pemilih berikutnya, lanjutkan ke halaman masuk.</p>
+      <a href={`${base}/masuk`}>Pemilih berikutnya</a>
     </main>
   </body>
 </html>

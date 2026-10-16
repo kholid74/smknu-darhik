@@ -5,7 +5,16 @@ import { db } from '../../../lib/prisma';
 const token = Astro.cookies.get('smkdh_token')?.value;
 if (!token) return Astro.redirect('/admin/login');
 if (!await verifyToken(token)) return Astro.redirect('/admin/login');
-if (Astro.request.method === 'POST') { const d = await Astro.request.formData(); const id = d.get('id')?.toString(); if (id) await db.teacher.delete({ where: { id } }).catch(()=>{}); }
+if (Astro.request.method === 'POST') {
+  const d = await Astro.request.formData(); const id = d.get('id')?.toString();
+  if (id) {
+    try { await db.teacher.delete({where: {id}}); }
+    catch(error) {
+      if ((error as {code?: string})?.code === 'P2003') return Astro.redirect('/admin/guru?in-use=1');
+      return Astro.redirect('/admin/guru?delete-error=1');
+    }
+  }
+}
 return Astro.redirect('/admin/guru');
 ---
 <html></html>

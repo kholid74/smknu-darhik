@@ -68,6 +68,60 @@ try{
    await cdp('Page.navigate',{url:origin+'/student-expired'});await waitFor(()=>evaluate("location.pathname==='/siswa/masuk'&&location.search==='?expired=1'"),'expiry navigation');
    assert.equal(await evaluate("document.body.textContent.includes('Tampilan privat fixture')"),false);
  });
+ await check('teacher portal uses its own credentials and dashboard, extension, logout and completion routes',async()=>{
+   const mock=await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`window.fetch=async(url,options)=>{
+     if(String(url).endsWith('/session')) {
+       if(options?.method==='POST'){sessionStorage.setItem('qaTeacherPayload',options.body);return new Response(JSON.stringify({redirectTo:'/pemilih'}));}
+       return new Response(JSON.stringify({csrfToken:'qa-preauth',phase:'OPEN'}));
+     }
+     return new Response(String(url).endsWith('/logout')?null:JSON.stringify({csrfToken:'qa-teacher-updated',idleExpiresAt:new Date(Date.now()+120000).toISOString()}),{status:String(url).endsWith('/logout')?204:200});
+   }`});
+   await cdp('Page.navigate',{url:origin+'/pemilih/masuk'});
+   await waitFor(()=>evaluate("document.querySelector('#submit')?.disabled===false"),'teacher preauth');
+   assert.equal(await evaluate("document.querySelector('#identifier').maxLength"),17);
+   assert.equal(await evaluate("document.querySelector('h1').textContent"),'Masuk ke Portal Pemilih');
+   await evaluate("document.querySelector('#identifier').value='GURU-ABCDEF123456';document.querySelector('#pin').value='0011223344';document.querySelector('#submit').click()");
+   await waitFor(()=>evaluate("location.pathname==='/pemilih'&&document.body.dataset.portalBase==='/pemilih'"),'teacher dashboard');
+   assert.deepEqual(JSON.parse(await evaluate("sessionStorage.getItem('qaTeacherPayload')")),{voterType:'TEACHER',code:'GURU-ABCDEF123456',pin:'0011223344'});
+   assert.equal(await evaluate("document.querySelector('a.button').getAttribute('href')"),'/pemilih/e-voting/mixed/pilih');
+   assert.equal(await evaluate("document.querySelectorAll('.coming').length"),0);
+   await evaluate("document.querySelector('#extend-session').click()");
+   await waitFor(()=>evaluate("document.body.dataset.csrf==='qa-teacher-updated'"),'teacher extension');
+   await evaluate("document.querySelector('#logout-button').click()");
+   await waitFor(()=>evaluate("location.pathname==='/pemilih/masuk'"),'teacher logout');
+   await cdp('Page.navigate',{url:origin+'/pemilih/selesai'});
+   await waitFor(()=>evaluate("document.querySelector('h1')?.textContent==='Pemilihan Anda telah selesai'"),'teacher completion');
+   assert.equal(await evaluate("document.querySelector('main a').getAttribute('href')"),'/pemilih/masuk');
+   assert.equal(await evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"),true);
+   await cdp('Page.removeScriptToEvaluateOnNewDocument',{identifier:mock.identifier});
+ });
+ await check('expired draft shows roster actions; student choices survive paging and preview sends only selected IDs',async()=>{
+   await cdp('Emulation.setDeviceMetricsOverride',{width:1366,height:900,deviceScaleFactor:1,mobile:false});
+   await cdp('Page.navigate',{url:origin+'/admin/e-voting/10000000-0000-4000-8000-000000000001/pemilih'});
+   await waitFor(()=>evaluate("document.querySelector('#student-roster [data-ui-table]')?.dataset.initialized==='true'"),'draft roster');
+   assert.equal(await evaluate("!!document.querySelector('#preview-student-roster')&&!!document.querySelector('#preview-teacher-roster')"),true);
+   assert.equal(await evaluate("document.querySelector('.feedback[data-tone=warning]').textContent.includes('DRAFT')"),true);
+   assert.equal(await evaluate("document.querySelectorAll('#student-roster tbody tr:not([hidden])').length"),10);
+   await evaluate("document.querySelector('#student-roster .student-choice').click();document.querySelector('#student-roster [data-table-next]').click();document.querySelector('#student-roster tbody tr:not([hidden]) .student-choice').click();document.querySelector('#preview-student-roster').click()");
+   assert.equal(await evaluate("document.querySelector('#student-selected-count').textContent"),'2 siswa dipilih');
+   assert.equal(await evaluate("document.querySelector('#sync-student-roster').disabled"),false);
+   assert.equal(await evaluate("document.querySelector('#student-roster-preview').textContent.includes('2/99')"),true);
+   await evaluate(`window.qaStudentPosts=[];window.fetch=async(url,options)=>{if(options?.method==='POST'){window.qaStudentPosts.push(JSON.parse(options.body));return new Response(JSON.stringify({error:{code:'STUDENT_NOT_ELIGIBLE'}}),{status:404});}return new Response('{}',{status:200});};document.querySelector('#sync-student-roster').click()`);
+   await waitFor(()=>evaluate("document.querySelector('#action-confirm-dialog')?.open"),'student confirmation');
+   await evaluate("document.querySelector('#action-confirm-dialog button[value=confirm]').click()");
+   await waitFor(()=>evaluate("window.qaStudentPosts.length===1"),'selected student request');
+   assert.equal((await evaluate('window.qaStudentPosts[0].studentIds')).length,2);
+   assert.deepEqual(Object.keys(await evaluate('window.qaStudentPosts[0]')),['studentIds']);
+   await waitFor(()=>evaluate("document.querySelector('#student-roster-preview').textContent.includes('tahun ajaran kelas berubah')"),'changed master feedback');
+   await evaluate("document.querySelector('#student-select-all').click()");
+   assert.equal(await evaluate("document.querySelector('#student-selected-count').textContent"),'31 siswa dipilih');
+   assert.equal(await evaluate("document.querySelector('#sync-student-roster').disabled"),true);
+   await evaluate("document.querySelector('#preview-student-roster').click()");
+   assert.equal(await evaluate("document.querySelector('#student-roster-preview').textContent.includes('31/99')"),true);
+   await cdp('Page.navigate',{url:origin+'/admin/e-voting/10000000-0000-4000-8000-000000000002/pemilih'});
+   await waitFor(()=>evaluate("document.querySelector('.feedback[data-tone=info]')?.textContent.includes('terkunci')"),'opened roster notice');
+   assert.equal(await evaluate("document.querySelector('#student-roster')===null&&document.querySelector('#teacher-roster')===null"),true);
+ });
  assert.deepEqual(errors,[]);
  console.log(JSON.stringify({outcomes,errors},null,2));await writeFile(resolve(artifactRoot,'results.json'),JSON.stringify({outcomes,errors},null,2));
 }catch(error){console.error(error);console.error(JSON.stringify({errors,state:socket?.readyState===1?await evaluate("({url:location.href,title:document.title,body:document.body?.innerText.slice(0,1600),scripts:[...document.scripts].map(s=>s.src)})").catch(()=>null):null},null,2));process.exitCode=1}

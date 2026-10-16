@@ -2,9 +2,15 @@
 
 Status: fondasi schema dan migration additive sudah diterapkan di `prisma/schema.prisma` dan `prisma/migrations/20261011090000_e_voting_foundation`; `prisma validate`, `format`, dan `generate` lulus. Seluruh migrasi dan cleanup sampel diuji pada PostgreSQL dalam memori; pengujian transaksi suara end-to-end pada Neon belum dilakukan. Generator/provider yang ada dipertahankan. Perubahan tidak mengubah Alumni menjadi Student atau menjadikan role siswa internal sebagai daftar pemilih.
 
+## Ekstensi pemilih guru, 16 Oktober 2026
+
+Teacher master yang sudah ada mendapat relasi balik `electionVoters ElectionVoter[]`. Teacher.accountId tetap opsional dan tidak dipakai login voting. ElectionVoter memiliki tepat satu sumber master: STUDENT dengan studentId/NISN dan tanpa teacherId/loginCode, atau TEACHER dengan teacherId/loginCode dan tanpa studentId/NISN. Unique per Teacher/periode dan kode/periode, FK Restrict, serta CHECK format diterapkan dalam `20261016100000_teacher_election_voters`. Nama dan kode adalah snapshot; className guru berisi label kelompok Guru. Ballot tidak berubah.
+
+Trigger menolak perubahan jenis, pemilik, periode atau kode login. INSERT/DELETE roster tersedia dalam DRAFT tanpa batas tanggal lama, atau SCHEDULED sebelum opensAt; cleanup uji yang terotorisasi tetap dapat menghapus data turunannya. Migrasi `20261016120000_draft_setup_editability` menyamakan aturan calon, voter dan penghapusan participation false, tanpa mengubah kolom/data. Participation true tetap monotonic dan Ballot immutable. Koreksi NISN siswa tidak mengganti pemilik. Semua agregat/batas 99 menghitung roster terpilih gabungan; hasil tanpa breakdown jenis. [Alur guru](09-usulan-pemilih-guru.md), [pilihan siswa dan DRAFT](10-daftar-pemilih-dan-draft.md).
+
 ## Model yang diusulkan
 
-`Student` adalah master persisten tanpa kredensial; `ElectionVoter` adalah snapshot dan kredensial siswa pada satu periode. Satu Student dapat memiliki banyak ElectionVoter dan CandidateMember lintas tahun. PIN tetap di ElectionVoter untuk MVP, bukan pada Student atau Account; belum perlu tabel akun permanen. `VoterParticipation` tidak memiliki candidateId. `Ballot` tidak memiliki studentId, voterId atau sessionId. Tidak ada relasi balik terselubung melalui receipt, transaction ID aplikasi, batch vote, atau timestamp.
+`Student` adalah master persisten tanpa kredensial; `ElectionVoter` adalah snapshot dan kredensial siswa atau guru pada satu periode. Satu Student dapat memiliki banyak ElectionVoter dan CandidateMember lintas tahun. PIN tetap di ElectionVoter untuk MVP, bukan pada Student atau Account; belum perlu tabel akun permanen. `VoterParticipation` tidak memiliki candidateId. `Ballot` tidak memiliki studentId, voterId atau sessionId. Tidak ada relasi balik terselubung melalui receipt, transaction ID aplikasi, batch vote, atau timestamp.
 
 ```prisma
 enum ElectionState {
@@ -99,27 +105,38 @@ model CandidateMember {
   @@index([studentId, periodId])
 }
 
+enum ElectionVoterType {
+  STUDENT
+  TEACHER
+}
+
 model ElectionVoter {
-  id                String             @id @default(uuid()) @db.Uuid
-  studentId         String             @db.Uuid
-  periodId          String             @db.Uuid
-  nisn              String             @db.VarChar(10)
-  name              String             @db.VarChar(120)
-  className         String             @db.VarChar(40)
-  credentialEnabled Boolean            @default(true)
-  pinHash           String?            @db.VarChar(60)
-  pinFingerprint    String?            @db.Char(64)
-  pinVersion        Int                @default(0)
-  period            ElectionPeriod     @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  student           Student            @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  id                String               @id @default(uuid()) @db.Uuid
+  voterType         ElectionVoterType    @default(STUDENT)
+  studentId         String?              @db.Uuid
+  teacherId         String?
+  loginCode         String?              @db.VarChar(32)
+  periodId          String               @db.Uuid
+  nisn              String?              @db.VarChar(10)
+  name              String               @db.VarChar(120)
+  className         String               @db.VarChar(40)
+  credentialEnabled Boolean              @default(true)
+  pinHash           String?              @db.VarChar(60)
+  pinFingerprint    String?              @db.Char(64)
+  pinVersion        Int                  @default(0)
+  period            ElectionPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  student           Student?             @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  teacher           Teacher?             @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   participation     VoterParticipation[]
   session           VotingSession?
 
   @@unique([periodId, nisn])
   @@unique([periodId, studentId])
+  @@unique([periodId, teacherId])
+  @@unique([periodId, loginCode])
   @@unique([periodId, pinFingerprint])
-  @@index([studentId])
   @@unique([id, periodId])
+  @@index([studentId])
   @@index([periodId, className])
 }
 
@@ -201,7 +218,7 @@ Prisma schema tidak merepresentasikan seluruh kebijakan berikut. Migration SQL a
 | CandidateMember FK/uniqueness | Candidate pair FK mencakup pair/period/organization; Student FK restrict; unique `(periodId, organization, studentId)` mencegah assignment ganda lintas pasangan; primary key `(candidatePairId, position)` membatasi satu anggota per posisi |
 | Komposisi calon | Tepat satu `CHAIR`, nol atau satu `VICE_CHAIR`; jika ada wakil, studentId harus berbeda. Deferred constraint trigger/service memvalidasi satu atau dua anggota setelah CRUD dan saat dijadwalkan. CandidatePair tetap menjadi pilihan ballot; tidak membuat anggota wakil kosong |
 | Candidate history/snapshot | `nameSnapshot` dan `classSnapshot` disalin dari Student oleh server saat penetapan anggota; update master tidak mengubah snapshot. Index `CandidateMember.studentId` mendukung pencarian riwayat calon. Tidak ada model masa jabatan/officeholder |
-| Candidate edits | Seluruh mutasi pair/member/audit satu transaksi; hanya sebelum opensAt. Trigger/service dengan lock periode menolak perubahan saat/selepas buka, dan candidate set tervalidasi sebelum membuka |
+| Candidate edits | Seluruh mutasi pair/member/audit satu transaksi; DRAFT tanpa batas tanggal lama atau SCHEDULED sebelum opensAt. Trigger/service dengan lock periode menolak perubahan saat/selepas pembukaan SCHEDULED; candidate set tervalidasi sebelum menjadwalkan |
 | PIN unik per periode | Unique `(periodId, pinFingerprint)`; NULL sebelum diterbitkan. CHECK pinHash dan fingerprint sama-sama NULL atau sama-sama terisi; service memastikan fingerprint HMAC dan regenerasi collision |
 | Scope sesi | Enum hanya ELECTION_VOTING; periode didapat lewat voter FK, tidak dari parameter browser. Guard scope/time juga berlaku pada dashboard, tidak ada session Student umum |
 | Jadwal valid | CHECK `opensAt < closesAt`; `extensionUsedAt` nullable menandai satu-satunya perpanjangan; perubahan `closesAt` menyimpan nilai sebelum/sesudah, aktor dan alasan di audit |

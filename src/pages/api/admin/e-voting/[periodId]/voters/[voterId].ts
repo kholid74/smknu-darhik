@@ -3,7 +3,7 @@ import { can } from '../../../../../../lib/rbac';
 import { getPrincipal } from '../../../../../../lib/auth';
 import { json, readJson, validMutation, UUID } from '../../../../../../lib/voting/admin-http';
 import { PeriodError } from '../../../../../../lib/voting/period-input';
-import { RosterError, validatePostOpenRosterCorrection, validateRosterSnapshot } from '../../../../../../lib/voting/voter-roster-input';
+import { RosterError, validatePostOpenRosterCorrection, validateRosterSnapshot, validateVoterSnapshot } from '../../../../../../lib/voting/voter-roster-input';
 import { removeVoterFromRoster, syncVoterFromMaster } from '../../../../../../lib/voting/voters';
 
 export const prerender = false;
@@ -49,7 +49,7 @@ export const DELETE: APIRoute = async ({ params, request, locals, cookies }) => 
   try {
     const body = await readJson(request);
     if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || !('expectedSnapshot' in body)) return json({ error: { code: 'INVALID_INPUT' } }, 400);
-    const expected = validateRosterSnapshot((body as Record<string, unknown>).expectedSnapshot);
+    const expected = validateVoterSnapshot((body as Record<string, unknown>).expectedSnapshot);
     await removeVoterFromRoster(params.periodId, params.voterId, expected, actorId);
     return new Response(null, { status: 204, headers: { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' } });
   } catch (error) { return errorResponse(error); }

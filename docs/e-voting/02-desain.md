@@ -2,6 +2,8 @@
 
 Status: rincian teknis proposed; autentikasi [ADR 0002](adr/0002-autentikasi-portal-siswa-mvp.md) dan keputusan operasional pada [README](README.md) sudah disepakati. Batas request perlu dikalibrasi saat gladi bersih; timeout sesi sudah tetap.
 
+Pembaruan implementasi 16 Oktober: [pemilih guru](09-usulan-pemilih-guru.md) disetujui dan diterapkan. Guru dipilih eksplisit dari Teacher master sebelum buka, memiliki kode guru + PIN periode, dan masuk `/pemilih`. Setiap guru mendapat empat hak suara dengan bobot sama; hasil digabung tanpa breakdown siswa/guru. Semua hitungan roster, kesiapan, PIN, partisipasi, rekonsiliasi dan tutup lebih awal memakai gabungan maksimal 99 pemilih. Sesi guru tidak membuka `/siswa`, sesi siswa tidak membuka `/pemilih`, dan cookie voting tidak memenuhi akses internal. Tidak ada penambahan guru pada periode yang sudah dibuka.
+
 ## Bentuk integrasi
 
 ```mermaid
@@ -18,6 +20,9 @@ flowchart LR
   T --> E[Periode, calon, pemilih, partisipasi]
   T --> B[Surat suara tanpa identitas pemilih]
   M[Master Student tanpa kredensial] --> E
+  G[Guru dengan kode dan PIN] --> DG[Dashboard Portal Pemilih]
+  DG --> V
+  MT[Master Teacher dipilih panitia] --> E
 ```
 
 Seluruh halaman/API pemilu dirender on-demand. Pertahankan `output: static`, beri `prerender = false` pada setiap route baru. Gunakan service kecil di `src/lib/voting/`, dipanggil baik oleh form Astro maupun endpoint; route hanya mengurus HTTP, autentikasi, validasi bentuk input, dan respons. Invariant domain, otorisasi tindakan, serta transaksi tetap diperiksa di service. Tidak ada polling kandidat terpilih, offline ballot queue, atau penyimpanan pilihan di browser.
@@ -32,7 +37,7 @@ State tersimpan hanya `DRAFT → SCHEDULED → CLOSED → ARCHIVED`. Publikasi a
 
 | State tersimpan/kondisi | Tampilan | Tindakan |
 | --- | --- | --- |
-| DRAFT | Persiapan | Edit jadwal, calon dan roster; buat PIN; belum bisa memilih |
+| DRAFT, termasuk tanggal awal lewat | Persiapan | Edit jadwal, calon dan roster; buat PIN; belum bisa memilih. Perbaiki jadwal ke masa depan sebelum menjadwalkan |
 | SCHEDULED, now < opensAt | Terjadwal | Roster/calon dapat dilengkapi atau dikoreksi setelah pengesahan registrar; distribusi/reissue PIN boleh |
 | SCHEDULED, opensAt ≤ now < closesAt | Dibuka | Login dan kirim suara; pantau partisipasi saja |
 | SCHEDULED, now ≥ closesAt | Menunggu penutupan resmi | Suara baru ditolak; panitia rekonsiliasi dan menutup; hasil tetap tersembunyi |
@@ -75,11 +80,11 @@ Snapshot anggota tidak ikut berubah ketika master Student dikoreksi. Hasil, arsi
 
 Simpan master `Student` persisten dengan ID stabil, NISN string 10 digit unik global, nama dan kelas terkini; tanpa PIN/password/session/account role. `ElectionVoter` mereferensikan Student dan menyimpan snapshot NISN/nama/kelas serta kredensial per periode. Student dapat ada tanpa keikutsertaan pemilu; satu Student hanya satu ElectionVoter per periode. Keberadaan master bukan bukti eligibility atau autentikasi. Master tidak dihapus ketika periode ditutup, PIN dicabut, sesi berakhir atau data kredensial dibersihkan.
 
-Pemilih periode sekolah adalah seluruh Student master yang terhubung ke `SchoolClass` dengan `academicYear` sama persis dengan periode. Halaman Kelola Pemilih menampilkan preview dan menyinkronkan kelompok itu; tidak ada impor roster kedua atau pembuatan Student dari alur pemilihan. Sinkronisasi hanya menambahkan Student yang belum ada, mempertahankan snapshot/roster existing, membuat empat eligibility atomik per siswa, dan menolak seluruh transaksi jika proyeksi melebihi 99 atau NISN bentrok. Student tanpa kelas terhubung tidak memenuhi filter; registrar harus membenahi master siswa/kelas lebih dulu. Populasi MVP kurang dari 100 siswa.
+Calon pemilih siswa bersumber dari Student yang terhubung ke `SchoolClass` dengan `academicYear` sama persis dengan periode. Panitia memilih subset melalui ID siswa, dengan pencarian/filter kelas, checkbox dan pratinjau; seluruh siswa hanya ikut bila dipilih eksplisit. Tidak ada impor kedua atau pembuatan Student. Penambahan mempertahankan snapshot/roster existing dan membuat empat eligibility atomik untuk siswa terpilih yang belum ada. Guru dipilih dari tabel Teacher terpisah. Kedua mutasi mengunci periode yang sama, menolak total gabungan di atas 99, dan membuat audit bersama roster/empat eligibility. Student tanpa kelas terhubung dikecualikan. Rincian [pilihan siswa dan DRAFT](10-daftar-pemilih-dan-draft.md).
 
 Koreksi NISN dilakukan pengelola data dari sumber resmi dengan dua pemeriksa; Student ID tetap dan tidak ada pencocokan otomatis berdasarkan nama. Hingga periode dibuka, sinkronkan snapshot secara eksplisit; perubahan NISN mengosongkan hash/fingerprint, menaikkan versi, mencabut sesi dan memerlukan PIN baru. Setelah dibuka, membership roster dan slate calon beku. Koreksi NISN untuk voter yang belum memberi suara tetap diperbolehkan lewat pengecualian terkontrol: sumber resmi, dua pemeriksa, Student ID sama, revokasi PIN/sesi dan penerbitan PIN baru. NISN voter yang sudah memberi suara tidak boleh diubah. Perubahan master tidak mengubah snapshot periode lama. Penghapusan roster sebelum buka tidak menghapus Student; hard-delete master yang direferensikan pemilu ditolak.
 
-PIN dibuat dengan `crypto.randomInt(0, 10 ** 10)`, dipad kiri nol menjadi 10 digit; bukan NISN/tanggal lahir/`Math.random`. Hash `HMAC-SHA256(VOTING_PIN_SECRET, periodId + separator + nisn + separator + pin)` dengan bcrypt cost 12. Pepper terpisah dari `JWT_SECRET`, tersimpan di secret manager dan backup konfigurasi; rotasi pepper memerlukan penerbitan ulang PIN. Benchmark cost pada runtime sebenarnya; jangan mengurangi proteksi secara diam-diam karena lambat.
+PIN dibuat dengan `crypto.randomInt(0, 10 ** 10)`, dipad kiri nol menjadi 10 digit; bukan NISN/tanggal lahir/`Math.random`. Material bcrypt cost 12 adalah HMAC-SHA256 atas `pin-hash`, periodId, identifier dan PIN dipisahkan NUL; identifier siswa tetap NISN, identifier guru adalah kode guru. Format hash siswa lama tidak diubah. Pepper terpisah dari `JWT_SECRET`, tersimpan di secret manager dan backup konfigurasi; rotasi pepper memerlukan penerbitan ulang PIN. Benchmark cost pada runtime sebenarnya; jangan mengurangi proteksi diam-diam karena lambat.
 
 Keunikan PIN berlaku di dalam periode: simpan `pinFingerprint = HMAC-SHA256(VOTING_PIN_SECRET, "unique-pin" + separator + periodId + separator + pin)` dengan domain berbeda dari input bcrypt. Unique constraint `(periodId, pinFingerprint)` menolak benturan, termasuk penerbitan paralel; buat ulang nilai bentrok dan ulangi transaksi dengan batas retry, jangan mencetak sebelum commit. Fingerprint tidak berisi NISN agar benar-benar mendeteksi PIN sama antar pemilih; tetap rahasia, tidak diekspos/log. Jangan memakai SHA-256 PIN tanpa secret. Penerbitan ulang harus memilih nilai berbeda dari PIN yang sedang berlaku. PIN periode lain tidak dipakai sebagai fallback autentikasi.
 
@@ -100,7 +105,7 @@ Istilah reset PIN dalam dokumen ini berarti penerbitan ulang **oleh admin berizi
 - Form `/siswa/masuk` memakai NISN + PIN + periode dari slug publik yang di-resolve server. Jika slug tidak diberikan, server menawarkan periode yang sedang dibuka; tidak menebak periode dari PIN. Gagal karena NISN tidak ada dalam roster, PIN salah, atau kredensial nonaktif menghasilkan pesan sama dan dummy bcrypt dengan cost sama. Master Student tanpa roster/PIN tidak dapat login. Jangan kembalikan identitas siswa sebelum berhasil.
 - Sesi berupa token acak 32 byte, hanya hash SHA-256 disimpan. Cookie produksi `__Host-smkdh_vote`, `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/`, tanpa Domain dan tanpa persistent Max-Age. Local HTTP memakai nama khusus dev; produksi wajib HTTPS.
 - Satu sesi aktif per voter, tersimpan dengan scope enum `ELECTION_VOTING` dan periode yang diturunkan dari voter. Tidak ada cookie sesi portal permanen atau pertukaran token pemilu menjadi token umum. Login baru, reset, penonaktifan, logout, atau penyelesaian empat suara mencabut sesi sebelumnya. Setelah bcrypt di luar transaksi, lock voter dan cek ulang `pinVersion`/hash/aktif serta jendela waktu untuk menutup race dengan reset/deadline.
-- Pelaksanaan sekolah menyediakan tiga Chromebook bersama. Maksimal tiga akun siswa aktif bersamaan, masing-masing satu akun pada satu perangkat; siswa bergantian memakai Chromebook. Uji sesi tiga siswa yang aktif bersamaan dan pembersihan sesi/tab saat pergantian siswa. Perangkat pribadi dan login serentak seluruh pemilih bukan mode MVP.
+- Pelaksanaan sekolah menyediakan tiga Chromebook bersama. Maksimal tiga sesi pemilih aktif bersamaan, masing-masing satu akun pada satu perangkat; siswa bergantian memakai Chromebook. Uji sesi tiga pemilih siswa/guru yang aktif bersamaan dan pembersihan sesi/tab saat pergantian siswa. Perangkat pribadi dan login serentak seluruh pemilih bukan mode MVP.
 - Idle 5 menit, absolute 15 menit atau deadline (mana lebih cepat); server memeriksa keduanya. `lastSeenAt` hanya diperpanjang oleh interaksi eksplisit, bukan background polling. Peringatan sebelum idle habis dan tombol lanjut yang dapat diakses; absolute limit tidak diperpanjang.
 - Kelanjutan berasal dari empat boolean partisipasi di DB. UI hanya menampilkan “sudah memilih”; tidak menyimpan atau menampilkan kembali nama kandidat pilihan. Login ulang parsial dengan PIN valid yang sama menuju dashboard `/siswa`, kemudian tombol lanjut ke organisasi belum selesai. Jika semua selesai saat login ulang selama periode valid, arahkan ke `/siswa/selesai`, kosongkan cookie tanpa sesi aktif baru. Di luar periode valid, jangan memverifikasi PIN untuk membuka riwayat pribadi; tampilkan status periode netral.
 - POST logout membatalkan sesi di DB dan menghapus cookie dengan atribut sama. Tombol logout ada di dashboard maupun pemungutan. Pada sukses suara keempat, sesi dicabut dalam transaksi dan UI membersihkan identitas/pilihan, lalu menampilkan layar `/siswa/selesai` generik dengan tombol “Siswa berikutnya” menuju login. Tidak kembali ke dashboard bersesi. Back atau tab lama harus ditolak/revalidasi, termasuk pada dashboard.

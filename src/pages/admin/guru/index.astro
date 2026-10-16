@@ -17,6 +17,8 @@ const teachers = await db.teacher.findMany({ orderBy: s.orderBy });
 ---
 
 <AdminLayout title="Guru &amp; Staf" user={{ role: session.role }}>
+  {Astro.url.searchParams.has('in-use') && <p class="feedback" data-tone="warning" role="status">Guru masih terdaftar sebagai pemilih. Data master tidak dapat dihapus karena diperlukan untuk riwayat pemilihan.</p>}
+  {Astro.url.searchParams.has('delete-error') && <p class="feedback" data-tone="error" role="alert">Guru belum dapat dihapus. Muat ulang dan coba lagi.</p>}
   <PageHeader title="Guru &amp; Staf"><Fragment slot="actions">
     <a href="/admin/guru/new" class="btn btn-primary"><span class="material-symbols-outlined">add</span> Tambah</a>
   </Fragment></PageHeader>

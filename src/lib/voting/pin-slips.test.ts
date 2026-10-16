@@ -21,3 +21,15 @@ test('PIN portal URL preserves the active host and port and rejects non-web sche
   assert.match(renderPinSlips(period, slips, 'http://localhost:4321'), /http:\/\/localhost:4321\/siswa\/masuk\?periode=osis-2026/);
   assert.throws(() => renderPinSlips(period, slips, 'javascript://unsafe/'));
 });
+
+test('mixed PIN batches print each portal and real identifier without fake teacher NISN',()=>{
+  const html=renderPinSlips({name:'Test',slug:'mixed',opensAt:new Date(),closesAt:new Date()},[
+    {name:'Student',nisn:'0012345678',className:'X',pin:'0011223344'},
+    {name:'<Teacher>',voterType:'TEACHER',nisn:null,loginCode:'GURU-ABCDEF123456',className:'Guru',pin:'1234567890'},
+  ],'https://school.example.test');
+  assert.match(html,/https:\/\/school.example.test\/siswa\/masuk\?periode=mixed/);
+  assert.match(html,/https:\/\/school.example.test\/pemilih\/masuk\?periode=mixed/);
+  assert.match(html,/Kode guru: GURU-ABCDEF123456/);
+  assert.match(html,/&lt;Teacher&gt;/);
+  assert.doesNotMatch(html,/NISN: (null|GURU)/);
+});

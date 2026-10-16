@@ -8,18 +8,21 @@ Status: implementasi berlangsung. Fondasi schema/migration, admin periode/kandid
 | --- | --- | --- |
 | `/siswa/masuk` | Login NISN/PIN; query `periode=<slug>` opsional untuk memilih periode yang sedang dibuka, pesan generik; tidak ada daftar/lupa password | `src/pages/siswa/masuk.astro`, form berlabel |
 | `/siswa` | Tujuan login parsial/awal; dashboard dengan E-Voting periode sesi dan kartu Coming Soon non-interaktif | `StudentPortalLayout.astro`; guard ELECTION_VOTING dan periode aktif |
-| `/siswa/e-voting/[slug]` | Jadwal WIB, aturan singkat, tombol lanjut periode yang cocok dengan sesi | StudentPortalLayout; protected |
 | `/siswa/e-voting/[slug]/pilih` | Empat status, lanjut organisasi belum selesai | `src/pages/siswa/e-voting/[slug]/pilih/index.astro`; protected, implemented |
 | `/siswa/e-voting/[slug]/pilih/[organization]` | Pasangan dengan snapshot anggota/foto opsional/visi-misi; satu radio; konfirmasi sebelum final | `src/pages/siswa/e-voting/[slug]/pilih/[organization].astro`; protected, implemented |
-| `/siswa/selesai` | Layar selesai setelah revokasi, pesan generik tanpa identitas/pilihan, “Siswa berikutnya” menuju `/siswa/masuk` | `src/pages/siswa/selesai.astro`; netral, dapat dibuka tanpa sesi, implemented |
+| `/siswa/selesai` | Layar selesai setelah revokasi, pesan generik tanpa identitas/pilihan, “Pemilih berikutnya” menuju `/siswa/masuk` | `src/pages/siswa/selesai.astro`; netral, dapat dibuka tanpa sesi, implemented |
 | `/e-voting/[slug]/hasil` | Hasil terbit per organisasi, persentase dan status seri | Server-rendered snapshot terbit, tidak memerlukan sesi PIN; implemented |
+| `/pemilih/masuk` | Kode guru + PIN periode, query periode opsional, link menuju login siswa | VoterLogin bersama; payload login tetap dipisah jenis |
+| `/pemilih` | Dashboard guru tanpa kartu layanan pribadi siswa | View bersama Portal Siswa, guard jenis sesi |
+| `/pemilih/e-voting/[slug]/pilih` dan `/pemilih/e-voting/[slug]/pilih/[organization]` | Empat organisasi, kandidat/konfirmasi/transaksi bersama | Root route menangani redirect/error; view dipakai bersama |
+| `/pemilih/selesai` | Layar netral dan tombol Pemilih berikutnya ke login guru | Tidak memerlukan sesi |
 | `/admin/siswa` | Master Student persisten, daftar/cari/create/koreksi eksplisit; tanpa PIN/password, tanpa hard-delete | AdminLayout; `student.kelola`, tidak bergantung periode aktif; implemented |
 | `/admin/e-voting` | Daftar periode + buat baru, empat organisasi dibuat otomatis | AdminLayout; implemented |
 | `/admin/e-voting/panduan` | Panduan satu halaman: master siswa, periode, calon, sinkronisasi pemilih, cetak PIN, jadwal, pelaksanaan, tutup/publikasi dan kendala umum; tautan dari daftar serta detail periode | AdminLayout; `evoting.lihat`, on-demand; implemented |
 | `/admin/e-voting/[id]` | Detail/edit nama, tahun ajaran, jadwal dengan stale guard; jadwalkan DRAFT setelah readiness check; tutup setelah deadline atau seluruh pemilih selesai empat suara (konfirmasi + password); arsipkan CLOSED | AdminLayout; konfigurasi, schedule, close, dan archive implemented |
 | `/admin/e-voting/[id]/partisipasi` | Total belum mulai/parsial/lengkap dan partisipasi per organisasi; daftar status roster hanya dengan izin tambahan | `evoting.partisipasi`, daftar juga `evoting.pemilih`; implemented |
 | `/admin/e-voting/[id]/calon` | Jumlah pasangan dinamis per organisasi; pilih ketua dan wakil opsional dari Student berbeda melalui pencarian (nama/NISN/kelas), atur posisi, nomor, visi/misi dan foto opsional per anggota | AdminLayout; `evoting.kelola` + `evoting.pemilih`; MediaPicker hanya bila juga punya media.kelola |
-| `/admin/e-voting/[id]/pemilih` | Kelola Pemilih: preview dan sinkronisasi seluruh master Student yang terhubung ke kelas pada tahun ajaran periode, penghapusan sebelum buka; koreksi NISN saja selama periode berlangsung dengan dua admin berbeda | AdminLayout; sinkronisasi butuh `evoting.pemilih`, koreksi juga `student.kelola`; mencabut PIN/sesi dan mengaudit |
+| `/admin/e-voting/[id]/pemilih` | Pilih subset siswa dari master tahun ajaran, cari/filter kelas, checkbox/pilih semua, pratinjau nama/jumlah, konfirmasi dan tambahan eksplisit. DRAFT tetap dapat disiapkan jika tanggal lewat; SCHEDULED membeku saat buka. Penghapusan eksplisit; koreksi NISN terkontrol saat berlangsung tetap khusus siswa | AdminLayout; pemilihan butuh `evoting.pemilih`, koreksi juga `student.kelola`; tanpa impor kedua atau penggantian roster otomatis |
 | `/admin/e-voting/[id]/pin` | Pilih maksimal 25 target untuk issue/reset, autentikasi ulang, alasan reset, slip print-only | `evoting.pin` + `evoting.pemilih`; implemented |
 | `/admin/e-voting/[id]/partisipasi` | Total, parsial/lengkap, status siswa hanya dengan izin tambahan | AdminLayout; tabel, tanpa chart library untuk versi awal |
 | `/admin/e-voting/[id]/hasil` | Snapshot setelah close, cetak agregat dan publikasi berizin | AdminLayout; tidak memuat tally lebih awal dalam hidden DOM |
@@ -125,6 +128,8 @@ Jangan menggandakan mutasi di frontmatter dan API; frontmatter hanya adaptor lay
 
 ## Urutan pekerjaan dan dependensi
 
+Pembaruan 16 Oktober 2026: persetujuan implementasi sudah diberikan; daftar T0–T9 berikut adalah urutan rencana awal, bukan permintaan persetujuan ulang. Implementasi guru mengikuti [keputusan final](09-usulan-pemilih-guru.md), dengan master Teacher dan sesi voting terpisah dari Account.
+
 | ID | Pekerjaan | Bergantung pada | Bukti selesai |
 | --- | --- | --- | --- |
 | T0 | Bekukan keputusan autentikasi dan operasional yang disepakati pada README/ADR 0002 | Izin implementasi terpisah, belum diberikan | Rencana siap ditinjau; tidak mengubah keputusan MVP |
@@ -138,8 +143,16 @@ Jangan menggandakan mutasi di frontmatter dan API; frontmatter hanya adaptor lay
 | T8 | Uji beban, browser manual, restore, deployment rehearsal | T1–T7 | Seluruh acceptance pada dokumen tes dan checklist operasional disahkan |
 | T9 | Deploy additive terkontrol dan pemilihan nyata | T8 | Checklist go/no-go; izin deploy saat akan dilaksanakan |
 
-Operasional pemilihan menetapkan tiga Chromebook bersama dan maksimal tiga akun siswa aktif bersamaan; profil beban staging mengikuti tiga perangkat itu, sementara kapasitas Vercel/Neon tetap perlu diverifikasi. Implementasi bertahap tetap harus selesai sampai kontrol keamanan dan uji integritas lulus; jangan membuka fitur siswa setelah T6 bila T7/T8 belum selesai.
+Operasional pemilihan menetapkan tiga Chromebook bersama dan maksimal tiga sesi pemilih aktif bersamaan; profil beban staging mengikuti tiga perangkat itu, sementara kapasitas Vercel/Neon tetap perlu diverifikasi. Implementasi bertahap tetap harus selesai sampai kontrol keamanan dan uji integritas lulus; jangan membuka fitur siswa setelah T6 bila T7/T8 belum selesai.
 
 ## Implementasi cleanup sampel ? 15 Oktober 2026
 
 Komponen TestPeriodCleanup pada konfigurasi periode uji memakai dua dialog native: ringkasan lalu konfirmasi HAPUS <slug> dan password. API test-cleanup menggunakan limiter/reauthentication admin yang sama, gate superadmin, CSRF dan versi snapshot. Stored function menjalankan cleanup atomik tanpa menonaktifkan trigger umum. Semua migrasi dan perilaku cleanup diuji pada PGlite; browser menggunakan respons API sintetis. [Panduan penggunaan](08-pembersihan-data-uji.md).
+
+## Implementasi pemilih guru
+
+Revisi berikutnya memperbaiki DRAFT dengan jadwal lewat dan menambah tabel pilihan siswa eksplisit, jumlah terpilih, cari/filter kelas, pilih semua serta preview/konfirmasi. Payload siswa kini `{studentIds:[...]}`, tanpa bulk implicit. Ketika terkunci, alasan ditampilkan. Rincian [pemilih dan DRAFT](10-daftar-pemilih-dan-draft.md).
+
+Kelola Pemilih menambahkan tabel master Teacher dengan pencarian dan pilihan eksplisit, pratinjau nama/jumlah gabungan, popup konfirmasi dan POST voters/teachers. Perubahan pilihan membatalkan pratinjau. Daftar terdaftar, PIN dan partisipasi memakai label NISN / kode guru serta Kelas / kelompok. Sync/koreksi NISN hanya siswa. Sebelum buka guru dapat dihapus dari roster lalu ditambahkan ulang untuk memperbaiki snapshot, tanpa menghapus master.
+
+Model/identity/auth/PIN/middleware/dashboard dan hasil memakai kedua jenis. Portal guru dan siswa berbagi view/layanan vote; tidak ada implementasi transaksi kedua atau hak admin dari PIN. Header no-store, timer, logout dan revalidasi browser mengikuti portal sesi. Guru master yang masih direferensikan tidak dapat dihapus dan mendapat pesan jelas. Rincian [keputusan, API dan rollout](09-usulan-pemilih-guru.md).

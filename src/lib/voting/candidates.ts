@@ -2,6 +2,7 @@ import type { VotingOrganization } from '@prisma/client';
 import { db } from '../prisma';
 import { retryDatabaseRead } from '../database-read';
 import { CandidateError, type CandidateInput, type ExpectedCandidate } from './candidate-input';
+import { canEditElectionSetup } from './setup-readiness';
 
 export { CandidateError, validateCandidateInput } from './candidate-input';
 
@@ -12,7 +13,7 @@ async function lockEditablePeriod(tx: any, periodId: string) {
   if (!rows[0]) throw new CandidateError('NOT_FOUND');
   const [{ now }] = await tx.$queryRawUnsafe('SELECT clock_timestamp() AS "now"');
   if (!['DRAFT', 'SCHEDULED'].includes(rows[0].state)) throw new CandidateError('INVALID_STATE');
-  if (new Date(now) >= new Date(rows[0].opensAt)) throw new CandidateError('CANDIDATES_LOCKED');
+  if (!canEditElectionSetup(rows[0], new Date(now))) throw new CandidateError('CANDIDATES_LOCKED');
 }
 
 async function resolveMembers(tx: any, input: CandidateInput) {

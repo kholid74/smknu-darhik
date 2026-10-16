@@ -1,5 +1,5 @@
 ---
 import StudentPortalLayout from '../../../../src/layouts/StudentPortalLayout.astro';
-Astro.locals.votingSession={id:'qa-session',scope:'ELECTION_VOTING',voterId:'qa-voter',periodId:'qa-period',createdAt:new Date(),lastSeenAt:new Date(),expiresAt:new Date(Date.now()+600000)};
+Astro.locals.votingSession={id:'qa-session',scope:'ELECTION_VOTING',voterType:'STUDENT',voterId:'qa-voter',periodId:'qa-period',createdAt:new Date(),lastSeenAt:new Date(),expiresAt:new Date(Date.now()+600000)};
 ---
 <StudentPortalLayout title="Fixture siswa" csrfToken="qa-csrf-before" periodId="qa-period"><h1>Portal Siswa — fixture sintetis</h1><p>Belum ada pilihan kandidat yang ditampilkan.</p><a class="button pale" href="#pemilihan">Mulai memilih <span aria-hidden="true">→</span></a><button class="secondary" id="extend-session" type="button">Perpanjang sesi</button><time id="session-expiry">Awal</time></StudentPortalLayout>

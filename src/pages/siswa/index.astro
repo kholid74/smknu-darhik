@@ -4,6 +4,7 @@ import { getStudentDashboard } from '../../lib/voting/student-dashboard';
 import { createStudentSessionCsrfToken } from '../../lib/voting/security';
 import { votingCsrfSecret } from '../../lib/voting/student-auth';
 
+import { voterPortal } from '../../lib/voting/voter-identity';
 export const prerender = false;
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
@@ -11,9 +12,10 @@ Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
 Astro.response.headers.set('X-Frame-Options', 'DENY');
 
 const session = Astro.locals.votingSession;
-if (!session) return Astro.redirect('/siswa/masuk');
-const dashboard = await getStudentDashboard(session.periodId, session.voterId);
-if (!dashboard) return Astro.redirect('/siswa/masuk');
+const base = voterPortal(session?.voterType);
+if (!session) return Astro.redirect(`${base}/masuk`);
+const dashboard = Astro.props.dashboard ?? await getStudentDashboard(session.periodId, session.voterId);
+if (!dashboard) return Astro.redirect(`${base}/masuk`);
 const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
 const organizations = [
   ['OSIS', 'OSIS'],
@@ -26,7 +28,7 @@ const completedCount = organizations.filter(([key]) => dashboard.participation[k
 <StudentPortalLayout title="Beranda" csrfToken={csrfToken} periodId={dashboard.period.id}>
   <section class="intro">
     <p class="eyebrow">DASHBOARD</p>
-    <h1>Selamat datang di Portal Siswa</h1>
+    <h1>Selamat datang di {session.voterType === 'TEACHER' ? 'Portal Pemilih' : 'Portal Siswa'}</h1>
     <p class="muted">Akses layanan pemilihan untuk periode yang sedang berlangsung.</p>
   </section>
 
@@ -39,8 +41,8 @@ const completedCount = organizations.filter(([key]) => dashboard.participation[k
         <span style={`width:${completedCount * 25}%`}></span>
       </div>
       {dashboard.complete
-        ? <a class="button pale" href="/siswa/selesai">Lihat status selesai</a>
-        : <a class="button pale" href={dashboard.services[0].href}>{completedCount ? `Lanjutkan · ${dashboard.nextOrganization}` : 'Mulai memilih'}<span aria-hidden="true">→</span></a>}
+        ? <a class="button pale" href={`${base}/selesai`}>Lihat status selesai</a>
+        : <a class="button pale" href={`${base}/e-voting/${dashboard.period.slug}/pilih`}>{completedCount ? `Lanjutkan · ${dashboard.nextOrganization}` : 'Mulai memilih'}<span aria-hidden="true">→</span></a>}
     </div>
     <div class="election-status" aria-label="Status partisipasi">
       {organizations.map(([key, label]) => <div class="status-row">
@@ -50,7 +52,7 @@ const completedCount = organizations.filter(([key]) => dashboard.participation[k
     </div>
   </section>
 
-  <section class="services" aria-labelledby="services-title">
+  {session.voterType !== 'TEACHER' && <section class="services" aria-labelledby="services-title">
     <div class="section-heading"><div><p class="eyebrow">LAYANAN</p><h2 id="services-title">Layanan Portal</h2></div></div>
     <div class="service-grid">
       {dashboard.services.slice(1).map((service) => <article class="service coming" aria-label={`${service.label}, segera hadir`}>
@@ -60,7 +62,7 @@ const completedCount = organizations.filter(([key]) => dashboard.participation[k
         <span class="service-state">Segera hadir</span>
       </article>)}
     </div>
-  </section>
+  </section>}
 
   <section class="session-box" aria-labelledby="session-title">
     <div><h2 id="session-title">Sesi perangkat ini</h2><p class="muted">Sesi berakhir setelah tidak aktif. Perpanjang hanya saat masih menggunakan portal.</p><p class="expiry">Berakhir pukul <time id="session-expiry">{session.expiresAt.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB</time></p></div>

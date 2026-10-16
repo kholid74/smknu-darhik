@@ -8,6 +8,12 @@ Istilah pemilihan empat organisasi sekolah dalam satu periode.
 
 **Portal Siswa MVP**: Dashboard setelah autentikasi PIN pemilu, berisi akses E-Voting periode tersebut dan informasi Coming Soon untuk layanan yang belum tersedia.
 
+**Guru pemilih**: Teacher master yang dipilih panitia sebagai pemilih suatu periode. Teacher.accountId opsional dan tidak digunakan untuk autentikasi voting. Guru tidak dibuat sebagai Student dan tidak mendapat NISN buatan.
+
+**Kode pemilih guru**: Identifier snapshot per periode berbentuk `GURU-` diikuti 12 digit heksadesimal, dibuat sistem. Dipakai bersama PIN periode, bukan password atau izin admin.
+
+**Portal Pemilih guru**: `/pemilih/masuk` dan dashboard `/pemilih`, memakai sesi ELECTION_VOTING yang sama aturannya dengan siswa, tetapi tidak membuka namespace Portal Siswa maupun layanan pribadi guru.
+
 **PIN pemilu**: Kredensial unik dalam satu periode yang diterbitkan dan dicetak panitia untuk seorang pemilih; bukan password akun siswa permanen.
 
 **Penerbitan ulang PIN**: Penggantian PIN oleh panitia berizin, misalnya karena slip hilang, tanpa mengubah suara yang telah masuk.
@@ -16,14 +22,16 @@ _Hindari_: Reset password siswa.
 **Periode pemilihan**: Satu penyelenggaraan pemilihan dengan jadwal bersama dan daftar pemilih tersendiri, misalnya periode tahun ajaran 2026/2027.
 _Hindari_: Tahun sebagai satu-satunya identitas pemilihan.
 
-**Organisasi**: Salah satu dari OSIS, Dewan Ambalan, IPNU, atau IPPNU yang dipilih setiap siswa terdaftar.
+**Organisasi**: Salah satu dari OSIS, Dewan Ambalan, IPNU, atau IPPNU yang dipilih setiap siswa dan guru terdaftar dengan bobot suara sama.
 
 **Pasangan calon**: Satu pilihan pada satu organisasi/periode yang memiliki tepat satu ketua dan wakil opsional (nol atau satu). Setiap anggota adalah Student berbeda yang dipilih dari master persistent. Tanpa wakil tetap merupakan satu pilihan calon yang sah.
 _Hindari_: Nama bebas yang tidak terhubung ke Student master.
 
 **Anggota pasangan calon**: Student yang ditugaskan pada posisi `CHAIR` atau `VICE_CHAIR` di CandidatePair. `studentId` dipertahankan untuk riwayat pencalonan, sedangkan nama dan kelas disimpan sebagai snapshot historis; perubahan data master tidak menulis ulang snapshot.
 
-**Pemilih terdaftar**: Siswa yang tercantum pada daftar suatu periode dan memiliki empat hak pilih. Daftar periode sekolah disinkronkan dari Student master yang terhubung ke kelas dengan tahun ajaran yang sama; Student lain tidak otomatis menjadi pemilih.
+**Pemilih terdaftar**: ElectionVoter dengan tepat satu referensi Student (STUDENT) atau Teacher (TEACHER), snapshot identitas dan empat hak pilih. Siswa dipilih eksplisit dari master yang terhubung ke kelas tahun ajaran periode; tidak wajib seluruh siswa ikut. Guru juga dipilih eksplisit. Batas 99 adalah jumlah gabungan. Keanggotaan membeku saat SCHEDULED mencapai pembukaan; PIN nonaktif tetap termasuk denominator.
+
+**Persiapan DRAFT**: Periode belum dijadwalkan, sehingga jadwal awal yang lewat tidak mengunci konfigurasi, calon, roster atau PIN. Jadwal wajib diperbaiki ke masa depan sebelum dijadwalkan. DRAFT tidak dapat menerima login/suara. [Aturan](10-daftar-pemilih-dan-draft.md).
 
 **Hak pilih**: Kesempatan seorang pemilih untuk mengirim satu suara final pada satu organisasi dalam satu periode.
 

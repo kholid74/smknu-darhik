@@ -1,0 +1,7 @@
+---
+import Voters from '../../../../../../../src/pages/admin/e-voting/[id]/pemilih.astro';
+export function getStaticPaths(){return ['10000000-0000-4000-8000-000000000001','10000000-0000-4000-8000-000000000002'].map(id=>({params:{id}}));}
+Astro.locals.principal={roles:['superadmin']};
+Astro.locals.session={sub:'qa-admin',role:'superadmin',roles:['superadmin']};
+---
+<Voters/>

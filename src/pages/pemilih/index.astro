@@ -1,0 +1,14 @@
+---
+import VotingPage from '../siswa/index.astro';
+import {getStudentDashboard} from '../../lib/voting/student-dashboard';
+export const prerender = false;
+Astro.response.headers.set('Cache-Control','private, no-store');
+Astro.response.headers.set('Referrer-Policy','no-referrer');
+Astro.response.headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
+Astro.response.headers.set('X-Frame-Options','DENY');
+const session=Astro.locals.votingSession;
+if(!session)return Astro.redirect('/pemilih/masuk');
+const dashboard=await getStudentDashboard(session.periodId,session.voterId);
+if(!dashboard)return Astro.redirect('/pemilih/masuk');
+---
+<VotingPage dashboard={dashboard}/>

@@ -2,6 +2,9 @@ type Member={position:string;studentId:string};
 type Voter={credentialEnabled:boolean;pinHash:string|null;pinFingerprint:string|null;participation:Array<{organization:string}>};
 export type SetupPeriod={opensAt:Date;closesAt:Date;contests:Array<{organization:string;candidates:Array<{members:Member[]}>}>;voters:Voter[]};
 export const ELECTION_ORGANIZATIONS=['OSIS','DEWAN_AMBALAN','IPNU','IPPNU'] as const;
+export function canEditElectionSetup(period:{state:string;opensAt:Date},now:Date){
+  return period.state==='DRAFT'||(period.state==='SCHEDULED'&&now<period.opensAt);
+}
 export function electionSetup(period:SetupPeriod,now:Date){
   const configurationReady=period.opensAt>now&&period.closesAt>period.opensAt;
   const candidatesReady=period.contests.length===4&&ELECTION_ORGANIZATIONS.every(org=>{

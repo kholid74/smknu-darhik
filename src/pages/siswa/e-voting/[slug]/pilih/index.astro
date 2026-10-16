@@ -4,18 +4,20 @@ import { votingCsrfSecret } from '../../../../../lib/voting/student-auth';
 import { createStudentSessionCsrfToken } from '../../../../../lib/voting/security';
 import { BallotPageError, getBallotProgress, ORGANIZATIONS } from '../../../../../lib/voting/ballot-pages';
 
+import { voterPortal } from '../../../../../lib/voting/voter-identity';
 export const prerender = false;
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive');
 Astro.response.headers.set('X-Frame-Options', 'DENY');
 const session = Astro.locals.votingSession;
-if (!session) return Astro.redirect('/siswa/masuk');
+const base = voterPortal(session?.voterType);
+if (!session) return Astro.redirect(`${base}/masuk`);
 let data;
-try { data = await getBallotProgress(session.periodId, Astro.params.slug!, session.voterId); }
+try { data = Astro.props.data ?? await getBallotProgress(session.periodId, Astro.params.slug!, session.voterId); }
 catch (error) {
-  if (error instanceof BallotPageError && error.code === 'UNAUTHENTICATED') return Astro.redirect('/siswa/masuk');
-  return Astro.redirect('/siswa');
+  if (error instanceof BallotPageError && error.code === 'UNAUTHENTICATED') return Astro.redirect(`${base}/masuk`);
+  return Astro.redirect(base);
 }
 const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
 const completed = ORGANIZATIONS.filter(({ id }) => data.participation[id]).length;
@@ -33,12 +35,12 @@ const completed = ORGANIZATIONS.filter(({ id }) => data.participation[id]).lengt
       return <article class="org-card">
         <div><p class="eyebrow">ORGANISASI</p><h2>{label}</h2></div>
         {voted ? <span class="state done">Selesai</span> : count > 0
-          ? <a class="button" href={`/siswa/e-voting/${data.period.slug}/pilih/${id}`}>Pilih kandidat <span aria-hidden="true">→</span></a>
+          ? <a class="button" href={`${base}/e-voting/${data.period.slug}/pilih/${id}`}>Pilih kandidat <span aria-hidden="true">→</span></a>
           : <span class="state">Kandidat belum tersedia</span>}
       </article>;
     })}
   </div>
-  <a class="back" href="/siswa">← Kembali ke dashboard</a>
+  <a class="back" href={base}>← Kembali ke dashboard</a>
 </StudentPortalLayout>
 
 <style>

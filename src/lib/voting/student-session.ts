@@ -5,12 +5,12 @@ export type StudentRouteAccess = 'public' | 'protected' | 'forbidden' | 'unrelat
 
 export function studentRouteAccess(path: string): StudentRouteAccess {
   const votingApi = path.match(/^\/api\/e-voting\/([^/]+)\/(session|status|activity|votes|results)$/);
-  if (path === '/siswa/masuk' || path === '/siswa/selesai' ||
+  if (/^\/(siswa|pemilih)\/(masuk|selesai)$/.test(path) ||
       (votingApi && UUID.test(votingApi[1]) && (votingApi[2] === 'session' || votingApi[2] === 'results')) ||
       path === '/api/e-voting/logout') return 'public';
-  if (path === '/siswa' || path.startsWith('/siswa/e-voting/')) return 'protected';
-  if (path === '/api/siswa/dashboard' || (votingApi && UUID.test(votingApi[1]))) return 'protected';
-  if (path.startsWith('/siswa/') || path.startsWith('/api/siswa/') || path.startsWith('/api/e-voting/')) return 'forbidden';
+  if (/^\/(siswa|pemilih)$/.test(path) || /^\/(siswa|pemilih)\/e-voting\//.test(path)) return 'protected';
+  if (/^\/api\/(siswa|pemilih)\/dashboard$/.test(path) || (votingApi && UUID.test(votingApi[1]))) return 'protected';
+  if (/^\/(?:api\/)?(siswa|pemilih)(?:\/|$)/.test(path) || path.startsWith('/api/e-voting/')) return 'forbidden';
   return 'unrelated';
 }
 

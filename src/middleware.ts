@@ -5,6 +5,7 @@ import { can, type Principal } from './lib/rbac';
 import { db } from './lib/prisma';
 import { tokenHash } from './lib/voting/student-auth';
 import { isActiveVotingSession, isStudentSessionCookie, studentRouteAccess, VOTING_SESSION_COOKIE } from './lib/voting/student-session';
+import { voterPortal } from './lib/voting/voter-identity';
 
 // Gerbang otorisasi terpusat untuk realm Internal (/admin + API tulis).
 // Guard inline di tiap halaman tetap ada sebagai defense-in-depth (dihapus bertahap).
@@ -52,7 +53,7 @@ function apiCapability(path: string, method: string): string | undefined {
     if (/\/test-cleanup\/?$/.test(path)) return 'evoting.hapus-uji';
     if (method === 'GET' && /\/participation\/voters\/?$/.test(path)) return 'evoting.partisipasi';
     if (method === 'GET' && /\/participation\/?$/.test(path)) return 'evoting.partisipasi';
-    if (method === 'POST' && /\/voters\/?$/.test(path)) return 'evoting.pemilih';
+    if (method === 'POST' && /\/voters(?:\/teachers)?\/?$/.test(path)) return 'evoting.pemilih';
     if (['PATCH', 'DELETE'].includes(method) && /\/voters\/[0-9a-f-]+\/?$/i.test(path)) return 'evoting.pemilih';
     if (method === 'POST' && /\/close\/?$/.test(path)) return 'evoting.tutup';
     if (method === 'POST' && /\/publish\/?$/.test(path)) return 'evoting.publikasi';
@@ -84,7 +85,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     const record = isStudentSessionCookie(rawToken) ? await db.votingSession.findUnique({
       where: { tokenHash: tokenHash(rawToken) },
       select: { id: true, scope: true, voterId: true, createdAt: true, lastSeenAt: true, expiresAt: true,
-        voter: { select: { periodId: true, credentialEnabled: true,
+        voter: { select: { periodId: true, voterType: true, credentialEnabled: true,
           participation: { where: { hasVoted: true }, select: { organization: true } },
           period: { select: { slug: true, state: true, opensAt: true, closesAt: true } },
         } },
@@ -102,16 +103,20 @@ export const onRequest = defineMiddleware(async (context, next) => {
       if (path.startsWith('/api/')) return new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED' } }), {
         status: 401, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' },
       });
-      return context.redirect('/siswa/masuk');
+      return context.redirect(`${/^\/(?:api\/)?pemilih(?:\/|$)/.test(path) ? '/pemilih' : '/siswa'}/masuk`);
     }
     const periodApi = path.match(/^\/api\/e-voting\/([^/]+)\/(status|activity|votes)$/);
-    const studentPeriodPage = path.match(/^\/siswa\/e-voting\/([^/]+)(?:\/|$)/);
+    const studentPeriodPage = path.match(/^\/(?:siswa|pemilih)\/e-voting\/([^/]+)(?:\/|$)/);
+    const requestedPortal = path.match(/^\/(?:api\/)?(siswa|pemilih)(?:\/|$)/);
+    if (requestedPortal && `/${requestedPortal[1]}` !== voterPortal(record.voter.voterType)) {
+      return new Response('Forbidden', {status: 403, headers: {'Cache-Control': 'private, no-store'}});
+    }
     if ((periodApi && periodApi[1] !== record.voter.periodId) ||
         (studentPeriodPage && studentPeriodPage[1] !== record.voter.period.slug)) {
       return new Response('Forbidden', { status: 403, headers: { 'Cache-Control': 'private, no-store' } });
     }
     context.locals.votingSession = {
-      id: record.id, scope: record.scope, voterId: record.voterId, periodId: record.voter.periodId,
+      id: record.id, scope: record.scope, voterId: record.voterId, periodId: record.voter.periodId, voterType: record.voter.voterType,
       createdAt: record.createdAt, lastSeenAt: record.lastSeenAt, expiresAt: record.expiresAt,
     };
   }

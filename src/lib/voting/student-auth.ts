@@ -4,6 +4,7 @@ import { db } from '../prisma';
 import { requireEnv } from '../env';
 import { pinHashMaterial } from './pin-input';
 import { createPreauthCsrfToken } from './security';
+import type { VoterType } from './voter-identity';
 
 export class StudentAuthError extends Error {
   constructor(public code: string) { super(code); }
@@ -21,7 +22,7 @@ export function newOpaqueToken() { return randomBytes(32).toString('base64url');
 export function tokenHash(token: string) { return createHash('sha256').update(token).digest('hex'); }
 export function preauthCsrf(secretValue: string, nonce: string, now?: number) { return createPreauthCsrfToken(secretValue, nonce, now); }
 
-export async function authenticateStudent(periodId: string, nisn: string, pin: string) {
+export async function authenticateVoter(periodId: string, identifier: string, pin: string, voterType: VoterType) {
   const pinSecret = secret('VOTING_PIN_SECRET');
   const rateSecret = secret('VOTING_RATE_SECRET');
   const period = await db.electionPeriod.findUnique({ where: { id: periodId }, select: { id: true, state: true, opensAt: true, closesAt: true } });
@@ -29,7 +30,7 @@ export async function authenticateStudent(periodId: string, nisn: string, pin: s
   if (!period || period.state !== 'SCHEDULED' || period.opensAt.getTime() > now || period.closesAt.getTime() <= now) {
     throw new StudentAuthError('ELECTION_NOT_OPEN');
   }
-  const rateKey = createHmac('sha256', rateSecret).update(`student-login\0${periodId}\0${nisn}`).digest('hex');
+  const rateKey = createHmac('sha256', rateSecret).update(`${voterType === 'TEACHER' ? 'teacher-login' : 'student-login'}\0${periodId}\0${identifier}`).digest('hex');
   const [{ attempts }] = await db.$queryRaw<[{ attempts: number }]>`
     INSERT INTO "VotingRateBucket" ("key", "attempts", "expiresAt") VALUES (${rateKey}, 1, clock_timestamp() + interval '15 minutes')
     ON CONFLICT ("key") DO UPDATE SET
@@ -38,14 +39,15 @@ export async function authenticateStudent(periodId: string, nisn: string, pin: s
     RETURNING "attempts"
   `;
   if (attempts > 5) throw new StudentAuthError('RATE_LIMITED');
-  const voter = await db.electionVoter.findUnique({ where: { periodId_nisn: { periodId, nisn } }, select: {
-    id: true, nisn: true, pinHash: true, credentialEnabled: true, pinVersion: true,
+  const voter = await db.electionVoter.findUnique({ where: voterType === 'TEACHER'
+    ? { periodId_loginCode: { periodId, loginCode: identifier } } : { periodId_nisn: { periodId, nisn: identifier } }, select: {
+    id: true, voterType: true, pinHash: true, credentialEnabled: true, pinVersion: true,
   } });
   const material = voter?.pinHash && voter.credentialEnabled
-    ? pinHashMaterial(pinSecret, periodId, nisn, pin)
-    : `unmatched-login:${periodId}:${nisn}:${pin}`;
+    ? pinHashMaterial(pinSecret, periodId, identifier, pin)
+    : `unmatched-login:${periodId}:${identifier}:${pin}`;
   const matched = await bcrypt.compare(material, voter?.pinHash ?? DUMMY_PIN_HASH);
-  if (!voter || !voter.credentialEnabled || !voter.pinHash || !matched) throw new StudentAuthError('INVALID_CREDENTIALS');
+  if (!voter || voter.voterType !== voterType || !voter.credentialEnabled || !voter.pinHash || !matched) throw new StudentAuthError('INVALID_CREDENTIALS');
 
   const rawToken = newOpaqueToken();
   const absoluteDeadline = Math.min(now + 15 * 60_000, period.closesAt.getTime());

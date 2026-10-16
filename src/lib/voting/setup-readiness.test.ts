@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {electionSetup,ELECTION_ORGANIZATIONS} from './setup-readiness';
+import test from 'node:test';import assert from 'node:assert/strict';import {canEditElectionSetup,electionSetup,ELECTION_ORGANIZATIONS} from './setup-readiness';
 const voter=()=>({credentialEnabled:true,pinHash:'hash',pinFingerprint:'fingerprint',participation:ELECTION_ORGANIZATIONS.map(organization=>({organization}))});
 const fixture=()=>({opensAt:new Date(200),closesAt:new Date(300),contests:ELECTION_ORGANIZATIONS.map(organization=>({organization,candidates:[{members:[{position:'CHAIR',studentId:'a'},{position:'VICE_CHAIR',studentId:'b'}]}]})),voters:[voter()]});
 test('preflight matches four contests, distinct members, valid schedule and 1–99 voters',()=>{assert.equal(electionSetup(fixture(),new Date(100)).ready,true);for(const count of [0,100]){const p=fixture();p.voters=Array.from({length:count},voter);assert.equal(electionSetup(p,new Date(100)).ready,false)}const p=fixture();p.contests[0].candidates[0].members[1].studentId='a';assert.equal(electionSetup(p,new Date(100)).candidatesReady,false);assert.equal(electionSetup(fixture(),new Date(200)).configurationReady,false)});
@@ -14,4 +14,12 @@ test('chair-only and mixed slates are ready; missing chair or duplicate position
   assert.equal(electionSetup(p,new Date(100)).candidatesReady,false);
   p.contests[0].candidates[0].members=[{position:'CHAIR',studentId:'a'},{position:'CHAIR',studentId:'b'}];
   assert.equal(electionSetup(p,new Date(100)).candidatesReady,false);
+});
+
+test('draft setup ignores stale dates; scheduled setup freezes exactly at opening',()=>{
+  const now=new Date(100);
+  assert.equal(canEditElectionSetup({state:'DRAFT',opensAt:new Date(50)},now),true);
+  assert.equal(canEditElectionSetup({state:'SCHEDULED',opensAt:new Date(101)},now),true);
+  for(const state of ['SCHEDULED','CLOSED','ARCHIVED'])assert.equal(canEditElectionSetup({state,opensAt:new Date(100)},now),false);
+  for(const state of ['CLOSED','ARCHIVED'])assert.equal(canEditElectionSetup({state,opensAt:new Date(200)},now),false);
 });
