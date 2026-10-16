@@ -51,7 +51,7 @@ const dateLabel = (date: Date | null) => date ? new Intl.DateTimeFormat('id-ID',
                 <h3><span class="number">Nomor {candidate.ballotNumber}</span>{leaders.includes(candidate) && <span class="tag" style="margin-left:8px">{leaders.length > 1 ? 'Seri pada perolehan tertinggi' : 'Perolehan tertinggi'}</span>}</h3>
                 <div class="members">
                   <div class="member">{candidate.chair.photoUrl && <img src={candidate.chair.photoUrl} alt="" loading="lazy"/>}<span><strong>Ketua:</strong> {candidate.chair.name} <small>({candidate.chair.className})</small></span></div>
-                  <div class="member">{candidate.viceChair.photoUrl && <img src={candidate.viceChair.photoUrl} alt="" loading="lazy"/>}<span><strong>Wakil:</strong> {candidate.viceChair.name} <small>({candidate.viceChair.className})</small></span></div>
+                  {candidate.viceChair && <div class="member">{candidate.viceChair.photoUrl && <img src={candidate.viceChair.photoUrl} alt="" loading="lazy"/>}<span><strong>Wakil:</strong> {candidate.viceChair.name} <small>({candidate.viceChair.className})</small></span></div>}
                 </div>
                 <p><strong>Visi</strong><br/>{candidate.vision}</p>
                 <p><strong>Misi</strong><br/>{candidate.mission}</p>

@@ -96,6 +96,18 @@ Rollback database bersama dapat menghapus update website, alumni dan akun selain
 
 Semua checklist tetap terbuka sampai ada bukti operasional. Infrastruktur/secret produksi tidak diperiksa selama audit ini; dokumen tidak merupakan persetujuan deploy.
 
+## Pembaruan calon tanpa wakil dan slip portal (16 Oktober 2026)
+
+Terapkan migrasi `20261016080000_optional_candidate_vice_chair` sebelum memakai form calon tanpa wakil. Migrasi hanya melonggarkan fungsi validasi komposisi menjadi satu ketua dan wakil opsional; tidak menghapus atau mengubah anggota, snapshot, pemilih maupun ballot lama. Seluruh larangan edit setelah pembukaan tetap berlaku. Tidak perlu mengisi wakil fiktif atau menonaktifkan trigger.
+
+Migrasi tersebut berhasil diterapkan di Neon pada 16 Oktober 2026. Pemeriksaan sebelumnya menemukan tiga riwayat lama di database yang tidak tersedia secara lokal: `20260817005759_init`, `20260817104407_add_reviewed`, dan `20260817210605_add_action_status`. Riwayat tersebut tidak diubah/diselesaikan paksa; pemulihan arsip migrasi lama merupakan pekerjaan terpisah. Pastikan pembaca aplikasi terbaru sudah terpasang sebelum calon tanpa wakil dipakai pada lingkungan online.
+
+Rollback aplikasi lama tidak aman jika sudah ada calon tanpa wakil atau snapshot dengan `viceChair: null`, karena pembaca lama mewajibkan wakil. Pertahankan versi yang mendukung kedua bentuk dan lakukan fix-forward. Definisi fungsi lama hanya boleh dipulihkan setelah semua calon relevan memenuhi komposisi lama; jangan mengubah calon periode berjalan/tertutup untuk memaksa rollback.
+
+Slip menampilkan URL lengkap portal berdasarkan origin request (domain/protokol/port), dengan slug periode. Cetak dari domain yang memang akan dipakai pemilih; cetakan dari localhost atau preview memakai alamat lingkungan tersebut. Penambahan alamat tidak menampilkan ulang PIN yang sudah diterbitkan. Gunakan prosedur reset/reissue bila slip perlu dicetak ulang, lalu distribusikan penggantinya.
+
+Untuk penambahan hak suara guru, lihat [usulan pemilih guru](09-usulan-pemilih-guru.md); model pemilih guru belum diterapkan oleh pembaruan ini.
+
 ## Membersihkan dua periode sampel
 
 Gunakan [Hapus data uji](08-pembersihan-data-uji.md) pada halaman konfigurasi sebagai superadmin. Periksa ringkasan, lanjutkan popup kedua, ketik HAPUS <slug> dan password login. Jangan memakai truncate, reset database resmi, menonaktifkan trigger, atau menghapus master siswa untuk mengulang testing. Migrasi hanya menandai dua sampel; penghapusan dijalankan operator melalui UI. Periode berikutnya yang digunakan untuk pemilihan nyata harus dibuat tanpa pilihan Periode uji.

@@ -4,7 +4,7 @@ export type VotingOrganizationName = typeof VOTING_ORGANIZATIONS[number];
 type CandidateResult = {
   candidateId: string; ballotNumber: number; vision: string; mission: string; votes: number;
   chair: { name: string; className: string; photoUrl: string | null };
-  viceChair: { name: string; className: string; photoUrl: string | null };
+  viceChair: { name: string; className: string; photoUrl: string | null } | null;
 };
 type ContestResult = { organization: VotingOrganizationName; votesCast: number; candidates: CandidateResult[] };
 export type ResultSnapshot = { version: 1; eligibleVoters: number; notStarted: number; partial: number; complete: number; contests: ContestResult[] };
@@ -29,7 +29,7 @@ export function publicResultSnapshot(value: unknown): ResultSnapshot | null {
         ? { name: input.name, className: input.className, photoUrl: input.photoUrl as string | null } : null;
       const chair = member(raw.chair);
       const viceChair = member(raw.viceChair);
-      if (!chair || !viceChair) return null;
+      if (!chair || (raw.viceChair !== null && !viceChair)) return null;
       candidates.push({ candidateId: raw.candidateId, ballotNumber: raw.ballotNumber, vision: raw.vision, mission: raw.mission, votes: raw.votes, chair, viceChair });
     }
     if (candidates.reduce((sum, row) => sum + row.votes, 0) !== rawContest.votesCast) return null;

@@ -4,11 +4,11 @@ export type CandidateInput = {
   organization: VotingOrganization;
   ballotNumber: number;
   chair: { studentId: string; photoUrl?: string };
-  viceChair: { studentId: string; photoUrl?: string };
+  viceChair: { studentId: string; photoUrl?: string } | null;
   vision: string;
   mission: string;
 };
-export type ExpectedCandidate = { ballotNumber: number; chairStudentId: string; viceChairStudentId: string; vision: string; mission: string };
+export type ExpectedCandidate = { ballotNumber: number; chairStudentId: string; viceChairStudentId: string | null; vision: string; mission: string };
 
 export class CandidateError extends Error {
   constructor(public code: string) { super(code); }
@@ -34,8 +34,8 @@ export function validateCandidateInput(value: unknown): CandidateInput {
     return { studentId: m.studentId, photoUrl: m.photoUrl as string | undefined };
   };
   const chair = member(v.chair);
-  const viceChair = member(v.viceChair);
-  if (chair.studentId === viceChair.studentId) throw new CandidateError('DUPLICATE_CANDIDATE');
+  const viceChair = v.viceChair == null ? null : member(v.viceChair);
+  if (chair.studentId === viceChair?.studentId) throw new CandidateError('DUPLICATE_CANDIDATE');
   if (typeof v.vision !== 'string' || !v.vision.trim() || v.vision.length > 2000 ||
       typeof v.mission !== 'string' || !v.mission.trim() || v.mission.length > 2000) throw new CandidateError('INVALID_INPUT');
   return {
@@ -52,7 +52,7 @@ export function validateExpectedCandidate(value: unknown) {
   if (Object.keys(expected).length !== keys.length || Object.keys(expected).some((key) => !keys.includes(key)) ||
       typeof expected.ballotNumber !== 'number' || !Number.isSafeInteger(expected.ballotNumber) || expected.ballotNumber < 1 ||
       typeof expected.chairStudentId !== 'string' || !UUID.test(expected.chairStudentId) ||
-      typeof expected.viceChairStudentId !== 'string' || !UUID.test(expected.viceChairStudentId) ||
+      (expected.viceChairStudentId !== null && (typeof expected.viceChairStudentId !== 'string' || !UUID.test(expected.viceChairStudentId))) ||
       expected.chairStudentId === expected.viceChairStudentId ||
       typeof expected.vision !== 'string' || typeof expected.mission !== 'string') throw new CandidateError('INVALID_INPUT');
   return expected as unknown as ExpectedCandidate;

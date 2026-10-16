@@ -7,10 +7,12 @@ import {createContext} from 'astro/middleware';
 let lookup: () => Promise<unknown>;
 let studentSearch: () => Promise<unknown>;
 let lookups = 0;
+let candidateTransaction: unknown;
 const fixtureDb = {
   account: {findUnique: () => { lookups++; return lookup(); }},
   electionPeriod: {findUnique: async () => ({id: '10000000-0000-4000-8000-000000000001'})},
   student: {findMany: () => studentSearch()},
+  $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(candidateTransaction),
 };
 const globals = globalThis as typeof globalThis & {middlewareTestDb?: typeof fixtureDb};
 globals.middlewareTestDb = fixtureDb;
@@ -29,6 +31,8 @@ register('data:text/javascript,' + encodeURIComponent(`
 const {onRequest} = await import('./middleware');
 const {signToken} = await import('./lib/auth');
 const {GET: search} = await import('./pages/api/admin/e-voting/[periodId]/students/search');
+const {saveCandidatePair} = await import('./lib/voting/candidates');
+const {validateCandidateInput} = await import('./lib/voting/candidate-input');
 after(() => { delete globals.middlewareTestDb; });
 
 const account = (overrides: Array<{capability: string; effect: string}> = []) => ({active: true, roles: [{role: 'superadmin'}], overrides});
@@ -112,4 +116,30 @@ test('permission retry cannot replay a downstream mutation after its response is
   await assert.rejects(onRequest(context, async () => {writes++; throw new Error('fixture lost response');}), /fixture lost response/);
   assert.equal(writes, 1);
   assert.equal(lookups, 1);
+});
+
+test('candidate CRUD creates and edits chair-only entries using master snapshots and nullable stale guards', async () => {
+  const chairId='20000000-0000-4000-8000-000000000001',viceId='20000000-0000-4000-8000-000000000002';
+  let members: Array<{position: string; studentId: string; nameSnapshot?: string}> = [];
+  const audits: unknown[]=[];
+  candidateTransaction={
+    $queryRawUnsafe: async (sql: string)=>sql.includes('clock_timestamp')?[{now:new Date(100)}]:[{state:'DRAFT',opensAt:new Date(200)}],
+    student:{findMany:async ({where}: {where:{id:{in:string[]}}})=>where.id.in.map(id=>({id,name:id===chairId?'Master Chair':'Master Vice',className:'QA'}))},
+    media:{findFirst:async()=>null},
+    electionContest:{findUnique:async()=>({periodId:'fixture-period'})},
+    candidatePair:{create:async()=>({id:'fixture-candidate'}),findFirst:async()=>({id:'fixture-candidate',ballotNumber:1,vision:'Vision',mission:'Mission',members}),update:async()=>({})},
+    candidateMember:{deleteMany:async()=>{members=[];},createMany:async ({data}: {data:typeof members})=>{members=data;}},
+    votingAuditEvent:{create:async (data: unknown)=>{audits.push(data);}},
+  };
+  const input=validateCandidateInput({organization:'OSIS',ballotNumber:1,chair:{studentId:chairId},vision:'Vision',mission:'Mission'});
+  await saveCandidatePair('fixture-period',input,'fixture-admin');
+  assert.equal(members.length,1);
+  assert.equal(members[0].nameSnapshot,'Master Chair');
+  const expected={ballotNumber:1,chairStudentId:chairId,viceChairStudentId:null,vision:'Vision',mission:'Mission'};
+  await saveCandidatePair('fixture-period',{...input,viceChair:{studentId:viceId}},'fixture-admin','fixture-candidate',expected);
+  assert.equal(members.length,2);
+  await assert.rejects(saveCandidatePair('fixture-period',input,'fixture-admin','fixture-candidate',expected),{code:'STALE_CANDIDATE'});
+  await saveCandidatePair('fixture-period',input,'fixture-admin','fixture-candidate',{...expected,viceChairStudentId:viceId});
+  assert.equal(members.length,1);
+  assert.equal(audits.length,3);
 });

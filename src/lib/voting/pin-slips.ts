@@ -8,11 +8,14 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', {
   dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Jakarta',
 }).format(date);
 
-export function renderPinSlips(period: { name: string; slug: string; opensAt: Date; closesAt: Date }, slips: Slip[]) {
-  const login = `/siswa/masuk?periode=${encodeURIComponent(period.slug)}`;
+export function renderPinSlips(period: { name: string; slug: string; opensAt: Date; closesAt: Date }, slips: Slip[], baseUrl: string) {
+  const loginUrl = new URL('/siswa/masuk', baseUrl);
+  if (!['http:', 'https:'].includes(loginUrl.protocol)) throw new Error('INVALID_PORTAL_URL');
+  loginUrl.searchParams.set('periode', period.slug);
+  const login = loginUrl.href;
   const cards = slips.map((slip) => `<article class="slip"><header><strong>${escapeHtml(period.name)}</strong><span>PIN E-Voting Periode Ini</span></header>
     <p>Nama: <b>${escapeHtml(slip.name)}</b><br>Kelas: ${escapeHtml(slip.className)}<br>NISN: ${escapeHtml(slip.nisn)}</p>
-    <p class="pin">${escapeHtml(slip.pin)}</p><p>Masuk ke Portal Siswa: <b>${escapeHtml(login)}</b></p>
+    <p class="pin">${escapeHtml(slip.pin)}</p><p style="overflow-wrap:anywhere">Masuk ke Portal Siswa: <b>${escapeHtml(login)}</b></p>
     <p>Pemilihan: ${escapeHtml(dateLabel(period.opensAt))} – ${escapeHtml(dateLabel(period.closesAt))} WIB</p>
     <footer>PIN ini hanya untuk E-Voting periode ini. Simpan dengan aman dan jangan bagikan kepada orang lain.</footer></article>`).join('');
   return `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>Slip PIN E-Voting</title><style>

@@ -16,20 +16,21 @@ async function lockEditablePeriod(tx: any, periodId: string) {
 }
 
 async function resolveMembers(tx: any, input: CandidateInput) {
-  const students = await tx.student.findMany({ where: { id: { in: [input.chair.studentId, input.viceChair.studentId] } } });
-  if (students.length !== 2) throw new CandidateError('INVALID_STUDENT');
+  const members = [
+    { ...input.chair, position: 'CHAIR' },
+    ...(input.viceChair ? [{ ...input.viceChair, position: 'VICE_CHAIR' }] : []),
+  ];
+  const students = await tx.student.findMany({ where: { id: { in: members.map(member => member.studentId) } } });
+  if (students.length !== members.length) throw new CandidateError('INVALID_STUDENT');
   const byId = new Map<string, any>(students.map((student: any) => [student.id, student] as const));
-  for (const member of [input.chair, input.viceChair]) {
+  for (const member of members) {
     if (member.photoUrl && !await tx.media.findFirst({ where: { url: member.photoUrl, kind: 'image' }, select: { id: true } })) {
       throw new CandidateError('INVALID_PHOTO');
     }
   }
-  return [
-    { studentId: input.chair.studentId, position: 'CHAIR', photoUrl: input.chair.photoUrl ?? null },
-    { studentId: input.viceChair.studentId, position: 'VICE_CHAIR', photoUrl: input.viceChair.photoUrl ?? null },
-  ].map((member) => {
+  return members.map((member) => {
     const student = byId.get(member.studentId) as any;
-    return { ...member, nameSnapshot: student.name, classSnapshot: student.className };
+    return { ...member, photoUrl: member.photoUrl ?? null, nameSnapshot: student.name, classSnapshot: student.className };
   });
 }
 
@@ -47,7 +48,7 @@ export async function saveCandidatePair(periodId: string, input: CandidateInput,
       if (!pair) throw new CandidateError('NOT_FOUND');
       if (!expected || pair.ballotNumber !== expected.ballotNumber || pair.vision !== expected.vision || pair.mission !== expected.mission ||
           pair.members.find((member: any) => member.position === 'CHAIR')?.studentId !== expected.chairStudentId ||
-          pair.members.find((member: any) => member.position === 'VICE_CHAIR')?.studentId !== expected.viceChairStudentId) {
+          (pair.members.find((member: any) => member.position === 'VICE_CHAIR')?.studentId ?? null) !== expected.viceChairStudentId) {
         throw new CandidateError('STALE_CANDIDATE');
       }
       await tx.candidatePair.update({ where: { id: pair.id }, data: { ballotNumber: input.ballotNumber, vision: input.vision, mission: input.mission } });

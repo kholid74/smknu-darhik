@@ -28,7 +28,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
   <a href={`/admin/e-voting/${periodId}`} style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;text-decoration:none;font-size:13px">← Kembali ke periode</a>
   <div style="display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:18px;flex-wrap:wrap">
     <div>
-      <h2 style="font-size:20px;font-weight:800">Pasangan Calon</h2>
+      <h2 style="font-size:20px;font-weight:800">Calon Pemilihan</h2>
       <p style="font-size:13px;color:var(--color-muted);margin-top:4px">{period.name} · {period.academicYear}. Nama dan kelas kandidat mengikuti snapshot saat disimpan.</p>
     </div>
     <span class="badge" style={`background:${period.state === 'DRAFT' ? '#fff7ed' : '#eef5ef'};color:#31573c`}>{period.state}</span>
@@ -37,7 +37,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
   <p id="candidate-message" role="status" aria-live="polite" style="display:none;margin-bottom:14px;padding:12px;border-radius:8px;font-size:13px"></p>
 
   <section class="card" style="margin-bottom:20px">
-    <h3 id="form-title" style="font-size:16px;font-weight:800;margin-bottom:16px">Tambah Pasangan</h3>
+    <h3 id="form-title" style="font-size:16px;font-weight:800;margin-bottom:16px">Tambah Calon</h3>
     <form id="candidate-form" data-period-id={periodId}>
       <div class="form-grid">
         <label>Organisasi
@@ -58,12 +58,14 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
           {canUseMedia && <MediaPicker field="chairPhotoUrl" label="Foto ketua (opsional)" folder="e-voting" hint="Gunakan foto siswa dari pustaka media sekolah." />}
         </div>
         <div class="member-picker" data-position="viceChair">
-          <h4>Wakil Ketua</h4>
+          <h4>Wakil Ketua (opsional)</h4>
+          <p class="field-hint">Kosongkan jika calon hanya memiliki ketua.</p>
           <label for="vice-search">Cari siswa dari master (nama, NISN, atau kelas)</label>
           <input id="vice-search" class="student-search" type="search" autocomplete="off" placeholder="Ketik minimal 2 karakter" aria-autocomplete="list" aria-controls="vice-student-results" aria-expanded="false"/>
           <input class="student-id" type="hidden"/>
           <p class="selected-student" role="status" aria-live="polite">Belum dipilih. Pilih nama dari suggestion.</p>
           <div id="vice-student-results" class="student-results" role="list" aria-label="Suggestion siswa dari master" aria-live="polite"></div>
+          <button class="btn btn-outline" id="clear-vice-chair" type="button">Kosongkan wakil</button>
           {canUseMedia && <MediaPicker field="viceChairPhotoUrl" label="Foto wakil ketua (opsional)" folder="e-voting" hint="Gunakan foto siswa dari pustaka media sekolah." />}
         </div>
         <label class="wide">Visi
@@ -74,15 +76,15 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
         </label>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
-        <button id="save-candidate" class="btn btn-primary" type="submit">Simpan pasangan</button>
+        <button id="save-candidate" class="btn btn-primary" type="submit">Simpan calon</button>
         <button id="cancel-edit" class="btn btn-outline" type="button" style="display:none">Batal edit</button>
       </div>
     </form>
   </section>
 
   <section aria-labelledby="current-candidates-title">
-    <h3 id="current-candidates-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Daftar pasangan ({candidates.length})</h3>
-    {candidates.length === 0 ? <div class="card" style="padding:24px;color:var(--color-muted);font-size:13px">Belum ada pasangan calon.</div> : (
+    <h3 id="current-candidates-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Daftar calon ({candidates.length})</h3>
+    {candidates.length === 0 ? <div class="card" style="padding:24px;color:var(--color-muted);font-size:13px">Belum ada calon.</div> : (
       <div style="display:grid;gap:12px">
         {candidates.map((pair) => {
           const chair = memberFor(pair, 'CHAIR');
@@ -91,13 +93,13 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
             id: pair.id, organization: pair.organization, ballotNumber: pair.ballotNumber,
             vision: pair.vision, mission: pair.mission,
             chair: { studentId: chair?.studentId, name: chair?.student.name, nisn: chair?.student.nisn, className: chair?.student.className, photoUrl: chair?.photoUrl },
-            viceChair: { studentId: vice?.studentId, name: vice?.student.name, nisn: vice?.student.nisn, className: vice?.student.className, photoUrl: vice?.photoUrl },
+            viceChair: vice ? { studentId: vice.studentId, name: vice.student.name, nisn: vice.student.nisn, className: vice.student.className, photoUrl: vice.photoUrl } : null,
           });
           return <article class="card candidate-row" style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
             <div>
               <p style="font-size:12px;color:var(--color-muted);font-weight:700">{orgLabel(pair.organization)} · Nomor {pair.ballotNumber}</p>
-              <h4 style="font-size:15px;font-weight:800;margin-top:6px">{chair?.nameSnapshot ?? 'Ketua belum diatur'} <span style="font-weight:500;color:var(--color-muted)">/</span> {vice?.nameSnapshot ?? 'Wakil belum diatur'}</h4>
-              <p style="font-size:12px;color:var(--color-muted);margin-top:3px">{chair?.classSnapshot ?? '—'} · {vice?.classSnapshot ?? '—'}</p>
+              <h4 style="font-size:15px;font-weight:800;margin-top:6px">{chair?.nameSnapshot ?? 'Ketua belum diatur'}{vice && <> <span style="font-weight:500;color:var(--color-muted)">/</span> {vice.nameSnapshot}</>}</h4>
+              <p style="font-size:12px;color:var(--color-muted);margin-top:3px">{chair?.classSnapshot ?? '-'}{vice && <> &middot; {vice.classSnapshot}</>}</p>
               <p style="font-size:12px;margin-top:9px"><strong>Visi:</strong> {pair.vision}</p>
               <p style="font-size:12px;margin-top:3px"><strong>Misi:</strong> {pair.mission}</p>
             </div>
@@ -209,7 +211,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
     picker.querySelector<HTMLInputElement>('.student-id')!.value = data.studentId ?? '';
     picker.querySelector<HTMLInputElement>('.student-search')!.value = data.name ?? '';
     picker.querySelector<HTMLElement>('.selected-student')!.textContent = data.name
-      ? `${data.name} · ${data.nisn ?? ''} · ${data.className ?? ''}` : 'Belum dipilih.';
+      ? `${data.name} · ${data.nisn ?? ''} · ${data.className ?? ''}` : position === 'viceChair' ? 'Tanpa wakil ketua.' : 'Belum dipilih.';
     const photo = picker.querySelector<HTMLInputElement>('.mp-input');
     if (photo) {
       photo.value = data.photoUrl ?? '';
@@ -223,8 +225,8 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
     delete form.dataset.expected;
     for (const position of ['chair', 'viceChair'] as const) setPicker(position, {});
     (form.elements.namedItem('organization') as HTMLSelectElement).disabled = false;
-    document.querySelector('#form-title')!.textContent = 'Tambah Pasangan';
-    document.querySelector('#save-candidate')!.textContent = 'Simpan pasangan';
+    document.querySelector('#form-title')!.textContent = 'Tambah Calon';
+    document.querySelector('#save-candidate')!.textContent = 'Simpan calon';
     document.querySelector<HTMLElement>('#cancel-edit')!.style.display = 'none';
   }
 
@@ -234,7 +236,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
     form.dataset.expected = JSON.stringify({
       ballotNumber: candidate.ballotNumber,
       chairStudentId: candidate.chair.studentId,
-      viceChairStudentId: candidate.viceChair.studentId,
+      viceChairStudentId: candidate.viceChair?.studentId ?? null,
       vision: candidate.vision,
       mission: candidate.mission,
     });
@@ -244,22 +246,27 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
     (form.elements.namedItem('vision') as HTMLTextAreaElement).value = candidate.vision;
     (form.elements.namedItem('mission') as HTMLTextAreaElement).value = candidate.mission;
     setPicker('chair', candidate.chair);
-    setPicker('viceChair', candidate.viceChair);
-    document.querySelector('#form-title')!.textContent = 'Edit Pasangan';
+    setPicker('viceChair', candidate.viceChair ?? {});
+    document.querySelector('#form-title')!.textContent = 'Edit Calon';
     document.querySelector('#save-candidate')!.textContent = 'Simpan perubahan';
     document.querySelector<HTMLElement>('#cancel-edit')!.style.display = 'inline-flex';
     form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
 
   document.querySelector('#cancel-edit')?.addEventListener('click', resetForm);
+  document.querySelector('#clear-vice-chair')?.addEventListener('click', () => {
+    setPicker('viceChair', {});
+    document.querySelector<HTMLInputElement>('[data-position="viceChair"] .student-search')!.dispatchEvent(new Event('input'));
+  });
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const saveButton = document.querySelector<HTMLButtonElement>('#save-candidate')!;
     const chair = document.querySelector<HTMLInputElement>('[data-position="chair"] .student-id')!.value;
     const viceChair = document.querySelector<HTMLInputElement>('[data-position="viceChair"] .student-id')!.value;
-    if (!chair || !viceChair) return showMessage('Pilih ketua dan wakil ketua dari master siswa.', true);
-    if (chair === viceChair) return showMessage('Ketua dan wakil ketua harus siswa yang berbeda.', true);
+    if (!chair) return showMessage('Pilih ketua dari master siswa.', true);
+    if (!viceChair && document.querySelector<HTMLInputElement>('[data-position="viceChair"] .student-search')!.value.trim()) return showMessage('Pilih wakil dari suggestion atau gunakan Kosongkan wakil.', true);
+    if (viceChair && chair === viceChair) return showMessage('Ketua dan wakil ketua harus siswa yang berbeda.', true);
     saveButton.disabled = true;
     saveButton.textContent = 'Menyimpan...';
     try {
@@ -268,7 +275,7 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
       const payload: Record<string, unknown> = {
         organization: value('organization'), ballotNumber: Number(value('ballotNumber')),
         chair: { studentId: chair, ...(value('chairPhotoUrl') ? { photoUrl: value('chairPhotoUrl') } : {}) },
-        viceChair: { studentId: viceChair, ...(value('viceChairPhotoUrl') ? { photoUrl: value('viceChairPhotoUrl') } : {}) },
+        viceChair: viceChair ? { studentId: viceChair, ...(value('viceChairPhotoUrl') ? { photoUrl: value('viceChairPhotoUrl') } : {}) } : null,
         vision: value('vision'), mission: value('mission'),
       };
       const candidateId = form.dataset.candidateId;
@@ -285,16 +292,16 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
           : code === 'STALE_CANDIDATE' ? 'Data pasangan berubah. Muat ulang halaman sebelum mengedit.'
           : code === 'INVALID_STUDENT' ? 'Siswa tidak ditemukan pada master siswa.'
           : code === 'CSRF_INVALID' ? 'Sesi keamanan kedaluwarsa. Muat ulang halaman lalu coba lagi.'
-          : 'Pasangan gagal disimpan. Periksa data dan coba lagi.';
+          : 'Calon gagal disimpan. Periksa data dan coba lagi.';
         showMessage(text, true);
         return;
       }
       location.reload();
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Pasangan gagal disimpan. Periksa koneksi lalu coba lagi.', true);
+      showMessage(error instanceof Error ? error.message : 'Calon gagal disimpan. Periksa koneksi lalu coba lagi.', true);
     } finally {
       saveButton.disabled = false;
-      saveButton.textContent = form.dataset.candidateId ? 'Simpan perubahan' : 'Simpan pasangan';
+      saveButton.textContent = form.dataset.candidateId ? 'Simpan perubahan' : 'Simpan calon';
     }
   });
 

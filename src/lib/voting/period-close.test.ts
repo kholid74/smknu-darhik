@@ -30,7 +30,7 @@ beforeEach(async () => {
 });
 afterEach(async () => { await pg.exec('ROLLBACK'); });
 
-async function seed(votes = [4, 4], id = periodId) {
+async function seed(votes = [4, 4], id = periodId, chairOnly = false) {
   await pg.query(`INSERT INTO "ElectionPeriod" (id,slug,name,"academicYear","opensAt","closesAt")
     VALUES ($1,$2,'Synthetic close test','2026/2027',now()+interval '1 day',now()+interval '2 days')`, [id, 'test-' + id]);
   for (const organization of organizations) {
@@ -38,6 +38,7 @@ async function seed(votes = [4, 4], id = periodId) {
     await pg.query('INSERT INTO "ElectionContest" ("periodId",organization) VALUES ($1,$2)', [id, organization]);
     await pg.query('INSERT INTO "CandidatePair" (id,"periodId",organization,"ballotNumber",vision,mission) VALUES ($1,$2,$3,1,$4,$5)', [candidateId, id, organization, 'Vision', 'Mission']);
     for (const [index, studentId] of studentIds.entries()) {
+      if (chairOnly && index === 1) continue;
       await pg.query(`INSERT INTO "CandidateMember" ("candidatePairId","periodId",organization,"studentId",position,"nameSnapshot","classSnapshot")
         VALUES ($1,$2,$3,$4,$5,$6,'QA')`, [candidateId, id, organization, studentId, index ? 'VICE_CHAIR' : 'CHAIR', 'Historical Student ' + index]);
     }
@@ -181,4 +182,29 @@ test('audit failure rolls back closed state, snapshot and session revocation tog
   await assertOpen();
   assert.equal((await pg.query('SELECT * FROM "VotingSession"')).rows.length, 2);
   assert.equal((await pg.query('SELECT * FROM "Ballot"')).rows.length, 8);
+});
+
+test('chair-only candidates pass deferred DB constraints, close and project as a valid public snapshot', async () => {
+  await seed([4,4], periodId, true);
+  await close();
+  const {publicResultSnapshot} = await import('./result-snapshot');
+  const snapshot=publicResultSnapshot((await storedPeriod()).resultSnapshot);
+  assert.ok(snapshot);
+  assert.ok(snapshot.contests.every(contest=>contest.candidates.every(candidate=>candidate.viceChair===null)));
+  assert.equal((await pg.query('SELECT * FROM "Ballot"')).rows.length,8);
+});
+
+test('database still rejects a vice without a chair and prevents editing a running candidate', async () => {
+  await seed([0,0],periodId,true);
+  await pg.exec('SAVEPOINT frozen_candidate');
+  await assert.rejects(pg.query('DELETE FROM "CandidateMember" WHERE "periodId"=$1',[periodId]));
+  await pg.exec('ROLLBACK TO SAVEPOINT frozen_candidate; RELEASE SAVEPOINT frozen_candidate');
+  await pg.exec('SAVEPOINT invalid_candidate');
+  const draftId=randomUUID(),candidateId=randomUUID();
+  await pg.query(`INSERT INTO "ElectionPeriod" (id,slug,name,"academicYear","opensAt","closesAt") VALUES ($1,$2,'Draft','2026/2027',now()+interval '1 day',now()+interval '2 days')`,[draftId,'draft-'+draftId]);
+  await pg.query('INSERT INTO "ElectionContest" ("periodId",organization) VALUES ($1,$2)',[draftId,'OSIS']);
+  await pg.query('INSERT INTO "CandidatePair" (id,"periodId",organization,"ballotNumber",vision,mission) VALUES ($1,$2,$3,1,$4,$5)',[candidateId,draftId,'OSIS','Vision','Mission']);
+  await pg.query(`INSERT INTO "CandidateMember" ("candidatePairId","periodId",organization,"studentId",position,"nameSnapshot","classSnapshot") VALUES ($1,$2,$3,$4,'VICE_CHAIR','Synthetic','QA')`,[candidateId,draftId,'OSIS',studentIds[0]]);
+  await assert.rejects(pg.exec('SET CONSTRAINTS ALL IMMEDIATE'),/one chair/);
+  await pg.exec('ROLLBACK TO SAVEPOINT invalid_candidate; RELEASE SAVEPOINT invalid_candidate');
 });

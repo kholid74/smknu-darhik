@@ -24,7 +24,7 @@ const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
 const completed=ORGANIZATIONS.filter(({id})=>data.participation[id]).length;
 const membersOf = (candidate: typeof data.candidates[number]) => ({
   chair: candidate.members.find((member) => member.position === 'CHAIR')!,
-  vice: candidate.members.find((member) => member.position === 'VICE_CHAIR')!,
+  vice: candidate.members.find((member) => member.position === 'VICE_CHAIR'),
 });
 ---
 <StudentPortalLayout title={`Pilih ${organization.label}`} csrfToken={csrfToken} periodId={session.periodId}>
@@ -32,27 +32,27 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
   <p class="eyebrow">E-VOTING · {data.period.name}</p>
   <h1>Pemilihan {organization.label}</h1>
   <div class="voting-progress"><span>{completed} dari 4 organisasi selesai</span><progress aria-label="Kemajuan empat organisasi" value={completed} max="4"></progress></div>
-  <p class="intro">Baca visi dan misi, lalu pilih satu pasangan. Pilihan yang dikirim tidak dapat diubah.</p>
+  <p class="intro">Baca visi dan misi, lalu pilih satu calon. Pilihan yang dikirim tidak dapat diubah.</p>
   <form id="vote-form" method="post" data-organization={organization.id} data-slug={data.period.slug}>
     <fieldset>
-      <legend class="sr-only">Pilih satu pasangan calon</legend>
+      <legend class="sr-only">Pilih satu calon</legend>
       <div class="candidate-grid">
         {data.candidates.map((candidate) => {
           const { chair, vice } = membersOf(candidate);
-          const label = `Nomor ${candidate.ballotNumber}: ${chair.nameSnapshot} dan ${vice.nameSnapshot}`;
+          const label = `Nomor ${candidate.ballotNumber}: ${chair.nameSnapshot}${vice ? ' dan ' + vice.nameSnapshot : ''}`;
           return <label class="candidate" for={`candidate-${candidate.id}`}>
             <input id={`candidate-${candidate.id}`} type="radio" name="candidateId" value={candidate.id} data-label={label} required />
             <article>
-              <div class="pair-head"><span class="number">{candidate.ballotNumber}</span><span class="choose-hint">Pilih pasangan</span></div>
+              <div class="pair-head"><span class="number">{candidate.ballotNumber}</span><span class="choose-hint">Pilih calon</span></div>
               <div class="members">
                 <div class="member">
                   {chair.photoUrl ? <img src={chair.photoUrl} alt={`Foto ${chair.nameSnapshot}`} loading="lazy" /> : <span class="photo-fallback" aria-hidden="true">{chair.nameSnapshot.slice(0,1)}</span>}
                   <div><span class="position">Ketua</span><strong>{chair.nameSnapshot}</strong><small>{chair.classSnapshot}</small></div>
                 </div>
-                <div class="member">
+                {vice && <div class="member">
                   {vice.photoUrl ? <img src={vice.photoUrl} alt={`Foto ${vice.nameSnapshot}`} loading="lazy" /> : <span class="photo-fallback" aria-hidden="true">{vice.nameSnapshot.slice(0,1)}</span>}
                   <div><span class="position">Wakil Ketua</span><strong>{vice.nameSnapshot}</strong><small>{vice.classSnapshot}</small></div>
-                </div>
+                </div>}
               </div>
               <div class="statement"><h2>Visi</h2><p>{candidate.vision}</p><h2>Misi</h2><p class="mission">{candidate.mission}</p></div>
             </article>
@@ -86,7 +86,7 @@ const membersOf = (candidate: typeof data.candidates[number]) => ({
   let selectedId = '';
   let sending=false;
   dialog?.addEventListener('cancel',event=>{if(sending)event.preventDefault()});
-  form?.addEventListener('change',()=>{form.querySelectorAll<HTMLLabelElement>('.candidate').forEach(card=>{card.querySelector('.choose-hint')!.textContent=card.querySelector<HTMLInputElement>('input')!.checked?'✓ Dipilih':'Pilih pasangan'})});
+  form?.addEventListener('change',()=>{form.querySelectorAll<HTMLLabelElement>('.candidate').forEach(card=>{card.querySelector('.choose-hint')!.textContent=card.querySelector<HTMLInputElement>('input')!.checked?'✓ Dipilih':'Pilih calon'})});
   form?.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!(form instanceof HTMLFormElement) || !form.reportValidity() || !(dialog instanceof HTMLDialogElement)) return;

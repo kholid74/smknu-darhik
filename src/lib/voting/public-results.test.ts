@@ -18,3 +18,13 @@ test('public result projection allows only aggregate candidate fields', () => {
 test('public result projection rejects mismatched participation totals', () => {
   assert.equal(publicResultSnapshot({ version: 1, eligibleVoters: 2, notStarted: 0, partial: 0, complete: 1, contests: [] }), null);
 });
+
+test('chair-only result uses explicit null vice chair while preserving validation and old snapshots', () => {
+  const snapshot = (viceChair: unknown) => ({version: 1, eligibleVoters: 1, notStarted: 1, partial: 0, complete: 0,
+    contests: organizations.map(organization => ({organization, votesCast: 0, candidates: [{...candidate, viceChair}]}))});
+  const result = publicResultSnapshot(snapshot(null));
+  assert.ok(result);
+  assert.equal(result.contests[0].candidates[0].viceChair, null);
+  assert.ok(publicResultSnapshot(snapshot(candidate.viceChair)));
+  for (const value of [undefined, {}, '', {name: 'Unvalidated'}]) assert.equal(publicResultSnapshot(snapshot(value)), null);
+});
