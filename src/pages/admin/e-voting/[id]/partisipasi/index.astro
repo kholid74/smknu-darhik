@@ -1,6 +1,8 @@
 ---
 export const prerender = false;
 import DataTable from '../../../../../components/ui/DataTable.astro';
+import StatusBadge from '../../../../../components/ui/StatusBadge.astro';
+import { voterStatus } from '../../../../../lib/ui/voter-status';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
 import { can } from '../../../../../lib/rbac';
 import { getParticipation, getParticipationVoters } from '../../../../../lib/voting/participation';
@@ -15,7 +17,8 @@ const canViewVoters = can(principal, 'evoting.pemilih');
 const voterPage = canViewVoters ? await getParticipationVoters(id, null, 50) : null;
 Astro.response.headers.set('Cache-Control', 'private, no-store, max-age=0');
 Astro.response.headers.set('Referrer-Policy', 'no-referrer');
-const labels: Record<string, string> = { OSIS: 'OSIS', DEWAN_AMBALAN: 'Dewan Ambalan', IPNU: 'IPNU', IPPNU: 'IPPNU' };
+const labels: Record<string, string> = Object.fromEntries(data.contests.map(c=>[c.organization,c.name]));
+const organizations = Object.entries(labels);
 const percent = (n: number, d: number) => d ? Math.round(n * 100 / d) : 0;
 ---
 
@@ -42,26 +45,31 @@ const percent = (n: number, d: number) => d ? Math.round(n * 100 / d) : 0;
   {canViewVoters && voterPage && <section class="card" style="margin-top:18px">
     <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Status pemilih</h3>
     <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Hanya tersedia bagi pemegang izin partisipasi dan pemilih. Pilihan kandidat dan waktu suara tidak ditampilkan.</p>
-    <div class="table-wrap"><DataTable id="table-e-voting" label="Status pemilih yang dimuat" filterColumn={2} filterLabel="Filter"><table id="voter-status-table"><thead><tr><th>NISN / kode guru</th><th>Nama</th><th>Kelas / kelompok</th><th>OSIS</th><th>Dewan Ambalan</th><th>IPNU</th><th>IPPNU</th></tr></thead><tbody>
-      {voterPage.data.map((voter) => <tr><td>{voter.loginCode ?? voter.nisn}</td><td>{voter.name}</td><td>{voter.className}</td><td>{voter.participation.OSIS ? 'Sudah' : 'Belum'}</td><td>{voter.participation.DEWAN_AMBALAN ? 'Sudah' : 'Belum'}</td><td>{voter.participation.IPNU ? 'Sudah' : 'Belum'}</td><td>{voter.participation.IPPNU ? 'Sudah' : 'Belum'}</td></tr>)}
+    <div class="table-wrap"><DataTable id="table-e-voting" label="Status pemilih yang dimuat" filterColumn={2} filterLabel="Filter"><table id="voter-status-table"><thead><tr><th>NISN / kode guru</th><th>Nama</th><th>Kelas / kelompok</th>{organizations.map(([id, label]) => <th data-organization={id}>{label}</th>)}</tr></thead><tbody>
+      {voterPage.data.map((voter) => <tr><td>{voter.loginCode ?? voter.nisn}</td><td>{voter.name}</td><td>{voter.className}</td>{organizations.map(([organization]) => <td><StatusBadge {...voterStatus(voter.participation[organization])}/></td>)}</tr>)}
     </tbody></table></DataTable></div>
     {voterPage.data.length === 0 && <p style="color:var(--color-muted)">Roster belum tersedia.</p>}
     <button id="more-voters" class="btn btn-outline" type="button" data-cursor={voterPage.nextCursor ?? ''} hidden={!voterPage.nextCursor}>Muat berikutnya</button>
     <p id="voter-status-message" role="status" aria-live="polite" style="font-size:12px;margin-top:8px"></p>
   </section>}
-  <p style="font-size:12px;color:var(--color-muted);margin-top:12px">Laporan ini hanya menampilkan agregat. Tidak ada nama siswa atau pilihan kandidat.</p>
+  <p style="font-size:12px;color:var(--color-muted);margin-top:12px">Pilihan kandidat dan waktu pemberian suara tidak ditampilkan pada laporan ini.</p>
 </AdminLayout>
 
 <style>
-  .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}.stat{display:flex;flex-direction:column;gap:5px}.stat strong{font-size:22px}.stat span{font-size:12px;color:var(--color-muted)}.row-head{display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:7px}progress{width:100%;height:12px;accent-color:#17643f}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:12px}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--color-border,#e5e7eb);white-space:nowrap}th{font-weight:800}@media(max-width:650px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.row-head{flex-direction:column;gap:3px}}
+  .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:18px}.stat{display:flex;flex-direction:column;gap:5px}.stat strong{font-size:22px}.stat span{font-size:12px;color:var(--color-muted)}.row-head{display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-bottom:7px}progress{width:100%;height:12px;accent-color:#17643f}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:12px}
+  /* Rows loaded by JavaScript need the same cell styles as server-rendered rows. */
+  :global(#voter-status-table th),:global(#voter-status-table td){text-align:left;padding:9px;border-bottom:1px solid var(--color-border,#e5e7eb);white-space:nowrap}
+  :global(#voter-status-table th){font-weight:800}
+  @media(max-width:650px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.row-head{flex-direction:column;gap:3px}}
 </style>
 
 <script>
+  import { voterStatus } from '../../../../../lib/ui/voter-status';
   const button = document.querySelector<HTMLButtonElement>('#more-voters');
   const tableBody = document.querySelector<HTMLTableSectionElement>('#voter-status-table tbody');
   const message = document.querySelector<HTMLElement>('#voter-status-message');
   const periodId = location.pathname.split('/')[3];
-  const organizations = ['OSIS', 'DEWAN_AMBALAN', 'IPNU', 'IPPNU'];
+  const organizations = [...document.querySelectorAll<HTMLElement>('#voter-status-table th[data-organization]')].map(header => header.dataset.organization!);
   button?.addEventListener('click', async () => {
     button.disabled = true;
     try {
@@ -72,8 +80,15 @@ const percent = (n: number, d: number) => d ? Math.round(n * 100 / d) : 0;
       if (!response.ok) throw new Error('Daftar status tidak dapat dimuat.');
       for (const voter of result.data.data) {
         const row = document.createElement('tr');
-        for (const value of [voter.loginCode ?? voter.nisn, voter.name, voter.className, ...organizations.map((organization) => voter.participation[organization] ? 'Sudah' : 'Belum')]) {
+        for (const value of [voter.loginCode ?? voter.nisn, voter.name, voter.className]) {
           const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
+        }
+        for (const organization of organizations) {
+          const status = voterStatus(voter.participation[organization]);
+          const cell = document.createElement('td');
+          const badge = document.createElement('span'); badge.className = 'status-badge'; badge.dataset.tone = status.tone;
+          const icon = document.createElement('span'); icon.setAttribute('aria-hidden', 'true'); icon.textContent = status.icon;
+          badge.append(icon, document.createTextNode(status.label)); cell.append(badge); row.append(cell);
         }
         tableBody?.append(row);
       }

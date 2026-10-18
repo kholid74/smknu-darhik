@@ -3,6 +3,7 @@ import { db } from '../prisma';
 import { requireEnv } from '../env';
 import { nextStudentSessionExpiry } from './student-session';
 import type { VoteInput } from './vote-input';
+import { votingProgress } from './contests';
 
 export class VoteError extends Error {
   constructor(public code: string) { super(code); }
@@ -45,6 +46,10 @@ export async function submitVote(sessionId: string, voterId: string, periodId: s
       await tx.votingSession.deleteMany({ where: { id: sessionId, voterId } });
       return { error: 'ELECTION_NOT_OPEN' as const };
     }
+    const contests = await tx.electionContest.findMany({ where: { periodId }, select: { organization: true, sortOrder: true } });
+    const rights = await tx.voterParticipation.findMany({ where: { voterId, periodId }, select: { organization: true, hasVoted: true } });
+    votingProgress(contests, rights);
+    if (!contests.some(c => c.organization === input.organization)) throw new VoteError('INVALID_ORGANIZATION');
     const candidate = await tx.candidatePair.findFirst({ where: { id: input.candidateId, periodId, organization: input.organization }, select: { id: true } });
     if (!candidate) throw new VoteError('INVALID_CANDIDATE');
     const updated = await tx.voterParticipation.updateMany({
@@ -54,15 +59,13 @@ export async function submitVote(sessionId: string, voterId: string, periodId: s
     if (updated.count !== 1) throw new VoteError('ALREADY_VOTED');
     await tx.ballot.create({ data: { periodId, organization: input.organization, candidateId: candidate.id } });
     const participation = await tx.voterParticipation.findMany({ where: { voterId, periodId }, select: { organization: true, hasVoted: true } });
-    const complete = participation.length === 4 && participation.every((row) => row.hasVoted);
-    const nextOrganization = complete ? null : (['OSIS', 'DEWAN_AMBALAN', 'IPNU', 'IPPNU'] as const).find((organization) =>
-      !participation.some((row) => row.organization === organization && row.hasVoted)) ?? null;
+    const { complete, nextOrganization } = votingProgress(contests, participation);
     if (complete) await tx.votingSession.delete({ where: { id: sessionId } });
     else {
       const expiry = nextStudentSessionExpiry(session.createdAt, now, period.closesAt);
       await tx.votingSession.update({ where: { id: sessionId }, data: { lastSeenAt: now, expiresAt: expiry.idleExpiresAt } });
     }
-    return { organization: input.organization, recorded: true as const, complete, nextOrganization };
+    return { recorded: true as const, complete, nextOrganization };
   }, { maxWait: 2_000, timeout: 5_000 });
   if ('error' in result) throw new VoteError(result.error);
   return result;

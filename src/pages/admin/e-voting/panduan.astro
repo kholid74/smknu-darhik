@@ -5,6 +5,7 @@ import PageHeader from '../../../components/ui/PageHeader.astro';
 
 const chapters = [
   {id: 'master-siswa', label: 'Siapkan master siswa'},
+  {id: 'jenis', label: 'Atur jenis pemilihan'},
   {id: 'periode', label: 'Buat periode'},
   {id: 'calon', label: 'Isi calon pemilihan'},
   {id: 'pemilih', label: 'Sinkronkan pemilih'},
@@ -22,7 +23,7 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
   </PageHeader>
 
   <div class="feedback" data-tone="info">
-    <strong>Satu master siswa, empat hak suara.</strong> Data siswa diimpor sekali ke master. Setiap periode memakai daftar pemilih dan PIN sendiri untuk OSIS, Dewan Ambalan, IPNU, dan IPPNU. Maksimal 99 pemilih gabungan siswa dan guru per periode.
+    <strong>Satu master siswa, hak suara sesuai periode.</strong> Data siswa diimpor sekali ke master. Setiap periode memakai daftar pemilih dan PIN sendiri untuk jenis pemilihan yang dipilih pada periode. Maksimal 99 pemilih gabungan siswa dan guru per periode.
   </div>
 
   <div class="guide-layout">
@@ -52,12 +53,20 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
           <p class="guide-result">Selesai jika semua siswa sudah tersimpan dan terhubung ke kelas dengan tahun ajaran yang benar.</p>
         </li>
 
+        <li class="card" id="jenis">
+          <h2>Atur jenis pemilihan</h2>
+          <p>Buka <a href="/admin/e-voting/jenis">Modul → Jenis Pemilihan</a>. Pilih <strong>Tambah jenis</strong>, isi kode unik, nama, jabatan, mode calon, urutan awal, serta logo opsional dari pustaka media. Mode <strong>Calon tunggal</strong> hanya memiliki jabatan utama; mode <strong>Wakil opsional</strong> dapat memiliki ketua saja atau ketua dan wakil.</p>
+          <p>Awal tersedia OSIS, Pradana Putra, Pradana Putri, IPNU dan IPPNU. Kode tidak dapat diubah. Edit melalui popup; jenis yang sudah dipakai periode tidak dapat dihapus. Gunakan <strong>Nonaktifkan</strong> untuk menghentikan pemakaian pada periode baru.</p>
+          <p class="guide-note">Edit/nonaktif master tidak mengubah snapshot nama, jabatan, logo, mode atau hak pemilih pada periode yang sudah ada. Koreksi master sebelum memasang jenis ke periode.</p>
+        </li>
+
         <li class="card" id="periode">
           <h2><span class="guide-number" aria-hidden="true">02</span>Buat periode</h2>
           <p>Buka <strong>Modul → Pemilihan → Buat periode</strong>. Isi nama, slug tautan, tahun ajaran, serta waktu mulai dan selesai dalam <strong>WIB</strong>. Waktu mulai harus di masa depan dan waktu selesai sesudahnya.</p>
           <p>Contoh: nama <strong>Pemilihan Organisasi 2026</strong>, slug <code>pem-osis-2026</code>, tahun ajaran <strong>2026/2027</strong>. Slug memakai huruf kecil, angka, atau tanda hubung dan tidak dapat diganti setelah dibuat.</p>
           <p class="guide-note">Centang <strong>Periode uji</strong> hanya untuk simulasi. Penanda ini tidak dapat diubah setelah dibuat. Untuk pemilihan resmi, biarkan tidak dicentang.</p>
-          <p class="guide-result">Pilih <strong>Buat periode DRAFT</strong>, lalu buka <strong>Konfigurasi</strong>. Empat organisasi sudah disiapkan otomatis.</p>
+          <p>Pilih <strong>1–20 jenis</strong> yang akan dipakai. Lima jenis awal tercentang jika masih aktif. Gunakan tombol naik/turun untuk menentukan urutan surat suara, lalu pilih <strong>Buat periode DRAFT</strong>.</p>
+          <p class="guide-result">Di <strong>Konfigurasi → Susunan surat suara</strong>, panitia dapat menambah, melepas atau mengurutkan jenis selama DRAFT. Jenis berisi calon harus dikosongkan lewat Kelola calon sebelum dilepas. Simpan susunan akan menyesuaikan hak seluruh pemilih tanpa mengganti PIN. Setelah dijadwalkan susunan terkunci.</p>
         </li>
 
         <li class="card" id="calon">
@@ -75,7 +84,7 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
           <p>Sumber siswa mengikuti tahun ajaran kelas yang sama dengan periode. Siswa yang sudah terdaftar tidak diduplikasi atau dihapus otomatis saat pilihan berubah. Untuk mengurangi jumlah, gunakan <strong>Hapus dari roster</strong> pada daftar terdaftar selama masih dapat diedit. <strong>Tidak perlu mengimpor file siswa lagi.</strong></p>
           <p class="guide-note">Jika jumlah belum sesuai, perbaiki kelas atau tahun ajaran pada master siswa, lalu buat pratinjau baru. Daftar pemilih harus berisi 1–99 pemilih gabungan siswa dan guru dan hanya dapat ditambah atau dihapus sebelum periode dibuka.</p>
           <p>Untuk guru, gunakan bagian <strong>Pemilih dari master guru</strong> pada halaman yang sama. Cari dan centang guru yang berhak, pilih <strong>Pratinjau guru terpilih</strong>, periksa nama/jumlah, lalu <strong>Tambahkan pemilih guru</strong> dan setujui popup. Guru tidak otomatis menjadi pemilih; master tersedia di <a href="/admin/guru">Guru &amp; Staf</a>.</p>
-          <p class="guide-result">Daftar resmi mencakup siswa dan guru, maksimal <strong>99 pemilih gabungan</strong>. Semua mendapat empat hak suara dengan bobot sama dan hasil gabungan. Master siswa/guru terpisah dari PIN. Guru harus ditambahkan sebelum pembukaan; jangan menyisipkan guru ke periode yang sudah berlangsung.</p>
+          <p class="guide-result">Daftar resmi mencakup siswa dan guru, maksimal <strong>99 pemilih gabungan</strong>. Semua mendapat hak suara untuk seluruh jenis periode dengan bobot sama dan hasil gabungan. Master siswa/guru terpisah dari PIN. Guru harus ditambahkan sebelum pembukaan; jangan menyisipkan guru ke periode yang sudah berlangsung.</p>
           <p class="guide-note">DRAFT tetap dapat disiapkan jika tanggal awal lewat. Buka Konfigurasi dan ubah jadwal ke masa depan sebelum menjadwalkan. Pada SCHEDULED yang sudah mencapai waktu mulai, daftar pemilih terkunci dan alasannya ditampilkan.</p>
         </li>
 
@@ -89,7 +98,7 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
 
         <li class="card" id="jadwal">
           <h2><span class="guide-number" aria-hidden="true">06</span>Jadwalkan pemilihan</h2>
-          <p>Kembali ke <strong>Konfigurasi</strong> dan periksa <strong>Pratinjau kesiapan</strong>: jadwal valid, calon ketua pada empat organisasi (wakil opsional), pemilih sesuai, serta PIN aktif untuk setiap pemilih.</p>
+          <p>Kembali ke <strong>Konfigurasi</strong> dan periksa <strong>Pratinjau kesiapan</strong>: jadwal valid, calon ketua pada seluruh jenis periode (wakil opsional), pemilih sesuai, serta PIN aktif untuk setiap pemilih.</p>
           <p>Pilih <strong>Jadwalkan periode</strong>. Server memeriksa kesiapan sekali lagi. Hanya satu periode dapat berstatus SCHEDULED pada satu waktu.</p>
           <p class="guide-note">SCHEDULED belum berarti siswa dapat langsung masuk. Form login tersedia ketika waktu mulai tercapai dan sebelum waktu selesai. Tidak ada tombol buka manual. Nama, tahun ajaran, dan jadwal masih dapat disunting sebelum waktu mulai.</p>
           <p class="guide-result">Siswa masuk melalui <code>/siswa/masuk?periode=&lt;slug&gt;</code> memakai NISN dan PIN. Guru melalui <code>/pemilih/masuk?periode=&lt;slug&gt;</code> memakai kode guru dan PIN. Slip cetak otomatis memuat URL lengkap sesuai jenis pemilih. Akun internal guru tidak dipakai sebagai kredensial voting.</p>
@@ -97,9 +106,9 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
 
         <li class="card" id="pelaksanaan">
           <h2><span class="guide-number" aria-hidden="true">07</span>Laksanakan pemilihan</h2>
-          <p>Siapkan <strong>tiga Chromebook</strong>, satu pemilih pada setiap perangkat. Setelah login, siswa masuk ke Portal Siswa, memilih <strong>Mulai memilih</strong>, dan menyelesaikan empat organisasi. Layanan Coming Soon belum dapat digunakan.</p>
+          <p>Siapkan <strong>tiga Chromebook</strong>, satu pemilih pada setiap perangkat. Setelah login, siswa masuk ke Portal Siswa, memilih <strong>Mulai memilih</strong>, dan menyelesaikan seluruh jenis periode. Layanan Coming Soon belum dapat digunakan.</p>
           <p>Pantau <strong>Partisipasi</strong> untuk jumlah belum mulai, parsial, dan lengkap. Pilihan kandidat tidak ditampilkan selama pemungutan. Siswa yang baru menyelesaikan sebagian dapat login lagi memakai NISN dan PIN valid yang sama untuk melanjutkan.</p>
-          <p class="guide-note">Sesi berakhir setelah 5 menit tanpa aktivitas atau maksimal 15 menit. Sesudah empat suara, sesi dicabut dan layar selesai ditampilkan. Sebelum pemilih berikutnya memakai perangkat, pastikan logout atau sesi berakhir dan layar sudah netral; matikan penyimpanan password browser.</p>
+          <p class="guide-note">Sesi berakhir setelah 5 menit tanpa aktivitas atau maksimal 15 menit. Sesudah seluruh hak suara periode, sesi dicabut dan layar selesai ditampilkan. Sebelum pemilih berikutnya memakai perangkat, pastikan logout atau sesi berakhir dan layar sudah netral; matikan penyimpanan password browser.</p>
           <p>Jika diperlukan dan disetujui panitia, <strong>Perpanjang waktu pemilihan</strong> tersedia satu kali selama periode berlangsung, menambah 60 menit dengan kode alasan dan password admin.</p>
           <p class="guide-result">Muat ulang laporan untuk melihat progres terbaru. Pastikan pendamping tidak melihat atau menentukan pilihan siswa.</p>
         </li>
@@ -107,9 +116,10 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
         <li class="card" id="penutupan">
           <h2><span class="guide-number" aria-hidden="true">08</span>Tutup dan publikasikan hasil</h2>
           <p>Sesudah waktu selesai, buka <strong>Konfigurasi → Tutup dan rekonsiliasi</strong>, masukkan password admin, lalu setujui popup. Setelah deadline, penutupan tetap diperbolehkan meskipun ada pemilih yang belum lengkap.</p>
-          <p>Untuk selesai sebelum jadwal, gunakan <strong>Tutup lebih awal dan rekonsiliasi</strong>. Tombol aktif hanya jika <strong>seluruh pemilih terdaftar telah menyelesaikan empat suara</strong>, termasuk pemilih dengan PIN nonaktif. Muat ulang setelah pemilih terakhir selesai. Jangan menghapus pemilih untuk memenuhi syarat ini.</p>
+          <p>Untuk selesai sebelum jadwal, gunakan <strong>Tutup lebih awal dan rekonsiliasi</strong> setelah waktu mulai. Periksa ringkasan lengkap, parsial, dan belum mulai; isi <strong>alasan keputusan panitia sepanjang 10–500 karakter</strong>, masukkan password admin, lalu setujui popup. Tidak perlu menunggu seluruh pemilih selesai. Pemilih absen dan PIN nonaktif tetap terdaftar, suara parsial tetap sah, dan tidak ada suara otomatis untuk hak yang belum dipakai.</p>
           <p class="guide-note">Server memeriksa ulang dan mencocokkan partisipasi dengan surat suara. Penutupan menyimpan snapshot hasil, mencabut sesi seluruh pemilih, dan mencatat audit. Jadwal asli tetap tersimpan. Jika rekonsiliasi gagal, hentikan proses dan minta pemeriksaan teknis; jangan mengubah suara secara manual. Periode yang sudah ditutup tidak dapat dibuka kembali.</p>
           <p>Setelah CLOSED, pilih <strong>Publikasikan hasil</strong> dengan password dan konfirmasi. Hasil publik baru tersedia di <code>/e-voting/&lt;slug&gt;/hasil</code> setelah langkah ini. Laksanakan penutupan dan publikasi dengan saksi sesuai prosedur panitia.</p>
+          <p>Setelah publikasi, tombol utama <strong>Lihat hasil voting (tab baru)</strong> muncul pada daftar dan detail periode. Hasil terbuka di tab baru sehingga dashboard tetap tersedia. Sebelum publikasi, status hasil ditampilkan; aksi Publikasikan hasil hanya tersedia bagi panitia berizin pada periode CLOSED.</p>
           <p class="guide-result">Gunakan <strong>Arsipkan periode</strong> untuk menyimpan riwayat; arsip tidak menghapus data. Publikasikan dahulu jika hasil hendak dibuka untuk umum, karena aksi publikasi tersedia pada status CLOSED.</p>
         </li>
       </ol>
@@ -117,8 +127,8 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
       <section class="card guide-help" id="bantuan" aria-labelledby="help-title">
         <h2 id="help-title">Kendala yang sering ditemui</h2>
         <details><summary>Kelola Pemilih masih 0 padahal siswa sudah diimpor</summary><p>Impor mengisi master siswa. Buka Kelola Pemilih pada periode yang dipilih, jalankan pratinjau, lalu tambahkan pemilih dari master. Jika pratinjau kosong, cocokkan tahun ajaran periode dengan kelas siswa.</p></details>
-        <details><summary>Periode gagal dijadwalkan atau siswa belum bisa login</summary><p>Periksa empat organisasi, calon ketua (wakil opsional), 1–99 pemilih, PIN aktif, dan jadwal mulai yang masih di masa depan saat dijadwalkan. Pastikan tidak ada periode SCHEDULED lain. Untuk login, waktu mulai harus sudah tercapai dan periode belum ditutup atau melewati waktu selesai.</p></details>
-        <details><summary>Hasil belum tersedia setelah siswa selesai memilih</summary><p>Selesainya seluruh pemilih tidak otomatis menutup atau menerbitkan hasil. Tutup dan rekonsiliasi dahulu, lalu publikasikan hasil. Bila belum seluruh pemilih lengkap, tunggu deadline untuk penutupan normal.</p></details>
+        <details><summary>Periode gagal dijadwalkan atau siswa belum bisa login</summary><p>Periksa seluruh jenis periode, calon ketua (wakil opsional), 1–99 pemilih, PIN aktif, dan jadwal mulai yang masih di masa depan saat dijadwalkan. Pastikan tidak ada periode SCHEDULED lain. Untuk login, waktu mulai harus sudah tercapai dan periode belum ditutup atau melewati waktu selesai.</p></details>
+        <details><summary>Hasil belum tersedia setelah siswa selesai memilih</summary><p>Selesainya seluruh pemilih tidak otomatis menutup atau menerbitkan hasil. Tutup dan rekonsiliasi dahulu, lalu publikasikan hasil. Panitia dapat menutup setelah pemilihan dibuka walau ada pemilih absen atau parsial; sebelum deadline, isi alasan dan konfirmasi penutupan lebih awal. Penutupan permanen mengakhiri seluruh hak yang tersisa.</p></details>
         <details><summary>Menu atau tombol tertentu tidak terlihat</summary><p>Aksi mengikuti izin akun: pengelolaan periode, siswa, calon/pemilih, PIN, partisipasi, penutupan, dan publikasi dapat diberikan terpisah. Hubungi superadmin untuk memeriksa izin akun panitia.</p></details>
         <details><summary>Bagaimana membersihkan pemilihan simulasi?</summary><p>Untuk periode yang ditandai Periode uji sejak dibuat dan belum dipublikasikan, superadmin dapat memakai Hapus data uji pada konfigurasi. Periksa pratinjau, lanjutkan popup konfirmasi, lalu ketik HAPUS diikuti slug dan password login. Data turunan periode dihapus; master siswa/guru dan audit tetap disimpan. Hasil uji yang sudah dipublikasikan tidak dapat dibersihkan lewat fitur ini.</p></details>
       </section>

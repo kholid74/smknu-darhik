@@ -19,9 +19,11 @@ export const POST: APIRoute = async ({ params, request, locals, cookies }) => {
     return json({ data: await publishPeriod(params.periodId, actorId, (body as { adminPassword: string }).adminPassword) });
   } catch (error) {
     if (error instanceof PeriodError) {
-      const status = error.code === 'NOT_FOUND' ? 404 : ['INVALID_STATE', 'RATE_LIMITED', 'INVALID_REAUTH'].includes(error.code) ? 409 : 400;
+      const status = error.code === 'NOT_FOUND' ? 404 : error.code === 'INVALID_REAUTH' ? 401 : error.code === 'RATE_LIMITED' ? 429 : error.code === 'INVALID_STATE' ? 409 : 400;
       return json({ error: { code: error.code } }, status);
     }
+    const code=error instanceof Error?error.message:'';
+    if(['INVALID_INPUT','BODY_TOO_LARGE','UNSUPPORTED_MEDIA_TYPE'].includes(code))return json({error:{code}},code==='BODY_TOO_LARGE'?413:code==='UNSUPPORTED_MEDIA_TYPE'?415:400);
     return json({ error: { code: 'TEMPORARILY_UNAVAILABLE' } }, 503);
   }
 };

@@ -28,6 +28,7 @@ const allGroups = [
     icon: 'how_to_vote',
     items: [
       { label: 'Pemilihan', href: '/admin/e-voting', cap: 'evoting.lihat' },
+      { label: 'Jenis Pemilihan', href: '/admin/e-voting/jenis', cap: 'evoting.lihat' },
       { label: 'Absensi', href: null, cap: null, comingSoon: true },
     ],
   }] : []),
@@ -98,7 +99,7 @@ const groups = allGroups
   .map((g) => ({ ...g, items: g.items.filter((i) => i.comingSoon || (i.cap && allow(i.cap))) }))
   .filter((g) => g.items.length > 0);
 
-const currentModule = groups.flatMap(group=>group.items).find(item=>item.href && currentPath.startsWith(item.href));
+const currentModule = groups.flatMap(group=>group.items).filter(item=>item.href && currentPath.startsWith(item.href)).sort((a,b)=>b.href!.length-a.href!.length)[0];
 const breadcrumbItems = [{label:'Dashboard',href:currentPath==='/admin'?undefined:'/admin'}, ...(currentModule ? [{label:currentModule.label,href:currentPath===currentModule.href?undefined:currentModule.href!}] : []), ...(currentPath!=='/admin' && title!==currentModule?.label ? [{label:title}] : [])];
 const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'Staf', guru: 'Guru', siswa: 'Siswa' };
 ---
@@ -140,7 +141,7 @@ const roleLabel: Record<string, string> = { superadmin: 'Super Admin', staf: 'St
             <div class="sidebar-group-items" id={groupId} data-open={String(groupActive)}>
               <div class="sidebar-group-inner">
                 {g.items.map(i => i.href ? (
-                  <a href={i.href} aria-current={currentPath.startsWith(i.href)?'page':undefined} class:list={[{ active: currentPath.startsWith(i.href) }]}>
+                  <a href={i.href} aria-current={currentModule?.href===i.href?'page':undefined} class:list={[{ active: currentModule?.href===i.href }]}>
                     {i.label}
                   </a>
                 ) : (

@@ -5,6 +5,8 @@ import { requireEnv } from '../env';
 import { pinHashMaterial } from './pin-input';
 import { createPreauthCsrfToken } from './security';
 import type { VoterType } from './voter-identity';
+import { votingProgress } from './contests';
+import { nextStudentSessionExpiry } from './student-session';
 
 export class StudentAuthError extends Error {
   constructor(public code: string) { super(code); }
@@ -50,24 +52,32 @@ export async function authenticateVoter(periodId: string, identifier: string, pi
   if (!voter || voter.voterType !== voterType || !voter.credentialEnabled || !voter.pinHash || !matched) throw new StudentAuthError('INVALID_CREDENTIALS');
 
   const rawToken = newOpaqueToken();
-  const absoluteDeadline = Math.min(now + 15 * 60_000, period.closesAt.getTime());
-  const idleDeadline = Math.min(now + 5 * 60_000, absoluteDeadline);
   const result = await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "ElectionPeriod" WHERE "id" = ${periodId}::uuid FOR SHARE`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(74190232)`;
       const locked = await tx.$queryRaw<Array<{ pinHash: string | null; credentialEnabled: boolean; pinVersion: number }>>`
         SELECT "pinHash", "credentialEnabled", "pinVersion" FROM "ElectionVoter" WHERE "id" = ${voter.id}::uuid FOR UPDATE`;
       const [{ now: dbNow }] = await tx.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
       const currentPeriod = await tx.electionPeriod.findUnique({ where: { id: periodId }, select: { state: true, opensAt: true, closesAt: true } });
       if (!locked.length || !currentPeriod || currentPeriod.state !== 'SCHEDULED' || currentPeriod.opensAt > dbNow || currentPeriod.closesAt <= dbNow ||
           locked[0].pinVersion !== voter.pinVersion || locked[0].pinHash !== voter.pinHash || !locked[0].credentialEnabled) return 'STALE';
-      const participation = await tx.voterParticipation.findMany({ where: { voterId: voter.id, hasVoted: true }, select: { organization: true } });
+      const participation = await tx.voterParticipation.findMany({ where: { voterId: voter.id, periodId }, select: { organization: true, hasVoted: true } });
+      const contests = await tx.electionContest.findMany({ where: { periodId }, select: { organization: true, sortOrder: true } });
+      const { complete } = votingProgress(contests, participation);
       await tx.votingSession.deleteMany({ where: { voterId: voter.id } });
-      if (participation.length >= 4) return 'COMPLETE';
-      const expiresAt = new Date(Math.min(idleDeadline, currentPeriod.closesAt.getTime()));
+      if (complete) return 'COMPLETE';
+      const [{ active }] = await tx.$queryRaw<Array<{ active: number }>>`
+        SELECT count(*)::integer AS active FROM "VotingSession" s
+        JOIN "ElectionVoter" v ON v.id=s."voterId" JOIN "ElectionPeriod" p ON p.id=v."periodId"
+        WHERE s.scope='ELECTION_VOTING' AND s."expiresAt">${dbNow}::timestamptz AND s."createdAt">${dbNow}::timestamptz - interval '15 minutes'
+          AND v."credentialEnabled" AND p.state='SCHEDULED' AND p."opensAt"<=${dbNow} AND p."closesAt">${dbNow}`;
+      if (active >= 3) return 'CAPACITY';
+      const expiresAt = nextStudentSessionExpiry(dbNow, dbNow, currentPeriod.closesAt).idleExpiresAt;
       const session = await tx.votingSession.create({ data: { voterId: voter.id, tokenHash: tokenHash(rawToken), createdAt: dbNow, lastSeenAt: dbNow, expiresAt }, select: { id: true } });
       return { type: 'ACTIVE' as const, sessionId: session.id };
   });
   if (result === 'STALE') throw new StudentAuthError('INVALID_CREDENTIALS');
+  if (result === 'CAPACITY') throw new StudentAuthError('SESSION_CAPACITY');
   if (result === 'COMPLETE') return { complete: true as const };
   return { complete: false as const, token: rawToken, sessionId: result.sessionId };
 }

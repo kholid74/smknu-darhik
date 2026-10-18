@@ -34,7 +34,7 @@ export const POST: APIRoute = async ({ request, params, locals, cookies }) => {
         cookies.delete(VOTING_SESSION_COOKIE, { path: '/', httpOnly: true, secure: production, sameSite: 'strict' });
         return json({ error: { code: error.code } }, 401);
       }
-      if (error.code === 'INVALID_CANDIDATE') return json({ error: { code: error.code } }, 400);
+      if (error.code === 'INVALID_CANDIDATE' || error.code === 'INVALID_ORGANIZATION') return json({ error: { code: error.code } }, 400);
     }
     return json({ error: { code: 'TEMPORARILY_UNAVAILABLE' } }, 503);
   }

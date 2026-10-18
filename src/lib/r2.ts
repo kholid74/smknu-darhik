@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import sharp from 'sharp';
+import { randomUUID } from 'node:crypto';
+import { prepareUpload, UPLOAD_FOLDERS, UploadError, type AssetKind } from './upload-file';
 import { env, requireEnv } from './env';
 
 // Built on first use, not at import time: pages that never touch R2 should not
@@ -23,42 +24,20 @@ function r2Client(): S3Client {
 const BUCKET = () => env('R2_BUCKET') || 'smknu-darulhikam-assets';
 const PUBLIC_URL = () => env('R2_PUBLIC_URL') || '/api/image';
 
-export async function uploadToR2(file: File, folder = 'uploads'): Promise<string> {
-  const origExt = file.name.split('.').pop()?.toLowerCase() || 'png';
+export async function uploadToR2(file: File, folder = 'uploads', assetKind?: AssetKind) {
+  if (!UPLOAD_FOLDERS.includes(folder)) throw new UploadError(400, 'Folder upload tidak valid.');
+  const { buffer, mimeType, size, kind, extension } = await prepareUpload(file, assetKind);
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const random = Math.random().toString(36).slice(2, 8);
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  // Compress with Sharp: max 1800px, 85% quality.
-  // Gambar beralpha (logo PNG transparan) -> WebP agar transparansi terjaga; selain itu JPEG.
-  let finalBuffer = buffer;
-  let contentType = file.type || 'application/octet-stream';
-  let ext = origExt;
-  try {
-    const meta = await sharp(buffer).metadata();
-    const pipeline = sharp(buffer).resize(1800, 1800, { fit: 'inside', withoutEnlargement: true });
-    if (meta.hasAlpha) {
-      finalBuffer = await pipeline.webp({ quality: 85 }).toBuffer();
-      contentType = 'image/webp';
-      ext = 'webp';
-    } else {
-      finalBuffer = await pipeline.jpeg({ quality: 85, progressive: true }).toBuffer();
-      contentType = 'image/jpeg';
-      ext = 'jpg';
-    }
-    console.log(`[R2] Compressed: ${(buffer.length / 1024).toFixed(0)}KB → ${(finalBuffer.length / 1024).toFixed(0)}KB (${ext})`);
-  } catch {
-    // If sharp fails (e.g., non-image file), use original bytes/ext/type
-  }
-  const key = `${folder}/${date}-${random}.${ext}`;
+  const key = `${folder}/${date}-${randomUUID()}.${extension}`;
   await r2Client().send(new PutObjectCommand({
     Bucket: BUCKET(),
     Key: key,
-    Body: finalBuffer,
-    ContentType: contentType,
+    Body: buffer,
+    ContentType: mimeType,
+    ...(kind === 'file' ? { ContentDisposition: 'attachment' } : {}),
     ACL: 'public-read',
   }));
-  return `${PUBLIC_URL()}/${key}`;
+  return { url:`${PUBLIC_URL().replace(/\/$/,'')}/${key}`, mimeType, size, kind };
 }
 
 export async function deleteFromR2(key: string): Promise<void> {

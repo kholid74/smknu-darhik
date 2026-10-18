@@ -80,12 +80,13 @@ const uid = 'fu-' + Math.random().toString(36).slice(2, 9);
         const fd = new FormData();
         fd.append('file', file);
         fd.append('folder', folder);
+        fd.append('assetKind', 'document');
         try {
           const res = await fetch('/api/upload', { method: 'POST', body: fd });
           const data = await res.json();
-          if (data.url) {
+          if (res.ok && data.url) {
             setValue(data.url);
-            status.textContent = 'Berhasil diupload.';
+            status.textContent = data.warning || 'Berhasil diupload.';
           } else {
             throw new Error(data.error || 'Upload gagal');
           }

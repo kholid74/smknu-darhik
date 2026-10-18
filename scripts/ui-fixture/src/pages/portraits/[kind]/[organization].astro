@@ -1,0 +1,15 @@
+---
+import Ballot from '../../../../../../src/pages/siswa/e-voting/[slug]/pilih/[organization].astro';
+import {votingFixture,session} from '../../../voting';
+export function getStaticPaths(){return ['student','teacher'].map(kind=>({params:{kind,organization:'OSIS'}}));}
+Astro.locals.votingSession={...session,voterType:Astro.params.kind==='teacher'?'TEACHER':'STUDENT'};
+const {data}=votingFixture(5);
+data.contests[0]={...data.contests[0],candidateMode:'OPTIONAL_VICE',chairLabel:'Ketua snapshot',viceChairLabel:'Wakil snapshot'};
+const member=(position:string,name:string,photoUrl:string|null)=>({position,nameSnapshot:name,classSnapshot:'X QA',photoUrl});
+data.candidates=[
+  {id:'40000000-0000-4000-8000-000000000001',ballotNumber:1,vision:'Visi bersama',mission:'Misi bersama',members:[member('CHAIR','Calon utama <b>aman</b>','/api/image/qa/portrait.png'),member('VICE_CHAIR','Wakil panjang untuk uji pembungkusan nama',null)]},
+  {id:'40000000-0000-4000-8000-000000000002',ballotNumber:2,vision:'Visi tunggal',mission:'Misi tunggal',members:[member('CHAIR','Calon tunggal','/api/image/qa/portrait.png')]},
+  {id:'40000000-0000-4000-8000-000000000003',ballotNumber:3,vision:'Visi tanpa foto',mission:'Misi tanpa foto',members:[member('CHAIR','Calon tanpa foto',null)]},
+];
+---
+<Ballot data={data}/>

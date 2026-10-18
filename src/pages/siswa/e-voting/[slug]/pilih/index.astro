@@ -2,7 +2,7 @@
 import StudentPortalLayout from '../../../../../layouts/StudentPortalLayout.astro';
 import { votingCsrfSecret } from '../../../../../lib/voting/student-auth';
 import { createStudentSessionCsrfToken } from '../../../../../lib/voting/security';
-import { BallotPageError, getBallotProgress, ORGANIZATIONS } from '../../../../../lib/voting/ballot-pages';
+import { BallotPageError, getBallotProgress } from '../../../../../lib/voting/ballot-pages';
 
 import { voterPortal } from '../../../../../lib/voting/voter-identity';
 export const prerender = false;
@@ -20,16 +20,16 @@ catch (error) {
   return Astro.redirect(base);
 }
 const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
-const completed = ORGANIZATIONS.filter(({ id }) => data.participation[id]).length;
+const completed = data.contests.filter(c=>data.participation[c.organization]).length;
 ---
 <StudentPortalLayout title="Pilih organisasi" csrfToken={csrfToken} periodId={session.periodId}>
   <p class="eyebrow">E-VOTING · {data.period.name}</p>
   <h1>Pilih organisasi</h1>
   <p class="muted">Pilih organisasi yang ingin Anda ikuti. Setiap pilihan hanya dapat dikirim satu kali.</p>
-  <div class="progress" aria-label={`${completed} dari 4 selesai`}><span style={`width:${completed * 25}%`}></span></div>
-  <p class="muted">{completed} dari 4 pemilihan selesai</p>
+  <div class="progress" aria-label={`${completed} dari ${data.contests.length} selesai`}><span style={`width:${completed * 100 / data.contests.length}%`}></span></div>
+  <p class="muted">{completed} dari {data.contests.length} pemilihan selesai</p>
   <div class="org-grid">
-    {ORGANIZATIONS.map(({ id, label }) => {
+    {data.contests.map(({ organization: id, name: label }) => {
       const voted = data.participation[id];
       const count = data.candidateCounts[id] ?? 0;
       return <article class="org-card">

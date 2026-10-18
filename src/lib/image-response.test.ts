@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import { imageResponse } from './image-response';
+test('document downloads use attachment and nosniff while keeping bytes intact',async()=>{
+  const source=Buffer.from('%PDF-1.7\nfixture');
+  const response=await imageResponse(new Request('https://school.example/api/image/file.pdf'),'file.pdf',async()=>({bytes:source,contentType:'application/pdf'}));
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()),source);assert.equal(response.headers.get('Content-Disposition'),'attachment');assert.equal(response.headers.get('X-Content-Type-Options'),'nosniff');
+});
 
 test('image endpoint retains originals, emits small WebP thumbnails, never enlarges, and keeps immutable success cache', async () => {
   const bytes = await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#187a3d' } }).jpeg().toBuffer();

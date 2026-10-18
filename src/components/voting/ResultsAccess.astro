@@ -1,0 +1,24 @@
+---
+interface Props {
+  period: { name: string; slug: string; state: string; publishedAt: Date | null };
+  publishHref?: string;
+}
+const { period, publishHref } = Astro.props;
+const published = (period.state === 'CLOSED' || period.state === 'ARCHIVED') && !!period.publishedAt;
+const status = published ? 'Hasil resmi sudah dipublikasikan.'
+  : period.state === 'CLOSED' ? 'Pemilihan ditutup. Hasil belum dipublikasikan.'
+  : period.state === 'ARCHIVED' ? 'Periode diarsipkan. Hasil belum dipublikasikan.'
+  : 'Hasil belum tersedia. Pemilihan harus ditutup dan hasil dipublikasikan terlebih dahulu.';
+---
+<div class="results-access" data-results-published={published}>
+  <p>{status}{published && period.publishedAt && <> <time datetime={period.publishedAt.toISOString()}>{new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(period.publishedAt)} WIB.</time></>}</p>
+  {published ? <a class="btn btn-primary" href={`/e-voting/${period.slug}/hasil`} target="_blank" rel="noopener noreferrer" aria-label={`Lihat hasil voting ${period.name} (tab baru)`}>Lihat hasil voting <span class="tab-hint">(tab baru)</span><span aria-hidden="true">↗</span></a>
+    : period.state === 'CLOSED' && publishHref && <a class="btn btn-primary" href={publishHref}>Publikasikan hasil</a>}
+</div>
+<style>
+  .results-access{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;width:100%;min-width:0;padding:16px;border:1px solid var(--color-line);border-radius:10px;background:var(--color-paper);margin-bottom:18px}
+  .results-access[data-results-published="true"]{border-color:var(--color-accent);background:#eef5ef}
+  p{flex:1 1 200px;font-size:13px;line-height:1.6;margin:0}
+  a{flex-wrap:wrap;white-space:normal;text-align:center;max-width:100%}
+  .tab-hint{font-size:12px;font-weight:500}
+</style>

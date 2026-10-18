@@ -15,7 +15,8 @@ let legacyFlags: Array<{isTest: boolean}>;
 
 before(async () => {
   const root = new URL('../../../prisma/migrations/', import.meta.url);
-  for (const entry of (await readdir(root, {withFileTypes: true})).filter(entry => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+  // Historical cleanup/classification regression; current guards are tested in dynamic-types-db.
+  for (const entry of (await readdir(root, {withFileTypes: true})).filter(entry => entry.isDirectory() && entry.name <= '20261016120000_draft_setup_editability').sort((a, b) => a.name.localeCompare(b.name))) {
     if (entry.name === '20261015140000_test_period_cleanup') {
       for (const [index, id] of legacyIds.entries()) {
         await db.query('INSERT INTO "ElectionPeriod" (id,slug,name,"academicYear",state,"opensAt","closesAt") VALUES ($1,$2,$3,$4,$5,now()+interval \'1 day\',now()+interval \'2 days\')',

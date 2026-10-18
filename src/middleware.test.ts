@@ -7,6 +7,7 @@ import {createContext} from 'astro/middleware';
 let lookup: () => Promise<unknown>;
 let studentSearch: () => Promise<unknown>;
 let lookups = 0;
+const fixtureContests=['OSIS','DEWAN_AMBALAN','IPNU','IPPNU'].map((organization,i)=>({organization,sortOrder:i+1}));
 let candidateTransaction: unknown;
 let votingSessionLookup: () => Promise<unknown> = async () => null;
 let rawQuery: (...args: unknown[]) => Promise<unknown> = async () => [{now: new Date()}];
@@ -16,7 +17,7 @@ const fixtureDb: any = {
   student: {findMany: () => studentSearch()},
   votingSession: {findUnique: () => votingSessionLookup()},
   $queryRaw: (...args: unknown[]) => rawQuery(...args),
-  $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback(candidateTransaction),
+  $transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({electionContest:{findMany:async()=>fixtureContests},...(candidateTransaction as object)}),
 };
 const globals = globalThis as typeof globalThis & {middlewareTestDb?: typeof fixtureDb};
 globals.middlewareTestDb = fixtureDb;
@@ -166,7 +167,7 @@ test('candidate CRUD creates and edits chair-only entries using master snapshots
     $queryRawUnsafe: async (sql: string)=>sql.includes('clock_timestamp')?[{now:new Date(100)}]:[{state:'DRAFT',opensAt:new Date(200)}],
     student:{findMany:async ({where}: {where:{id:{in:string[]}}})=>where.id.in.map(id=>({id,name:id===chairId?'Master Chair':'Master Vice',className:'QA'}))},
     media:{findFirst:async()=>null},
-    electionContest:{findUnique:async()=>({periodId:'fixture-period'})},
+    electionContest:{findUnique:async()=>({periodId:'fixture-period',candidateModeSnapshot:'OPTIONAL_VICE'})},
     candidatePair:{create:async()=>({id:'fixture-candidate'}),findFirst:async()=>({id:'fixture-candidate',ballotNumber:1,vision:'Vision',mission:'Mission',members}),update:async()=>({})},
     candidateMember:{deleteMany:async()=>{members=[];},createMany:async ({data}: {data:typeof members})=>{members=data;}},
     votingAuditEvent:{create:async (data: unknown)=>{audits.push(data);}},
@@ -175,7 +176,7 @@ test('candidate CRUD creates and edits chair-only entries using master snapshots
   await saveCandidatePair('fixture-period',input,'fixture-admin');
   assert.equal(members.length,1);
   assert.equal(members[0].nameSnapshot,'Master Chair');
-  const expected={ballotNumber:1,chairStudentId:chairId,viceChairStudentId:null,vision:'Vision',mission:'Mission'};
+  const expected={ballotNumber:1,chairStudentId:chairId,viceChairStudentId:null,chairPhotoUrl:null,viceChairPhotoUrl:null,vision:'Vision',mission:'Mission'};
   await saveCandidatePair('fixture-period',{...input,viceChair:{studentId:viceId}},'fixture-admin','fixture-candidate',expected);
   assert.equal(members.length,2);
   await assert.rejects(saveCandidatePair('fixture-period',input,'fixture-admin','fixture-candidate',expected),{code:'STALE_CANDIDATE'});
@@ -189,7 +190,7 @@ test('teacher voting session only enters its own portal and shared vote API; it 
   const now=new Date();
   let type='TEACHER';
   votingSessionLookup=async()=>({id:'session',scope:'ELECTION_VOTING',voterId:'voter',createdAt:now,lastSeenAt:now,expiresAt:new Date(+now+60000),
-    voter:{voterType:type,periodId:'10000000-0000-4000-8000-000000000001',credentialEnabled:true,participation:[],period:{slug:'test',state:'SCHEDULED',opensAt:new Date(+now-60000),closesAt:new Date(+now+600000)}}});
+    voter:{voterType:type,periodId:'10000000-0000-4000-8000-000000000001',credentialEnabled:true,participation:fixtureContests.map(c=>({organization:c.organization,hasVoted:false})),period:{contests:fixtureContests,slug:'test',state:'SCHEDULED',opensAt:new Date(+now-60000),closesAt:new Date(+now+600000)}}});
   const visit=async(path:string)=>{
     const context=createContext({request:new Request('http://localhost:4321'+path,{headers:{Cookie:VOTING_SESSION_COOKIE+'='+'A'.repeat(43)}})});
     return onRequest(context,async()=>new Response(context.locals.votingSession?.voterType??'next'));
@@ -278,9 +279,11 @@ test('teacher reauth resumes partial votes, replaces one session, and fourth vot
       if(sql.includes('clock_timestamp'))return [{now}];
       if(sql.includes('FROM "ElectionPeriod"'))return [period];
       if(sql.includes('FROM "ElectionVoter"'))return [voter];
+      if(sql.includes('count(*)'))return [{active:sessions.length}];
       if(sql.includes('FROM "VotingSession"'))return sessions;
       throw Error(sql);
     },
+    $executeRaw:async()=>0,
     electionPeriod:{findUnique:async()=>period},
     votingSession:{deleteMany:async()=>{sessions=[];},create:async({data}:any)=>{const row={id:'30000000-0000-4000-8000-000000000001',scope:'ELECTION_VOTING',...data};sessions=[row];return row;},delete:async()=>{sessions=[];},update:async({data}:any)=>Object.assign(sessions[0],data)},
     voterParticipation:{findMany:async({where}:any)=>where.hasVoted?participation.filter(row=>row.hasVoted):participation,
@@ -311,8 +314,8 @@ test('expired draft PIN issuance hashes each identifier correctly in a mixed bat
   const {issuePins}=await import('./lib/voting/pins');
   const {pinHashMaterial}=await import('./lib/voting/pin-input');
   const periodId='10000000-0000-4000-8000-000000000001',now=new Date();
-  const voters=[{id:'20000000-0000-4000-8000-000000000001',voterType:'STUDENT',nisn:'0012345678',loginCode:null,name:'Student',className:'X',pinVersion:0,pinHash:null,credentialEnabled:false,participation:[]},
-    {id:'20000000-0000-4000-8000-000000000002',voterType:'TEACHER',nisn:null,loginCode:'GURU-ABCDEF123456',name:'Teacher',className:'Guru',pinVersion:0,pinHash:null,credentialEnabled:false,participation:[]}];
+  const voters=[{id:'20000000-0000-4000-8000-000000000001',voterType:'STUDENT',nisn:'0012345678',loginCode:null,name:'Student',className:'X',pinVersion:0,pinHash:null,credentialEnabled:false,participation:fixtureContests.map(c=>({organization:c.organization,hasVoted:false}))},
+    {id:'20000000-0000-4000-8000-000000000002',voterType:'TEACHER',nisn:null,loginCode:'GURU-ABCDEF123456',name:'Teacher',className:'Guru',pinVersion:0,pinHash:null,credentialEnabled:false,participation:fixtureContests.map(c=>({organization:c.organization,hasVoted:false}))}];
   const password='synthetic-password',passwordHash=await bcrypt.hash(password,4),updated=new Map<string,any>();let audits:any[]=[];
   lookup=async()=>({active:true,passwordHash});rawQuery=async()=>[{attempts:1}];
   fixtureDb.electionVoter={findMany:async()=>voters};

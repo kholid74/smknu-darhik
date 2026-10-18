@@ -43,7 +43,10 @@ export const DELETE: APIRoute = async ({ params, request, locals, cookies }) => 
   if (!validIds(params.periodId, params.candidateId)) return json({ error: { code: 'INVALID_INPUT' } }, 400);
   if (!validMutation(request, accountId, cookies.get('smkdh_token')?.value ?? '')) return json({ error: { code: 'CSRF_INVALID' } }, 403);
   try {
-    await deleteCandidatePair(params.periodId!, params.candidateId!, accountId);
+    const body = await readJson(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || !Object.hasOwn(body, 'expected')) throw new CandidateError('INVALID_INPUT');
+    const expected = validateExpectedCandidate((body as Record<string, unknown>).expected);
+    await deleteCandidatePair(params.periodId!, params.candidateId!, accountId, expected);
     return new Response(null, { status: 204, headers: { 'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer' } });
   } catch (error) { return failure(error); }
 };

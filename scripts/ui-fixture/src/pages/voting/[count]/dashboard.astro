@@ -1,0 +1,7 @@
+---
+import Dashboard from '../../../../../../src/pages/siswa/index.astro';
+import {votingFixture,session} from '../../../voting';
+export function getStaticPaths(){return [1,5,6].map(n=>({params:{count:String(n)}}));}
+Astro.locals.votingSession=session;
+---
+<Dashboard dashboard={votingFixture(Number(Astro.params.count)).dashboard}/>

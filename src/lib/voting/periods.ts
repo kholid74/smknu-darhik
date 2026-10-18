@@ -1,48 +1,40 @@
 import { closePeriodTransaction } from './period-close';
 import { canEditElectionSetup, electionSetup } from './setup-readiness';
-import { VotingOrganization } from '@prisma/client';
 import { createHmac } from 'node:crypto';
 import { db } from '../prisma';
 import { requireEnv } from '../env';
 import { verifyPassword } from '../auth';
-import { PeriodError, type PeriodConfig, type PeriodInput } from './period-input';
+import { PeriodError, validateCloseReason, type PeriodConfig } from './period-input';
+
+export { createPeriod } from './election-types';
 
 export async function listPeriods() {
   return db.electionPeriod.findMany({
-    select: { id: true, slug: true, name: true, academicYear: true, isTest: true, state: true, opensAt: true, closesAt: true, createdAt: true },
+    select: { id: true, slug: true, name: true, academicYear: true, isTest: true, state: true, opensAt: true, closesAt: true, createdAt: true, publishedAt: true },
     orderBy: [{ opensAt: 'desc' }, { id: 'desc' }],
   });
 }
 
-export async function createPeriod(input: PeriodInput, actorAccountId: string) {
-  return db.$transaction(async (tx) => {
-    const [{ now }] = await tx.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
-    if (input.opensAt <= now) throw Object.assign(new Error('INVALID_SCHEDULE'), { code: 'INVALID_SCHEDULE' });
-    const period = await tx.electionPeriod.create({ data: {
-      ...input,
-      contests: { create: Object.values(VotingOrganization).map((organization) => ({ organization })) },
-    } });
-    await tx.votingAuditEvent.create({ data: {
-      periodId: period.id, actorAccountId, event: 'PERIOD_CREATED', targetId: period.id,
-      detail: { slug: period.slug, isTest: period.isTest, organizations: Object.values(VotingOrganization) },
-    } });
-    return period;
-  });
-}
-
 export async function getPeriod(periodId: string) {
-  return db.electionPeriod.findUnique({
-    where: { id: periodId },
-    select: { id: true, slug: true, name: true, academicYear: true, isTest: true, state: true, opensAt: true, closesAt: true, extensionUsedAt: true, closedAt: true, publishedAt: true,
-      contests: { select: { organization: true, _count: { select: { candidates: true } } }, orderBy: { organization: 'asc' } } },
-  });
+  return db.$transaction(async tx => {
+    const period = await tx.electionPeriod.findUnique({
+      where: { id: periodId },
+      select: { id: true, slug: true, name: true, academicYear: true, isTest: true, state: true, opensAt: true, closesAt: true, extensionUsedAt: true, closedAt: true, publishedAt: true,
+        contestsRevision: true,
+        contests: { select: { organization: true, nameSnapshot: true, logoUrlSnapshot: true, candidateModeSnapshot: true, chairLabelSnapshot: true, viceChairLabelSnapshot: true, sortOrder: true, _count: { select: { candidates: true } } }, orderBy: { sortOrder: 'asc' } } },
+    });
+    if (!period) return null;
+    return { ...period, contests: period.contests.map(({ nameSnapshot, logoUrlSnapshot, candidateModeSnapshot, chairLabelSnapshot, viceChairLabelSnapshot, ...contest }) => ({
+      ...contest, name: nameSnapshot, logoUrl: logoUrlSnapshot, candidateMode: candidateModeSnapshot, chairLabel: chairLabelSnapshot, viceChairLabel: viceChairLabelSnapshot,
+    })) };
+  }, { isolationLevel: 'RepeatableRead', maxWait: 2000, timeout: 10000 });
 }
 
 export async function getPeriodSetup(periodId:string){
   return db.$transaction(async tx=>{
     const period=await tx.electionPeriod.findUnique({where:{id:periodId},select:{
       opensAt:true,closesAt:true,
-      contests:{select:{organization:true,candidates:{select:{members:{select:{position:true,studentId:true}}}}}},
+      contests:{select:{organization:true,sortOrder:true,candidateModeSnapshot:true,candidates:{select:{members:{select:{position:true,studentId:true}}}}}},
       voters:{select:{credentialEnabled:true,pinHash:true,pinFingerprint:true,participation:{select:{organization:true}}}},
     }});
     if(!period)return null;
@@ -85,7 +77,7 @@ export async function schedulePeriod(periodId: string, actorAccountId: string) {
     if (period.state !== 'DRAFT') throw new PeriodError('INVALID_STATE');
     const [{ now }] = await tx.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
     if (period.opensAt <= now || period.closesAt <= period.opensAt) throw new PeriodError('INVALID_SCHEDULE');
-    const organizations = Object.values(VotingOrganization);
+    const organizations = [...period.contests].sort((a,b)=>a.sortOrder-b.sortOrder).map(c=>c.organization);
     if (!electionSetup(period,now).ready) throw new PeriodError('NOT_READY');
     const otherScheduled = await tx.electionPeriod.findFirst({ where: { id: { not: periodId }, state: 'SCHEDULED' }, select: { id: true } });
     if (otherScheduled) throw new PeriodError('ANOTHER_SCHEDULED_PERIOD');
@@ -151,9 +143,10 @@ export async function extendPeriod(periodId: string, actorAccountId: string, adm
   });
 }
 
-export async function closePeriod(periodId: string, actorAccountId: string, adminPassword: string, early = false) {
+export async function closePeriod(periodId: string, actorAccountId: string, adminPassword: string, early = false, reason?: string) {
+  const closeReason = validateCloseReason(early, reason);
   await reauthenticateAdmin(actorAccountId, adminPassword);
-  return db.$transaction((tx) => closePeriodTransaction(tx, periodId, actorAccountId, early), { maxWait: 2_000, timeout: 10_000 });
+  return db.$transaction((tx) => closePeriodTransaction(tx, periodId, actorAccountId, early, closeReason), { maxWait: 2_000, timeout: 10_000 });
 }
 
 export async function publishPeriod(periodId: string, actorAccountId: string, adminPassword: string) {

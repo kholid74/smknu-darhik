@@ -92,8 +92,8 @@ const thumb = (url: string) => (url.startsWith('/api/image/') ? `${url}?w=300` :
             : <span id="ph-ic" class="material-symbols-outlined" style="color:#b8c2b6;font-size:40px">person</span>}
         </div>
         <div>
-          <input type="file" id="ph-file" accept="image/*" style="font-size:13px" />
-          <div id="ph-status" style="font-size:12px;color:#6f7a6e;margin-top:4px">JPG/PNG, maks 5MB.</div>
+          <input type="file" id="ph-file" accept="image/jpeg,image/png,image/webp" style="font-size:13px" />
+          <div id="ph-status" role="status" aria-live="polite" style="font-size:12px;color:#6f7a6e;margin-top:4px">JPG/PNG/WebP statis, maks 5MB. Foto dioptimalkan ke WebP.</div>
         </div>
       </div>
       <input type="hidden" name="photoUrl" id="photoUrl" value={form?.photoUrl || ''} />
@@ -149,10 +149,10 @@ const thumb = (url: string) => (url.startsWith('/api/image/') ? `${url}?w=300` :
         if (!res.ok) throw new Error(j.error || 'Gagal');
         if (hidden) hidden.value = j.url;
         if (prev) prev.innerHTML = `<img src="${j.url.startsWith('/api/image/') ? j.url + '?w=300' : j.url}" style="width:100%;height:100%;object-fit:cover" />`;
-        if (statusEl) statusEl.textContent = 'Foto siap. Klik Simpan untuk menyimpan.';
+        if (statusEl) statusEl.textContent = j.warning || 'Foto siap. Klik Simpan untuk menyimpan.';
       } catch (e) {
         if (statusEl) statusEl.textContent = 'Gagal mengunggah: ' + (e as Error).message;
-      }
+      } finally { fileEl.value=''; }
     });
   </script>
 </AlumniPortalLayout>

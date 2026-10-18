@@ -1,135 +1,118 @@
-# Checklist deployment, migrasi, backup dan rollback
+# Operasional dan transisi jenis dinamis
 
-## Perbaikan DRAFT dan penentuan siswa — 16 Oktober 2026
+**Pembaruan T11, 18 Oktober:** endpoint hasil internal dan status publikasi401/429 diterapkan. Regresi232tes lulus (satu penanda tes DB dilewati dan dijalankan terpisah), PostgreSQL lokal lintas koneksi6/6, browser37skenario, Prisma validate/generate dan build lulus. Penerimaan R2/Vercel/perangkat tetap belum selesai. [Bukti T11](06-pengujian.md#bukti-dan-gerbang-rilis).
 
-[Keputusan dan alur](10-daftar-pemilih-dan-draft.md) menggantikan penambahan seluruh siswa otomatis. Panitia memilih subset nama/ID dari master tahun ajaran; roster existing tidak dikurangi/ditulis ulang otomatis. Daftar resmi adalah yang benar-benar terdaftar pada periode, bukan jumlah seluruh master. Cetak PIN dan early close menggunakan daftar terpilih gabungan siswa/guru, maksimal 99.
+**Pembaruan upload 18 Oktober:** T10 sudah diimplementasikan dan diuji lokal (228 tes, 37 skenario browser, build lulus). Verifikasi object R2/hosted belum selesai karena konfigurasi R2 lokal belum tersedia. [Bukti dan batas](../image-upload-webp-study.md#implementasi-t10-dan-bukti-terbaru).
 
-Migrasi `20261016120000_draft_setup_editability` harus diterapkan sebelum memakai UI/service baru, supaya DRAFT lewat tidak ditolak trigger calon/roster/participation. Tidak mengubah tanggal, state, siswa, PIN atau suara yang sudah tersimpan. Setelah migrasi, operator dapat membuka draft lama dan memperbaiki jadwal sendiri; tidak ada reschedule otomatis. SCHEDULED yang sudah dibuka tetap terkunci. Rollback mengembalikan definisi tiga fungsi lewat migrasi maju; jangan menghapus data untuk memperbaiki draft.
+**Pembaruan Neon 17 Oktober 2026:** migrasi schema dan cleanup empat periode yang disetujui sudah berhasil setelah backup teruji. Master dan audit lama tetap; deployment belum dilakukan. [Catatan pelaksanaan](13-catatan-migrasi-neon.md).
 
-Migrasi berhasil diterapkan ke Neon pada 16 Oktober 2026. Verifikasi baca ulang mengonfirmasi ketiga fungsi diperbarui, kedua draft dapat dikelola, dan roster yang sudah berisi 52 tetap ada. Tidak memasukkan, menghapus, atau menjadwalkan data pemilihan sebagai bagian migrasi. Pengujian lokal: 134 tes, 12 skenario browser dan build lulus.
+Status 17 Oktober 2026: **T01–T09 selesai lokal; schema Neon sudah dimigrasi, deployment belum**. Pengguna mendahulukan migrasi DB; upload T10, pengujian T11 dan deployment/hosted verification T12 tetap tersisa. [Task](12-task-implementasi-jenis-dinamis.md), [schema](03-schema.md), [pengujian](06-pengujian.md).
 
-## Peluncuran pemilih guru — 16 Oktober 2026
+## Status dan izin yang sudah tersedia
 
-Gunakan [alur guru final](09-usulan-pemilih-guru.md) dan panduan `/admin/e-voting/panduan`. Deploy migrasi `20261016100000_teacher_election_voters` sebelum runtime baru. Migrasi additive menambah jenis/Teacher/kode, melonggarkan null hanya untuk identitas guru dengan CHECK eksklusif, dan mengunci identitas/membership. Tidak mengubah hash/PIN/sesi siswa lama atau memasukkan guru otomatis. Siapkan backup/restore point Neon sebelum perubahan; jangan memakai seed/reset simulasi pada database umum.
+Baseline yang sudah dideploy masih empat jenis dan syarat early-close lama. Branch lokal T04 sudah mendukung hak/sesi/suara/rekap dinamis; T07 lokal telah mengganti syarat turnout penuh dengan keputusan panitia dan alasan dini. Badge T00 belum commit/deploy. Catatan migrasi historis terdapat pada [dukungan guru](09-usulan-pemilih-guru.md), [DRAFT/pemilih](10-daftar-pemilih-dan-draft.md) dan [cleanup runtime](08-pembersihan-data-uji.md); aturan jenis/penutupan lama dalam dokumen historis digantikan ADR0003.
 
-Migrasi ini berhasil diterapkan ke Neon pada 16 Oktober 2026. Verifikasi baca ulang: migration finished, tiga kolom tambahan tersedia, CHECK dan trigger identitas aktif, jumlah voter TEACHER = 0. Tidak membuat periode, memilih guru atau menerbitkan PIN di Neon. Runtime baru tetap harus dipakai sebelum guru ditambahkan.
+Pengguna mengizinkan menghapus **data pemilihan sampel jika menghambat migrasi**, termasuk riwayat sampel, dan izin itu tetap berlaku. Ini tidak mengizinkan reset database, hapus Student/Teacher/kelas/jurusan/akun/izin/CMS/Media atau audit yang dipertahankan. Tidak meminta persetujuan ulang untuk scope yang sama; bila inventaris menemukan data bukan sampel, hentikan langkah yang bergantung padanya dan laporkan ketidaksesuaian, bukan memasukkannya diam-diam ke cleanup.
 
-Setelah runtime baru siap, panitia memilih guru master secara eksplisit pada Kelola Pemilih, meninjau jumlah siswa+guru (maksimal 99), lalu mencetak PIN dari menu yang sama. Slip guru memakai kode dan URL lengkap `/pemilih/masuk?periode=<slug>`; siswa tetap NISN + `/siswa/masuk`. Verifikasi identitas saat membagikan slip. Semua guru mendapat empat hak dengan bobot sama dan hasil gabungan; tidak ada breakdown jenis. Master guru yang direferensikan periode tidak dapat dihapus.
+## Persiapan T02/T11
 
-Jangan menambahkan guru ke periode yang sudah dibuka. Untuk periode mendatang, sahkan daftar guru sebelum menjadwalkan dan beri kesempatan melengkapi sebelum opensAt. Perubahan Teacher master tidak mengubah snapshot pemilih; untuk koreksi guru sebelum buka, hapus dari roster, tambahkan ulang, lalu terbitkan PIN baru. Jangan menggunakan koreksi NISN siswa untuk guru.
+T03–T04 menambah konfigurasi serta hak/sesi/suara/partisipasi/snapshot dinamis tanpa secret baru atau migration/seed Neon. Menu/popup CRUD master, logo MediaPicker dan susunan DRAFT sudah tersedia pada T05; form mode/jabatan snapshot dan kartu portrait selesai pada T06. Edit/hapus calon memerlukan expected termasuk foto; penguncian pembukaan tetap di server. Penutupan tanpa turnout penuh tersedia lokal pada T07; sebelum deadline wajib alasan10–500 dan password/konfirmasi. Ringkasan menampilkan lengkap/parsial/belum mulai, tetapi angka final diperiksa server setelah lock. Jangan menghapus pemilih absen atau membuat suara pengganti. Gagal rekonsiliasi tetap membatalkan penutupan; periksa teknis tanpa mengubah ledger. Tidak ada DDL/secret baru khusus T07. Password salah401, limiter429; bila respons terputus, reload status sebelum mencoba kembali. Publikasi tetap aksi terpisah. Uji Prisma Client, adapter pg resmi, SQL dan middleware memakai PGlite. Transport satu koneksi/savepoint tidak membuktikan row lock lintas koneksi, isolation level atau privilege Neon.
 
-Gladi bersih tiga Chromebook harus mencakup perpindahan siswa/guru, slip masing-masing, reauth parsial, logout, expiry dan suara keempat. Sesi internal panitia tetap terpisah. Early close harus menunggu seluruh siswa **dan guru**, termasuk PIN nonaktif, selesai empat suara. Setelah deadline, close normal tetap menerima partisipasi parsial, kemudian publikasi terpisah.
+T08 lokal: hasil publik CLOSED/ARCHIVED+publishedAt memuat snapshot resmi berfoto/logo, ringkasan orang dan surat suara, donut/bar dan cetak. Visi/misi dapat dibuka tanpa JavaScript; Cetak hasil atau menu cetak browser menghasilkan laporan dengan seluruh detail. Periksa hasil seri/nol, logo/crop pada aset resmi dan angka denominator sebelum rilis. Thumbnail memakai jalur existing dan cache gambar; tidak ada normalisasi upload WebP baru sampai T10. API/HTML hasil tetap private, no-store; tidak ada hasil kandidat sebelum gate publikasi. Endpoint hasil internal kini diterapkan T11, berizin lihat+hasil setelah CLOSED/ARCHIVED dan sebelum publikasi, dalam format JSON. CTA dashboard selesai pada T09. Tidak ada DDL/secret baru untuk T08.
 
-Rollback aplikasi ke versi khusus siswa hanya aman **sebelum ada voter guru**. Setelah guru ditambahkan, perbaiki maju atau siapkan versi kompatibel; runtime lama tidak dapat memproses identitas nullable/kode guru. Jangan menghapus kolom, master atau ballot sah untuk rollback. Cleanup periode uji tetap melalui fitur berlapis yang disetujui dan mempertahankan Student/Teacher master serta audit.
+T09 lokal: tombol utama Lihat hasil voting (tab baru) berada pada daftar dan bagian atas detail, hanya untuk CLOSED/ARCHIVED yang sudah dipublikasikan. Dashboard tetap terbuka. Sebelum publikasi, status menggantikan link publik; hanya akun evoting.publikasi pada CLOSED belum terbit mendapat aksi publikasi. Form berada di atas detail dan meminta password/konfirmasi; batal/gagal membersihkan password. Bila sesi keamanan belum siap, tombol tidak aktif. Aksi publish tetap memakai API, reauth, CSRF/Origin, limiter dan audit existing; tidak ada publikasi otomatis atau DDL/secret baru.
 
-Status: rencana untuk fase implementasi; **tidak ada command di dokumen ini yang dijalankan oleh audit**. Tetapkan penanggung jawab sekolah, operator deploy/database, pengelola PIN dan saksi penutupan. Jangan menempatkan secret, roster atau lembar PIN di issue, repo, chat, R2 publik, atau artefak CI.
+Artifact yang sudah tersedia: [migration](../../prisma/migrations/20261017090000_dynamic_election_types/migration.sql), [cleanup offline](../../scripts/sql/evoting-sample-cleanup.sql), [uji PGlite](../../src/lib/voting/dynamic-types-db.test.ts). Migration mensyaratkan tabel domain pemilihan kosong dan tidak menghapus data sendiri. Ia juga membuat lima master; jangan menjalankan seed CMS/demo untuk mengisi jenis. Historical migration tidak diubah.
 
-## Sebelum implementasi dan staging
+PGlite telah menguji urutan baseline→backup→cleanup published samples→migration, penolakan sisa periode di luar manifest, serta restore schema/data lama dari backup. Ini bukan restore Neon, pengujian konkurensi lintas koneksi atau bukti least-privilege pada hosting. Client Prisma sudah digenerate untuk schema baru. Neon kini memakai schema baru dan query baca adapter aplikasi sudah lulus; pengujian seluruh flow/hosted serta rilis aplikasi tetap belum selesai. Simulator dan suite layanan penutupan sudah memakai schema baru pada T04. Hanya dua suite regresi migrasi historis (teacher/cleanup) yang tetap pada baseline 16 Oktober; schema/runtime baru diuji terpisah.
 
-- [ ] Jadikan ADR 0002 keputusan autentikasi final: NISN + PIN tercetak, login ke dashboard Portal Siswa, sesi khusus ELECTION_VOTING, tanpa registrasi mandiri atau password permanen/recovery siswa. Jangan meminta siswa membuat akun atau mengganti PIN sendiri.
-- [ ] Registrar mengesahkan sumber resmi dan roster sebelum periode dibuka; koreksi NISN dilakukan dua pemeriksa dengan Student ID tetap. Tidak ada pencocokan otomatis berdasarkan nama. Setelah dibuka, koreksi identitas hanya untuk voter yang belum memilih, dengan PIN baru; voter yang telah memilih tidak dikoreksi.
-- [ ] Ikuti keputusan lifecycle, publikasi, seri/calon tunggal, turnout tanpa quorum, pemisahan prosedural dua orang, retensi dan populasi kurang dari 100 pada [README](README.md). Roster/calon membeku saat periode dibuka.
-- [ ] Verifikasi runtime production, region aplikasi/Neon, connection pool, batas function, TLS/domain canonical, trusted proxy header, origin allowlist dan cache/CDN bypass.
-- [ ] Inventaris credential DB yang dipakai runtime; pisahkan role owner/migrator dari non-owner aplikasi. Uji grants yang dibutuhkan tanpa membuka UPDATE/DELETE ballot.
-- [ ] Periksa status migrasi aktual dan schema drift menggunakan clone/staging sebelum membuat migration. Repo memiliki 19 migrasi, tetapi audit tidak memeriksa mana yang sudah diterapkan di produksi.
-- [ ] Sediakan database staging tersendiri dan secrets nonproduksi. Preview deployment tidak boleh menunjuk database/PIN produksi; akses preview dibatasi.
-- [ ] Tetapkan log policy di hosting, DB, APM dan proxy: disable body/cookie/bind-parameter capture untuk auth/voting/print, redaksi error, retensi dan akses operator. Tidak cukup menghapus `console.log` source.
-- [ ] Buktikan backup/PITR tersedia sesuai paket sebenarnya. Tentukan RPO dan RTO yang dapat dipenuhi; target integritas adalah tidak kehilangan suara yang sudah dikonfirmasi. Jangan menjanjikan RPO nol bila fasilitas recovery tidak mendukungnya.
+1. Rekam commit, branch, target DB (nama/host disamarkan), versi PostgreSQL/Prisma, daftar migrasi lokal/remote, triggers/functions/FK/index/grants dan owner. Jangan mencetak DATABASE_URL/password/PIN atau isi master siswa ke log. Tidak memakai secret contoh dalam dokumen/fixture.
+2. Gunakan PostgreSQL terisolasi untuk rehearsal schema+data sintetis1/5/6. Tes perubahan FK/deferred order/mode/rights/append-only, dump master dan rowcount sebelum/sesudah cleanup, serta restore. Runtime lama dan schema baru tidak kompatibel: pilih maintenance satu paket, bukan migrasi terpisah lalu menjalankan kode enum lama.
+3. Cocokkan migrasi aktual sebelum deploy. Catatan operasional sebelumnya menemukan riwayat remote `20260817005759_init`, `20260817104407_add_reviewed`, `20260817210605_add_action_status` yang belum tersedia lokal; verifikasi ulang dan pulihkan arsip bila masih mismatch. Jangan menyatakan drift bersih atau memakai resolve/reset paksa untuk melewatinya.
+4. Backup teruji/PITR checkpoint, akses restore dan RTO/RPO ditetapkan bersama operator. Restore ke clone, verifikasi CMS/master serta semua suara acknowledged sebelum cutover. DB bersama tidak boleh dikembalikan ke masa lalu secara buta.
+5. Pastikan env existing lengkap: DB Neon, admin JWT/session, PIN pepper/fingerprint, R2 dan origin/base URL sesuai deployment. Nama secret mengikuti env template repo; tidak menambah secret atau memberi votingPIN akses Account. Verifikasi izin DB runtime nonowner dan tanpa DDL/Ballot UPDATE/DELETE/TRUNCATE/audit UPDATE/DELETE; jangan menganggap URL owner sekarang sudah least-privilege.
 
-## Migrasi additive
+## Manifest cleanup sampel dan batas penghapusan
 
-Gunakan CLI Prisma **7.9.0 dari lockfile** setelah dependency diinstal. Alur CLI mengacu [migrate dev](../../.agents/skills/prisma-cli/references/migrate-dev.md) dan [migrate deploy](../../.agents/skills/prisma-cli/references/migrate-deploy.md) yang tersedia di repo; bukan API ORM 8 dari dokumentasi web terkini.
+T12 harus menyiapkan manifest reviewable dari inventaris aktual: exact period UUID+slug, state/isTest/publishedAt, jumlah masing-masing child, versi snapshot, alasan klasifikasi sampel dan backup checkpoint. Jangan menggunakan filter semua periode/academicYear/nama mengandung demo sebagai otorisasi. Data berubah dari manifest => abort seluruh transaksi dan inventaris ulang.
 
-1. Pada database dev/shadow **disposable**, validasi schema proposal yang telah digabung, generate client, buat migrasi `--create-only`. Review master Student tanpa credential, FK studentId restriktif, unique student-per-period dan PIN fingerprint, enum scope sesi, CHECK, index parsial, trigger, grants dan larangan cascade ke ballot/master.
-2. Jalankan migrasi dari kosong dan dari clone schema existing; verifikasi tidak ada drop/rename/backfill destruktif tabel website. Jalankan suite integrasi dengan runtime role terbatas.
-3. Pastikan default UUID acak v4, UTC/timestamptz dan PrismaNeon mendukung transaksi/lock yang direncanakan. Ukur timeout serta mapping error nyata.
-4. Staging menggunakan `migrate deploy`, kemudian client generate/build dan smoke. Tidak memakai `db push`, reset database, atau seed demo untuk produksi.
-
-Command referensi setelah URL database dev/staging sudah dipastikan oleh operator:
-
-```text
-npm ci
-npx prisma validate
-npx prisma generate
-npx prisma migrate dev --name e_voting --create-only
-```
-
-Command produksi nanti (melalui job migrasi tunggal dengan credential migrator, bukan saat request atau cold start):
-
-```text
-npx prisma migrate status
-npx prisma migrate deploy
-npx prisma generate
-npm run build
-```
-
-`migrate status` tidak membuktikan tidak ada drift; bandingkan schema/DDL pada staging clone. Jangan mengedit migration lama atau memanggil `migrate resolve` untuk menyembunyikan kegagalan tanpa pemeriksaan SQL yang benar-benar telah berjalan. URL migrator disuplai ke environment job; runtime tetap memakai credential terbatas. Hindari fallback localhost pada job produksi.
-
-## Deployment dan gerbang buka
-
-- [ ] Tutup semua blocker audit: CSRF/origin, akun/role panitia, Secure cookie admin, rate limiter durable, XSS jalur konten bersama, serta regresi alumni/public.
-- [ ] Tambahkan `VOTING_PIN_SECRET`, `VOTING_CSRF_SECRET`, `VOTING_RATE_SECRET`, origin resmi dan switch server `VOTING_ENABLED` (default off). Secret hanya server, cukup acak, tidak dicetak di build/log. Import modul pemilu tidak boleh menggagalkan website ketika switch off.
-- [ ] Switch off menolak login/mutasi baru dan memberikan halaman pemeliharaan; bukan perubahan state pemilihan atau mekanisme otomatis memperpanjang waktu. Requests yang sudah masuk transaksi bisa tetap commit; inspeksi sebelum mengambil tindakan operasional.
-- [ ] Ambil backup konsisten sebelum migration dan catat deployment/DDL hash. Terapkan migration additive lalu deploy aplikasi dengan feature off. Jalankan smoke internal, kemudian aktifkan pada gladi staging dahulu.
-- [ ] Jangan menjalankan `prisma/seed-pg.ts` di produksi: berisi akun/demo credential contoh. Inventaris akun aktif dan pastikan password bootstrap/demo tidak dapat dipakai. Berikan grant panitia individual dan cek revoke.
-- [ ] Verifikasi HTTPS cookie, headers no-store/error, exact origin di proxy, tidak ada CDN caching personalized content, tidak ada analytics/session replay pada bilik/cetak.
-- [ ] Siapkan/reuse master Student persisten melalui admin dan pastikan setiap siswa memiliki kelas dengan tahun ajaran yang benar. Buat periode nyata DRAFT, pratinjau lalu sinkronkan pemilih dari master; pastikan jumlah sesuai (maksimal 99), tiap voter terkait Student, dan ada empat partisipasi false. Perbaiki kelas/tahun ajaran di master jika jumlah tidak cocok; jangan impor roster kedua atau seed produksi.
-- [ ] Uji PIN unik per periode, cetak/distribusi individual dan penerbitan ulang oleh admin untuk slip hilang, tanpa plaintext permanen. Dua petugas menyaksikan dan mencatat setiap batch issue/reissue; prosedur ini tidak ditegakkan otomatis oleh aplikasi. Slip mencantumkan periode, WIB dan `/siswa/masuk?periode=<slug>`; jelaskan akses hanya pemilu, bukan nilai/profil pribadi. Jadwalkan setelah data siap.
-- [ ] Smoke login → dashboard `/siswa` → E-Voting; Coming Soon tanpa aksi/link/API, tidak ada signup/password/reset. Uji scope PIN pada layanan lain, jendela periode pada dashboard/deep link/API, logout/expiry dan suara keempat → revoke → `/siswa/selesai`.
-- [ ] Uji beban dan website publik bersamaan, final acceptance, restore rehearsal dan mekanisme bantuan siswa. Baru izinkan jadwal nyata dibuka.
-
-Jika dev server diperlukan selama implementasi, ikuti `AGENTS.md`: `astro dev --background`, dengan `astro dev status`, `astro dev logs`, `astro dev stop`. Audit dokumentasi tidak menyalakan server.
-
-## Backup dan pemulihan
-
-Backup harus mencakup **satu snapshot konsisten database**: master Student, periode/calon/roster dengan studentId, kredensial ter-hash/fingerprint, partisipasi/ballot/sesi/audit. Jangan membackup ledger dan ballot secara terpisah dengan waktu berlainan. Simpan backup terenkripsi, akses minimum, retention tertulis dan restoration target terpisah. Secret PIN pepper/konfigurasi dipulihkan lewat backup secret manager terpisah; tidak dimasukkan ke dump yang bisa dibaca pihak yang sama secara bebas. Cleanup kredensial per periode tidak menghapus master Student; retensi PII master dikelola terpisah dan tidak diperpanjang tanpa kebijakan hanya karena portal mungkin punya layanan baru kelak.
-
-Sebelum pemilihan, latih restore ke database baru dan rekonsiliasi empat kontes: jumlah ballot = partisipasi true, jumlah per kandidat menjumlah tepat, snapshot closed konsisten. Pastikan tidak mengirim email alumni atau menulis media publik saat menjalankan clone. Batalkan semua sesi siswa hasil restore sebelum layanan dipakai lagi. Bukti restore adalah catatan waktu, coverage data, counts dan siapa yang memverifikasi, tanpa rincian suara individu.
-
-Jika kegagalan terjadi selama voting:
-
-1. Matikan penerimaan baru, amankan database/log/backup dengan akses terbatas, catat waktu insiden. Jangan otomatis menganggap request timeout gagal commit.
-2. Tentukan titik recovery terakhir yang menyertakan **semua suara yang sudah acknowledged**. Dengan PITR, pulihkan clone sampai titik konsisten dan rekonsiliasi sebelum cutover.
-3. Jika ada suara yang mungkin hilang setelah ack, jangan melanjutkan seolah tidak terjadi apa-apa atau meminta hanya siswa tertentu mengulang: anonimitas membuat pemulihan pilihan per siswa tidak tersedia. Eskalasi ke panitia untuk keputusan prosedural (termasuk kemungkinan pemilihan baru), setelah menjaga bukti dan menjelaskan kehilangan data.
-4. Perpanjangan yang disetujui hanya satu kali, maksimal 60 menit oleh ketua/pengelola pemilu yang bukan pengelola PIN, dengan audit dan berita acara. Jika gangguan masih berlangsung setelah itu, hentikan saat tenggat, dokumentasikan dan minta keputusan sekolah; periode tertutup tidak dibuka ulang. Pemilihan ulang memakai periode baru untuk seluruh pemilih.
-
-## Rollback
-
-| Situasi | Tindakan aman |
+| Boleh dihapus untuk setiap target exact | Harus tetap |
 | --- | --- |
-| Migration belum diterapkan | Batalkan release, tetap gunakan aplikasi lama |
-| Migration additive sudah berhasil, belum ada voting nyata | Rollback binary/deployment kompatibel dan feature off; biarkan tabel additive, jangan drop terburu-buru |
-| Ada suara nyata tersimpan | Freeze penerimaan baru; rollback aplikasi hanya jika tidak menghapus data dan tidak membuka jalur bypass. Pertahankan schema, ballot/ledger/audit; utamakan fix-forward |
-| Migration gagal parsial | Periksa DDL/status dan transaksi yang selesai, restore rehearsal atau corrective migration ter-review; jangan `migrate reset` produksi |
-| Korupsi/kehilangan database | Recovery ke clone sesuai prosedur backup; tidak restore website+voting ke snapshot lama secara buta |
+| VotingSession target, CandidateMember/Pair target, VoterParticipation target, Ballot sampel target, ElectionVoter+PIN target, ElectionContest target, ElectionPeriod+resultSnapshot target | Student, Teacher, SchoolClass, Department, Account/role/override, CMS, Media/R2, periode di luar manifest, semua VotingAuditEvent lama dan audit cleanup baru |
 
-Rollback database bersama dapat menghapus update website, alumni dan akun selain suara. Sebab itu restore harus ke target terpisah, diperiksa, lalu cutover terencana. Menurunkan versi kode tidak mengembalikan pilihan yang hilang; penutupan/publikasi bukan toggle yang dibatalkan dengan rollback.
+Rate bucket tidak mempunyai FK period universal; jangan membersihkan semua bucket sebagai efek cleanup. Kredensial aktif dicabut dengan penghapusan sesi/voter target. Referensi audit period UUID sengaja tetap meski parent terhapus; actor Account FK restriktif tidak dilepas. Master ElectionType legacy hanya dibuang bila tidak punya referensi dan memang perlu untuk transisi; tidak menambah sampel baru di Neon.
 
-## Hari pemilihan dan penutupan
+Runtime `/test-cleanup` tetap hanya isTest dan belum dipublikasi dengan popup+password+previewVersion. Jika target sesuai syarat, reuse jalur tersebut dalam rehearsal. Sampel published/legacy di luar aturan runtime **tidak** diberi bypass endpoint; pembersihan yang sudah diotorisasi dilakukan migrator offline berikut, bukan mengubah klasifikasi/isTest agar lolos guard.
 
-- [ ] Panitia memakai perangkat terpisah dari Chromebook siswa. PIN tidak dibacakan atau ditampilkan massal. Verifikasi identitas saat pembagian; kertas bekas/reset dimusnahkan dengan prosedur sekolah.
-- [ ] Sediakan tiga Chromebook bersama dengan satu akun siswa per perangkat (maksimal tiga siswa login bersamaan). Siswa maju bergantian ke perangkat yang tersedia; sebelum perangkat dipakai siswa berikutnya, pastikan siswa sebelumnya logout atau sesi sudah berakhir, layar kembali netral, dan tab lama tidak dapat menampilkan identitas atau pilihan sebelumnya. Password saving dimatikan. Tidak ada mode perangkat pribadi pada MVP.
-- [ ] Untuk pemilih parsial, gunakan NISN dan PIN valid yang sama selama periode masih terbuka; masuk lagi ke dashboard dan lanjutkan organisasi tersisa. Slip hilang ditangani panitia berizin dengan reissue + revokasi sesi, bukan password-reset/self-registration. Sesudah lengkap pastikan layar selesai dan dashboard lama tak aktif.
-- [ ] Pantau hanya kesehatan layanan, limiter, antrean, errors tersanitasi dan partisipasi agregat; jangan membuka query live candidate tally selama pemungutan.
-- [ ] Deadline berlaku sesuai jadwal/perpanjangan yang tercatat dan menolak suara baru tanpa cron. Panitia menunggu transaksi yang sedang commit, lalu menutup resmi dengan saksi dan rekonsiliasi. Penutupan lebih awal hanya boleh setelah seluruh pemilih terdaftar menyelesaikan empat suara, termasuk pemilih dengan PIN nonaktif. Jika ada yang belum selesai, tunggu deadline; tidak menghapus pemilih untuk memenuhi syarat. Pada konfigurasi periode, muat ulang progres, pilih Tutup lebih awal dan rekonsiliasi, masukkan password login admin dan setujui popup. Server mengecek ulang di bawah lock; penolakan tidak mengubah data. Jadwal asli tetap tersimpan, waktu tutup aktual dan alasan ALL_VOTERS_COMPLETED diaudit. Catat saksi dalam berita acara. Jika selisih, jangan publish atau mengedit ballot manual.
-- [ ] Arsipkan snapshot hasil, berita acara penutupan, total peserta/parsial/lengkap, hasil seri bila ada, waktu tutup dan pihak pengesah; bukan dump pilihan per siswa.
-- [ ] Publish agregat per organisasi secara terpisah setelah tutup resmi dengan saksi, termasuk jika ditutup lebih awal; catat dua petugas yang menyaksikan penutupan/publikasi. Setelah masa sanggah 30 hari, bersihkan PIN dan sesi; simpan roster/audit satu tahun dan hasil agregat lintas periode. Pembersihan tidak mengubah ballot/ledger; master Student mengikuti kebijakan retensi terpisah.
-- [ ] Tahun berikutnya: reuse master Student yang sudah dikoreksi, buat periode/roster/PIN baru dan sesi baru. Jangan truncate master/riwayat, menyalin PIN lama atau menggunakan kembali periode CLOSED/ARCHIVED. Tidak mempromosikan PIN/sesi pemilu menjadi akun permanen atau akses personal/akademik.
+### Memakai artifact cleanup offline pada T12
 
-Semua checklist tetap terbuka sampai ada bukti operasional. Infrastruktur/secret produksi tidak diperiksa selama audit ini; dokumen tidak merupakan persetujuan deploy.
+File SQL bukan command mandiri atau fungsi yang dipasang pada database. Migrator menyiapkan dua temporary table dalam **satu koneksi/transaksi**, mengisi hanya target dari manifest yang sudah diverifikasi, lalu mengeksekusi file pada koneksi yang sama. Bentuk persiapannya:
 
-## Pembaruan calon tanpa wakil dan slip portal (16 Oktober 2026)
+```sql
+BEGIN;
+CREATE TEMP TABLE "_EvotingCleanupManifest" (
+  "periodId" uuid PRIMARY KEY, slug text, "previewVersion" text
+) ON COMMIT DROP;
+CREATE TEMP TABLE "_EvotingCleanupContext" (
+  "actorAccountId" text, reason text, confirmation text
+) ON COMMIT DROP;
+-- Isi dengan parameter terikat: exact UUID, exact slug, version hasil preview yang direview.
+-- Context: akun superadmin aktif, alasan 10–500 karakter,
+-- confirmation tepat 'HAPUS SAMPEL UNTUK JENIS DINAMIS'.
+-- Jalankan scripts/sql/evoting-sample-cleanup.sql pada koneksi ini.
+-- Verifikasi manifest/master/audit/guard, lalu COMMIT; jika gagal ROLLBACK.
+```
 
-Terapkan migrasi `20261016080000_optional_candidate_vice_chair` sebelum memakai form calon tanpa wakil. Migrasi hanya melonggarkan fungsi validasi komposisi menjadi satu ketua dan wakil opsional; tidak menghapus atau mengubah anggota, snapshot, pemilih maupun ballot lama. Seluruh larangan edit setelah pembukaan tetap berlaku. Tidak perlu mengisi wakil fiktif atau menonaktifkan trigger.
+File memerlukan table owner/migrator, lock tabel domain, manifest nonkosong dan versi preview yang masih cocok. Hanya enam guard legacy yang menghalangi delete, ditambah guard contest jika schema baru, disimpan via pg_get_triggerdef lalu dilepas/dibangun lagi secara transaksional. Guard lain, terutama audit append-only dan FK aktor, tetap aktif. Published samples boleh hanya karena exact manifest di jalur migrator yang sudah diotorisasi; tidak ada bypass runtime baru. Jangan menambahkan auto-select seluruh periode untuk mengisi manifest.
 
-Migrasi tersebut berhasil diterapkan di Neon pada 16 Oktober 2026. Pemeriksaan sebelumnya menemukan tiga riwayat lama di database yang tidak tersedia secara lokal: `20260817005759_init`, `20260817104407_add_reviewed`, dan `20260817210605_add_action_status`. Riwayat tersebut tidak diubah/diselesaikan paksa; pemulihan arsip migrasi lama merupakan pekerjaan terpisah. Pastikan pembaca aplikasi terbaru sudah terpasang sebelum calon tanpa wakil dipakai pada lingkungan online.
+Jika statement sesudah penghapusan ballot atau pemasangan kembali trigger gagal, rollback mengembalikan rows, audit baru dan definisi guard. Hal ini diuji melalui fault injection sintetis. Script tidak menghapus Media/R2, Student/Teacher/kelas/jurusan/Account, CMS, rate buckets atau audit lama. Rilis dengan data di luar manifest tetap ditolak oleh preflight migration.
 
-Rollback aplikasi lama tidak aman jika sudah ada calon tanpa wakil atau snapshot dengan `viceChair: null`, karena pembaca lama mewajibkan wakil. Pertahankan versi yang mendukung kedua bentuk dan lakukan fix-forward. Definisi fungsi lama hanya boleh dipulihkan setelah semua calon relevan memenuhi komposisi lama; jangan mengubah calon periode berjalan/tertutup untuk memaksa rollback.
+## Urutan maintenance T12
 
-Slip menampilkan URL lengkap portal berdasarkan origin request (domain/protokol/port), dengan slug periode. Cetak dari domain yang memang akan dipakai pemilih; cetakan dari localhost atau preview memakai alamat lingkungan tersebut. Penambahan alamat tidak menampilkan ulang PIN yang sudah diterbitkan. Gunakan prosedur reset/reissue bila slip perlu dicetak ulang, lalu distribusikan penggantinya.
+1. Pastikan T11 lulus dan artifact baru siap. Aktifkan maintenance untuk seluruh writer pemilu (API, SSR action, job); blok traffic baru dan drain transaksi lama. Website CMS dapat tetap baca; admin writer lain juga dijeda bila backup/cutover membutuhkannya. Slot serverless lama harus dicegah menulis schema baru. Rekam checkpoint backup dan manifest final; hitungan target di-lock diverifikasi lagi.
+2. Migrator khusus owner/DDL, bukan runtime, mengambil lock yang sudah direhearsal. Cleanup satu transaksi dengan exact manifest. Tulis audit cleanup **sebelum** parent dihapus agar guard audit existing-period sah; detail berisi target/count/reason/manifest digest aman, tidak PIN/nama/pilihan. Audit append-only/FK actor tetap aktif.
+3. Untuk sampel yang memerlukan penghapusan Ballot/period beku, inventaris guard spesifik pada dependency graph: trigger reject Ballot change, freeze calon/roster/participation/period/contest dan FK restrict. Simpan definisi asli. Dalam transaksi maintenance, drop/recreate **hanya objek yang terinventaris** dan constraint terkait yang menghalangi penghapusan authorized target; DELETE berparameter dengan period exact dan urut children→parent. Jika guard dipasang ulang gagal, rollback seluruh transaksi. Jangan `DISABLE TRIGGER ALL`, `session_replication_role`, TRUNCATE, runtime GUC flag, permanen SECURITY DEFINER bypass atau `DROP ... CASCADE`.
+4. Terapkan migration SQL baru yang sudah direhearsal: master ElectionType+revision; seed lima; convert enum organization di semua dependency menjadi varchar(32), bangun FK ke master/contest dan index/deferred order; tambah snapshots/contestsRevision/mode serta guard dinamis. Transisi schema dan cleanup dapat dalam satu transaksi maintenance yang direview bila dependency menuntutnya; tidak menyebutnya additive-only. Historical migrations tidak diedit. [ALTER TABLE PostgreSQL](https://www.postgresql.org/docs/current/sql-altertable.html).
+5. Pastikan guard/index/FK/grants lengkap kembali sebelum commit/traffic. Validasi orphan, tepat N hak, uniqueness/order/mode, Ballot anonim dan audit lama tidak berkurang; master/CMS/media rowcount/checksum sama kecuali perubahan lain yang tercatat. Kegagalan salah satu check membatalkan release. T02 harus menghasilkan SQL exact yang bisa direview; T01 tidak menyajikan pseudocode ini sebagai migration siap eksekusi.
+6. Verifikasi tidak ada snapshot v1/data nonsampel tersisa sebelum merilis parser v2-only. Bila ada, stop, pertahankan data dan perlukan backfill/reader kompatibel yang diuji. Jangan menyamakan v1 Dewan Ambalan dengan dua Pradana atau menyalin suaranya.
+7. Deploy artifact schema-compatible, generate Prisma Client pada build sesuai pipeline; periksa commit deployment aktual, logs dan env tanpa membocorkan secret. Smoke create masterjenis6+DRAFT+calon+selected roster+PIN/login/status/vote/close/publish pada environment sintetis. Pada produksi gunakan periode uji terpisah yang sah dan tidak mengubah periode resmi; bersihkan dengan jalur aman. Buka traffic setelah checklist lulus.
 
-Untuk penambahan hak suara guru, lihat [usulan pemilih guru](09-usulan-pemilih-guru.md); model pemilih guru belum diterapkan oleh pembaruan ini.
+Definisi trigger/fungsi restored diperbandingkan dengan target yang disetujui, termasuk append-only audit, audit period INSERT guard dan cleanup runtime. Jika maintainer tidak dapat membuktikan scope drop/recreate aman, jangan menjalankan partial cleanup lalu melanjutkan. [Lock PostgreSQL](https://www.postgresql.org/docs/current/explicit-locking.html). Tidak ada langkah di atas telah dijalankan pada Neon oleh T01.
 
-## Membersihkan dua periode sampel
+## Upload T10 dan verifikasi yang tertunda
 
-Gunakan [Hapus data uji](08-pembersihan-data-uji.md) pada halaman konfigurasi sebagai superadmin. Periksa ringkasan, lanjutkan popup kedua, ketik HAPUS <slug> dan password login. Jangan memakai truncate, reset database resmi, menonaktifkan trigger, atau menghapus master siswa untuk mengulang testing. Migrasi hanya menandai dua sampel; penghapusan dijalankan operator melalui UI. Periode berikutnya yang digunakan untuk pemilihan nyata harus dibuat tanpa pilihan Periode uji.
+Lengkapi R2_ENDPOINT/R2_ACCESS_KEY/R2_SECRET_KEY serta bucket/public URL sesuai environment melalui secret store/.env, tanpa mencetak nilainya. Lokal belum menyediakan tiga credential utama sehingga probe berhenti sebelum membuat object. Sesudah tersedia, verifikasi PutObject Content-Type=image/webp dan ukuran sesuai metadata/Media, GET thumbnail miss/cache hit serta hapus hanya object probe sendiri. Uji dua realm upload via aplikasi; ukur cold start, memori, multipart mendekati batas hosting dan kualitas foto resmi. Tidak perlu migrasi Neon tambahan.
+
+Pilih Foto untuk foto dan Logo untuk lossless; dokumen melalui FileUpload. File asli disimpan operator terpisah bila diperlukan. SVG/animasi ditolak; jangan rename untuk melewati validasi. Warning indexing berarti object mungkin sudah tersimpan tetapi belum terdaftar Media: simpan URL dan minta pemeriksaan, jangan upload berulang. Media referensi pemilihan/historis tidak dapat dihapus. Bila entri tak terpakai terhapus tetapi pembersihan R2 gagal, periksa object yatim; jangan menghapus aset berreferensi atau bucket massal.
+
+## Verifikasi T11 lokal dan pekerjaan rilis
+
+Endpoint GET /api/admin/e-voting/{periodId}/results memerlukan evoting.lihat+evoting.hasil. Sebelum close409 tanpa tally; setelah close/archive200 snapshot tersanitasi, tanpa perlu publishedAt. Ini API JSON, bukan halaman pratinjau baru. Publish tetap langkah terpisah berizin+reauth+CSRF; password salah401, limiter429, body400/413/415. Tidak mempublikasikan atau merekayasa suara untuk menguji API pada Neon.
+
+PostgreSQL17.11 portabel lokal menjalankan6skenario lintas koneksi: kapasitas3/4login, final-vote ganda, kedua urutan vote/close dan kedua urutan attach-logo/delete-media. Barrier memakai trigger/advisory lock pada DB sintetis khusus, tanpa mengganti timeout/lock produksi. Server dihentikan setelah tes. Jalankan scripts/test-voting-postgres.mjs dengan PG_TEST_BIN menunjuk bin PostgreSQL lokal; runner membuat cluster/data/password di artifacts/ui-qa, hanya loopback, database smkdh_voting_t11_only, dan tidak membaca .env. Jangan arahkan tes destruktif ke Neon.
+
+Sebelum rilis hosted, lengkapi env R2 dan verifikasi upload/multipart/cold start/memori/aset resmi, runtime DB nonowner, tiga Chromebook guest/kiosk beserta Back/logout/koneksi putus, serta versi artifact Vercel yang sesuai. Tiga arsip migrasi historis masih perlu dipulihkan. DB Neon sudah dimigrasi; jangan menganggap kode Vercel lama kompatibel atau menandai seluruh T12 selesai.
+
+## Hari pemilihan
+
+1. Kelola Jenis: nama/logo/jabatan/mode resmi. Buat periode dengan1–20 jenis; awal OSIS,PRADANA PUTRA,PRADANA PUTRI,IPNU,IPPNU. Koreksi master sebelum memasangnya; edit master tidak memperbarui snapshot periode existing. Setelah schedule susunan tidak bisa diedit.
+2. Tambah calon dari Student master, cek suggestion/autofill/nomor/visi/misi/foto. SINGLE tanpa wakil; lainnya wakil opsional. Pilih siswa sesuai tahun ajaran kelas dan guru eksplisit, gabungan <=99; tidak ada import kedua/perlu seluruh siswa.
+3. Registrar mengesahkan roster; akun panitia individual berizin, cetak PIN maksimal25/batch dengan saksi dua petugas menurut prosedur. URL slip harus domain pemilih, bukan localhost/preview. Print sekali: slip hilang perlu reset/reissue sah yang membatalkan PIN lama. Jangan membacakan PIN massal/logging.
+4. Schedule setelah checklist siap. Mulai waktu buka slate/roster beku; masterjenis boleh diedit tetapi tak berpengaruh pada periode. Panitia memakai perangkat terpisah. Tiga Chromebook dalam mode guest/kiosk, password saving mati, satu pemilih/perangkat dan maksimal3sesi global. Pastikan logout/selesai/expiry layar netral sebelum giliran berikutnya; Back/tablama tidak menampilkan akun sebelumnya.
+5. Pemilih parsial login ulang PIN valid yang sama untuk resume; selesai cabut sesi. Saat koreksi NISN pemilih belum memilih, dua pemeriksa sesuai alur existing, Student ID tetap, PIN/sesi dicabut dan dicetak baru; bukan edit identitas setelah memberi suara. Gangguan koneksi cek status terlebih dulu karena timeout mungkin sudah commit.
+6. Monitor hanya partisipasi; belum/parsial boleh didampingi tanpa melihat pilihan. Tidak ada tally kandidat sebelum close, termasuk saat semua selesai. PIN disabled tetap denominator dan tidak menghapus hak/suara.
+7. Sesudah opensAt panitia boleh close walau absen/parsial. Sebelum deadline, alasan10–500+early opt-in+password+konfirmasi konsekuensi. Rekonsiliasi wajib, nol suara sah dengan roster nonkosong. Close permanen, jadwal asli tetap; publikasi terpisah. Dua saksi adalah prosedur, tidak diklaim aplikasi membuktikan kehadiran mereka.
+8. Periksa hasil internal/rekonsiliasi, setujui berita acara lalu publish. CTA Lihat hasil voting membuka tabbaru. Seri/nol ditangani kebijakan sekolah; aplikasi tidak menetapkan pemenang/quorum. Archive setelah proses resmi; jangan hapus periode nyata untuk mengulang hasil.
+
+## Insiden, rollback dan retensi
+
+Gangguan: catat waktu, blok write baru bila integritas diragukan, amankan bukti tanpa PII/PIN. Snapshot/count mismatch tidak diselesaikan dengan reset participation atau insert/delete ballot manual. Perpanjangan sekali<=60menit dengan alasan/password/audit; jika belum pulih, berhenti pada tenggat dan keputusan sekolah. Periode CLOSED tak dibuka lagi; pemilihan ulang periode baru untuk semua tanpa transfer suara/kertas tercampur.
+
+| Kondisi | Pemulihan |
+| --- | --- |
+| Belum maintenance/migration | Batalkan release, runtime lama tetap |
+| Transaksi migration/cleanup gagal | Rollback transaksi, verifikasi target/master/audit/guard; jangan lanjut partial atau migrate reset |
+| Schema baru sudah commit, belum suara nyata | Runtime lama belum tentu kompatibel; fix-forward artifact kompatibel atau restore clone schema+data+code yang cocok lalu cutover terencana |
+| Sudah ada suara acknowledged | Freeze bila perlu, utamakan fix-forward. Restore/PITR harus memuat semua suara yang sudah diakui; jika mungkin hilang laporkan panitia, jangan meminta hanya siswa tertentu mengulang |
+
+Backup berisi PII dan potensi korelasi WAL: akses terbatas/retensi tercatat. DB owner/operator tetap pihak tepercaya, bukan anonimitas kriptografis terhadap admin. Setelah sanggah30hari bersihkan PIN hash/fingerprint+sesi, roster/audit1tahun dan aggregate lintas tahun sesuai kebijakan sekolah; penghapusan PII/ledger saat retensi perlu prosedur khusus, tidak membypass append-only lewat API. Media referenced snapshot tidak dihapus. Master Student/Teacher independen dan mengikuti retensi sekolah sendiri.

@@ -17,12 +17,7 @@ if (!session) return Astro.redirect(`${base}/masuk`);
 const dashboard = Astro.props.dashboard ?? await getStudentDashboard(session.periodId, session.voterId);
 if (!dashboard) return Astro.redirect(`${base}/masuk`);
 const csrfToken = createStudentSessionCsrfToken(votingCsrfSecret(), session.id);
-const organizations = [
-  ['OSIS', 'OSIS'],
-  ['DEWAN_AMBALAN', 'Dewan Ambalan'],
-  ['IPNU', 'IPNU'],
-  ['IPPNU', 'IPPNU'],
-] as const;
+const organizations = dashboard.contests.map(c=>[c.organization,c.name]);
 const completedCount = organizations.filter(([key]) => dashboard.participation[key]).length;
 ---
 <StudentPortalLayout title="Beranda" csrfToken={csrfToken} periodId={dashboard.period.id}>
@@ -36,9 +31,9 @@ const completedCount = organizations.filter(([key]) => dashboard.participation[k
     <div class="election-copy">
       <p class="eyebrow light">PEMILIHAN AKTIF</p>
       <h2 id="election-title">{dashboard.period.name}</h2>
-      <p>{completedCount} dari 4 pemilihan selesai</p>
-      <div class="progress-track" role="progressbar" aria-label="Kemajuan pemilihan" aria-valuemin="0" aria-valuemax="4" aria-valuenow={completedCount}>
-        <span style={`width:${completedCount * 25}%`}></span>
+      <p>{completedCount} dari {organizations.length} pemilihan selesai</p>
+      <div class="progress-track" role="progressbar" aria-label="Kemajuan pemilihan" aria-valuemin="0" aria-valuemax={organizations.length} aria-valuenow={completedCount}>
+        <span style={`width:${completedCount * 100 / organizations.length}%`}></span>
       </div>
       {dashboard.complete
         ? <a class="button pale" href={`${base}/selesai`}>Lihat status selesai</a>
