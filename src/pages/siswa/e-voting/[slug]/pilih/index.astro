@@ -3,6 +3,8 @@ import StudentPortalLayout from '../../../../../layouts/StudentPortalLayout.astr
 import { votingCsrfSecret } from '../../../../../lib/voting/student-auth';
 import { createStudentSessionCsrfToken } from '../../../../../lib/voting/security';
 import { BallotPageError, getBallotProgress } from '../../../../../lib/voting/ballot-pages';
+import { thumbnailUrl } from '../../../../../lib/image-url';
+import { env } from '../../../../../lib/env';
 
 import { voterPortal } from '../../../../../lib/voting/voter-identity';
 export const prerender = false;
@@ -29,11 +31,14 @@ const completed = data.contests.filter(c=>data.participation[c.organization]).le
   <div class="progress" aria-label={`${completed} dari ${data.contests.length} selesai`}><span style={`width:${completed * 100 / data.contests.length}%`}></span></div>
   <p class="muted">{completed} dari {data.contests.length} pemilihan selesai</p>
   <div class="org-grid">
-    {data.contests.map(({ organization: id, name: label }) => {
+    {data.contests.map(({ organization: id, name: label, logoUrl }) => {
       const voted = data.participation[id];
       const count = data.candidateCounts[id] ?? 0;
       return <article class="org-card">
-        <div><p class="eyebrow">ORGANISASI</p><h2>{label}</h2></div>
+        <div class="org-title">
+          {logoUrl && <img src={thumbnailUrl(logoUrl,128,Astro.url.origin,env('R2_PUBLIC_URL'))} width="64" height="64" alt="" loading="lazy" decoding="async"/>}
+          <div><p class="eyebrow">ORGANISASI</p><h2>{label}</h2></div>
+        </div>
         {voted ? <span class="state done">Selesai</span> : count > 0
           ? <a class="button" href={`${base}/e-voting/${data.period.slug}/pilih/${id}`}>Pilih kandidat <span aria-hidden="true">→</span></a>
           : <span class="state">Kandidat belum tersedia</span>}
@@ -52,6 +57,7 @@ const completed = data.contests.filter(c=>data.participation[c.organization]).le
   .org-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 28px; }
   .org-card { display: flex; min-height: 160px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 22px; border: 1px solid #dce5df; border-radius: 14px; background: #fff; }
   .org-card h2 { margin: 0; font-size: 1.2rem; }
+  .org-title{display:flex;align-items:center;gap:14px;min-width:0}.org-title>div{min-width:0;overflow-wrap:anywhere}.org-title img{width:64px;height:64px;object-fit:contain;flex:none;padding:6px;border:1px solid #dce5df;border-radius:14px}
   .state { color: #58685e; font-size: .9rem; font-weight: 700; }
   .state.done { color: #17643f; }
   .back { display: inline-block; margin-top: 28px; color: #145c3b; font-weight: 700; }
