@@ -10,6 +10,8 @@ Status: **T02–T09 diuji lokal 17 Oktober; form mode/foto calon, penutupan tanp
 
 ## Pemeriksaan dokumen T01
 
+Pembaruan18Oktober untuk [cleanup published/archived](08-pembersihan-data-uji.md): suite penuh237tes,236lulus dan1penanda PostgreSQL terpisah dilewati;39skenario browser dan build produksi lulus. Pengujian memakai seluruh migrasi terkini, endpoint/middleware/Prisma nyata pada PGlite: CLOSED terbit, ARCHIVED terbit/belum terbit, master serta periode lain tetap, audit lama identik dan audit penghapusan memuat state/publishedAt/count. Password/CSRF/revoke/konfirmasi/stale/limiter tetap ditolak; gagal setelah Ballot terhapus membatalkan seluruh transaksi. DELETE biasa/UPDATE Ballot/DELETE audit tetap ditolak. Browser memeriksa aksi hanya untuk data uji+superadmin, peringatan hasil publik/arsip, dua popup dan password dikosongkan setelah batal. Suite historis tetap memverifikasi aturan lama pada baseline migrasinya.
+
 Jalankan `node docs/e-voting/contracts/check.mjs`. Checker memeriksa local $ref/path/security, contoh JSON positif/negatif dan invariant aggregate snapshot untuk1/5/6 jenis menggunakan Ajv yang sudah terpasang. Ini bukan validasi Prisma, full conformance validator OpenAPI, tes DB atau bukti implementasi. Validasi referensi Markdown/istilah/state juga diperlukan; hasil aktual dicatat pada backlog T01.
 
 ## Matriks wajib

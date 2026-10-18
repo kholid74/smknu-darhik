@@ -37,6 +37,13 @@ const canViewParticipation = principal ? can(principal, 'evoting.partisipasi') :
 const canExtendPeriod = principal ? can(principal, 'evoting.perpanjang') : false;
 const editable=lifecycleEditable&&canManagePeriod;
 const setup=canManageCandidates&&canManageRoster?await getPeriodSetup(id):null;
+const readinessChecks = setup ? [
+  { key: 'configuration', title: 'Jadwal dan jenis pemilihan', ready: setup.configurationReady, detail: 'Jadwal mulai di masa depan dan selesai setelah mulai, dengan susunan surat suara yang valid.' },
+  { key: 'candidates', title: 'Daftar calon', ready: setup.candidatesReady, detail: setup.candidatesReady ? `Calon untuk seluruh ${period.contests.length} jenis pemilihan sudah lengkap.` : `Lengkapi dan periksa calon untuk seluruh ${period.contests.length} jenis pemilihan.` },
+  { key: 'roster', title: 'Daftar pemilih', ready: setup.rosterReady, detail: `${setup.voterCount} pemilih terdaftar. Setiap pemilih harus memiliki hak untuk seluruh jenis periode.` },
+  { key: 'pins', title: 'PIN pemilih', ready: setup.pinsReady, detail: `${setup.pinCount} dari ${setup.voterCount} PIN aktif. Seluruh pemilih harus memiliki kredensial yang aktif.` },
+] : [];
+const readyCheckCount = readinessChecks.filter(check => check.ready).length;
 const steps=[
  {label:'Konfigurasi',href:canManagePeriod?'/admin/e-voting/'+id:null,ready:period.state!=='DRAFT'||!!setup?.configurationReady,detail:'Nama dan jadwal WIB'},
  {label:'Calon',href:canManageCandidates?'/admin/e-voting/'+id+'/calon':null,ready:!!setup?.candidatesReady,detail:period.contests.length+' jenis pemilihan'},
@@ -67,7 +74,20 @@ const steps=[
   {period.isTest && <p class="feedback" data-tone="warning">Periode ini adalah data uji. Jangan digunakan untuk pemilihan resmi.</p>}
   {period.state === 'DRAFT' && period.opensAt <= new Date() && <p class="feedback" data-tone="warning">Periode masih DRAFT dan tetap dapat disiapkan. Jadwal mulai sudah lewat; ubah jadwal ke waktu mendatang sebelum menjadwalkan pemilihan.</p>}
   <nav class="setup-steps" aria-label="Langkah pemilihan">{steps.map((step,index)=>step.href?<a class="setup-step" href={step.href} target={step.newTab?'_blank':undefined} rel={step.newTab?'noopener noreferrer':undefined} data-ready={step.ready}><span class="step-number">{String(index+1).padStart(2,'0')}</span><strong>{step.label}</strong><small>{step.detail}</small></a>:<div class="setup-step" data-ready={step.ready}><span class="step-number">{String(index+1).padStart(2,'0')}</span><strong>{step.label}</strong><small>{step.detail}</small></div>)}</nav>
-  {setup&&period.state==='DRAFT'&&<section class="preflight" aria-label="Kesiapan penjadwalan"><strong>Pratinjau kesiapan</strong><ul><li data-ready={setup.configurationReady}>{setup.configurationReady?'✓':'!'} Jadwal mulai di masa depan dan selesai setelah mulai</li><li data-ready={setup.candidatesReady}>{setup.candidatesReady?'✓':'!'} Calon siap untuk {period.contests.length} jenis pemilihan</li><li data-ready={setup.rosterReady}>{setup.rosterReady?'✓':'!'} {setup.voterCount} pemilih dengan hak untuk seluruh jenis periode</li><li data-ready={setup.pinsReady}>{setup.pinsReady?'✓':'!'} {setup.pinCount}/{setup.voterCount} PIN aktif</li></ul><p style="font-size:12px;margin-top:12px">Kesiapan diperiksa ulang oleh server saat dijadwalkan.</p></section>}
+  {setup&&period.state==='DRAFT'&&<section class="preflight readiness-panel" data-ready={setup.ready} aria-labelledby="readiness-title">
+    <div class="readiness-heading">
+      <div><p class="readiness-eyebrow">PERSIAPAN PEMILIHAN</p><h3 id="readiness-title">Pratinjau kesiapan</h3><p class="readiness-count"><strong>{readyCheckCount} dari {readinessChecks.length}</strong> pemeriksaan sudah siap</p></div>
+      <StatusBadge label={setup.ready ? 'Siap dijadwalkan' : 'Perlu dilengkapi'} tone={setup.ready ? 'success' : 'warning'}/>
+    </div>
+    <progress class="readiness-progress" value={readyCheckCount} max={readinessChecks.length} aria-label="Jumlah pemeriksaan yang siap"></progress>
+    <ul class="readiness-checks">
+      {readinessChecks.map(check => <li class="readiness-item" data-ready={check.ready} data-check={check.key}>
+        <span class="readiness-icon" aria-hidden="true">{check.ready ? '✓' : '!'}</span>
+        <div class="readiness-content"><div class="readiness-item-heading"><h4>{check.title}</h4><StatusBadge label={check.ready ? 'Siap' : 'Perlu dilengkapi'} tone={check.ready ? 'success' : 'warning'}/></div><p>{check.detail}</p></div>
+      </li>)}
+    </ul>
+    <p class="readiness-note"><span aria-hidden="true">ⓘ</span> Status berdasarkan data saat halaman dimuat. Kesiapan diperiksa ulang oleh server saat dijadwalkan.</p>
+  </section>}
   <section class="card" style="margin-bottom:18px">
     <h3 style="font-size:16px;font-weight:800;margin-bottom:12px">Susunan surat suara</h3>
     {canManagePeriod&&period.state==='DRAFT'?<form id="period-contests-form" data-period-id={id} data-revision={period.contestsRevision}>
@@ -140,10 +160,28 @@ const steps=[
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">{canManageCandidates && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/calon`}>Kelola calon</a>}{canManageRoster && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/pemilih`}>Kelola Pemilih</a>}{canManagePins && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/pin`}>Terbitkan PIN</a>}{canViewParticipation && <a class="btn btn-outline" href={`/admin/e-voting/${period.id}/partisipasi`}>Partisipasi</a>}</div>
   </section>
   <p style="font-size:12px;color:var(--color-muted);margin-top:14px">Periode terjadwal akan terbuka otomatis pada waktu mulai yang ditentukan.</p>
-  {period.isTest && !period.publishedAt && canDeleteTestPeriod(principal) && <TestPeriodCleanup periodId={id} name={period.name} slug={period.slug}/>}
+  {period.isTest && canDeleteTestPeriod(principal) && <TestPeriodCleanup periodId={id} name={period.name} slug={period.slug}/>}
 </AdminLayout>
 
 <style>
+  .preflight.readiness-panel{padding:24px;border:1px solid #e8d6ae;border-top:4px solid #c69330;border-radius:16px;background:white;box-shadow:0 4px 18px #17392b08}
+  .preflight.readiness-panel[data-ready=true]{border-color:#b9d9c5;border-top-color:#1b7a3d}
+  .readiness-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+  .readiness-eyebrow{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--color-muted);margin:0 0 6px}
+  .readiness-heading h3{font-size:18px;font-weight:800;margin:0;color:var(--color-ink)}
+  .readiness-count{font-size:12px;color:var(--color-muted);margin:8px 0 0}.readiness-count strong{color:var(--color-ink)}
+  .readiness-progress{display:block;width:100%;height:7px;margin:18px 0;border:0;border-radius:99px;overflow:hidden;background:#eaf0ec;accent-color:#1b7a3d}
+  .readiness-progress::-webkit-progress-bar{background:#eaf0ec;border-radius:99px}.readiness-progress::-webkit-progress-value{background:#1b7a3d;border-radius:99px}.readiness-progress::-moz-progress-bar{background:#1b7a3d;border-radius:99px}
+  .preflight .readiness-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;margin:0;list-style:none}
+  .readiness-item{display:flex;align-items:flex-start;gap:12px;min-width:0;padding:16px;border:1px solid #e8d4aa;border-left:3px solid #c69330;border-radius:12px;background:#fffaf0}
+  .readiness-item[data-ready=true]{border-color:#cce4d5;border-left-color:#1b7a3d;background:#f2faf5}
+  .readiness-icon{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:50%;background:#ffedc3;color:#875f0c;font-size:18px;font-weight:800;line-height:1}
+  .readiness-item[data-ready=true] .readiness-icon{background:#1b7a3d;color:white}
+  .readiness-content{min-width:0;flex:1}.readiness-item-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  .readiness-item h4{font-size:13px;line-height:1.5;color:var(--color-ink);margin:0;font-weight:800}
+  .readiness-item p{font-size:12px;line-height:1.7;color:var(--color-muted-strong);margin:8px 0 0;overflow-wrap:anywhere}
+  .readiness-note{display:flex;align-items:flex-start;gap:8px;border-top:1px solid var(--color-line);padding-top:14px;margin:18px 0 0;color:var(--color-muted);font-size:11px;line-height:1.7}.readiness-note>span{font-size:15px;line-height:1.25;flex:none}
+  @media(max-width:760px){.preflight.readiness-panel{padding:18px}.preflight .readiness-checks{grid-template-columns:minmax(0,1fr)}.readiness-item{padding:14px}.readiness-heading h3{font-size:17px}}
   .publish-form{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
   .publish-form label{display:flex;flex:1 1 220px;flex-direction:column;gap:6px;font-size:13px;font-weight:700;min-width:0}
   .publish-form button{white-space:normal}

@@ -30,6 +30,8 @@ Route roster/PIN aktual dipertahankan pada T05; label menu tetap **Kelola pemili
 
 ## Foto, infografis, tombol dan aksesibilitas
 
+Pembaruan tampilan 18 Oktober: kartu calon hasil dan surat suara memakai kolom foto40%/keterangan60%, ditumpuk pada layar <=480px. Foto memakai tinggi otomatis dan rasio asli tanpa crop. Untuk logo pada navigasi jenis di bawah statistik dan judul bagian hasil, prioritaskan snapshot; jika kosong, baca logo master berdasarkan kode jenis. Satu query hanya untuk jenis yang belum berlogo, tanpa membaca master Student/Teacher atau menghitung ulang suara. URL logo cadangan dibatasi ke media sekolah. Kegagalan lookup memakai inisial; hasil tetap tersedia. Snapshot/identitas/perolehan dan payload API tidak berubah. Tes SQL regresi dan38skenario browser serta build produksi lulus.
+
 Foto awal target tinggi260–320px desktop menyesuaikan mobile; tunggal satu portrait, berwakil dua setara. Nama/jabatan/nomor jelas, dimensi stabil/aspect-ratio agar tidak CLS, fallback inisial dengan ukuran sama. Foto opsional; bukan alasan menolak calon valid. Reuse thumbnail responsif, sizes/srcset dan loading sesuai letak; jangan fetch semua original1800px. Crop wajah harus diperiksa pada aset representatif.
 
 T06 tersedia lokal: form calon hanya menawarkan wakil pada OPTIONAL_VICE melalui checkbox. Menonaktifkan wakil/memilih SINGLE membersihkan ID, foto dan suggestion yang tertunda. Pemilihan Student tetap melalui master; edit mempertahankan snapshot identitas anggota lama, hanya Student baru mengambil nama/kelas terkini. Form/action tampil sesuai izin dan sebelum pembukaan; server memeriksa waktu DB setelah lock. PATCH/DELETE membandingkan expected termasuk foto; admin tanpa izin media tetap mempertahankan foto lama saat mengedit data calon. Kartu portal memakai thumbnail responsif, portrait tinggi260–320px dengan crop ke atas, fallback setara dan radio/konfirmasi existing. T08 memakai komponen portrait yang sama untuk hasil publik dan ballot.
@@ -61,6 +63,8 @@ T10 lokal memakai prepareUpload + receiveUpload bersama untuk admin/alumni. Medi
 Inventaris ini adalah daftar dampak, bukan izin membangun abstraksi baru atau merombak CMS. Saat mulai tiap task, `rg` seluruh caller dahulu dan perbarui bersama. Pertahankan helper/pola yang sudah ada; target master jenis/hasil tidak membutuhkan komponen React, queue, service worker, akun siswa atau library grafik.
 
 ## Urutan rilis
+
+Perubahan cleanup18Oktober memerlukan migrasi `20261018090000_published_test_cleanup` sebelum aplikasi baru. Migrasi mengganti dua fungsi guard, tanpa menghapus atau mengubah klasifikasi periode. Aplikasi menampilkan Hapus data uji untuk superadmin berizin pada seluruh periode isTest, termasuk published/archived; pratinjau, konfirmasi slug, password, limiter, CSRF, versi, audit append-only dan rollback tetap. Panduan dashboard diperbarui; [alur lengkap](08-pembersihan-data-uji.md).
 
 T02 schema/DB terisolasi → T03 master+membership → T04 mekanisme dinamis → T05 UI jenis/periode → T06 calon → T07 early close → T08 hasil → T09 CTA. T10 upload dapat dikerjakan terpisah setelah kontrak, tetapi semua caller harus cocok saat rilis. T11 uji gabungan, T12 cleanup/migrasi Neon dan deploy paket kompatibel dalam maintenance. Jangan deploy client enum empat di atas schema dinamis.
 

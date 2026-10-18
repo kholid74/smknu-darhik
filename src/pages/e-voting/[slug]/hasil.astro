@@ -3,7 +3,7 @@ export const prerender = false;
 import '../../../styles/portal-tokens.css';
 import PortalHead from '../../../components/ui/PortalHead.astro';
 import CandidatePortraits from '../../../components/voting/CandidatePortraits.astro';
-import { getPublishedResult } from '../../../lib/voting/public-results';
+import { getPublishedResult, getResultDisplayLogos } from '../../../lib/voting/public-results';
 import { thumbnailUrl } from '../../../lib/image-url';
 import { env } from '../../../lib/env';
 
@@ -21,6 +21,7 @@ const percentage = (count: number, total: number) => total ? count * 100 / total
 const percentLabel = (count: number, total: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(percentage(count,total)) + '%';
 const photo = (source: string, width: number) => thumbnailUrl(source, width, Astro.url.origin, env('R2_PUBLIC_URL'));
 const result = published?.result;
+const displayLogos = result ? await getResultDisplayLogos(result.contests, Astro.url.origin) : new Map<string, string | null>();
 const participating = result ? result.complete + result.partial : 0;
 const totalBallots = result?.contests.reduce((sum,contest) => sum + contest.votesCast, 0) ?? 0;
 const segments = result ? [
@@ -81,17 +82,18 @@ let offset = 0;
         </section>
         <nav class="contest-nav" aria-label="Hasil per jenis pemilihan">
           {result.contests.map(contest => <a href={`#hasil-${contest.organization}`}>
-            {contest.logoUrl ? <img src={photo(contest.logoUrl,96)} width="32" height="32" alt="" loading="lazy" decoding="async"/> : <span class="logo-fallback" aria-hidden="true">{contest.name.slice(0,1)}</span>}
+            {displayLogos.get(contest.organization) ? <img src={photo(displayLogos.get(contest.organization)!,96)} width="32" height="32" alt="" loading="lazy" decoding="async"/> : <span class="logo-fallback" aria-hidden="true">{contest.name.slice(0,1)}</span>}
             <span>{contest.name}</span>
           </a>)}
         </nav>
         {result.contests.map((contest,contestIndex) => {
           const highest = Math.max(0,...contest.candidates.map(candidate => candidate.votes));
           const leaders = highest > 0 ? contest.candidates.filter(candidate => candidate.votes === highest) : [];
+          const logoUrl = displayLogos.get(contest.organization);
           return <section class="contest" id={`hasil-${contest.organization}`} aria-labelledby={`title-${contest.organization}`}>
             <div class="contest-heading">
               <div class="contest-title">
-                {contest.logoUrl ? <img src={photo(contest.logoUrl,128)} width="64" height="64" alt="" loading="lazy" decoding="async"/> : <span class="logo-fallback large" aria-hidden="true">{contest.name.slice(0,1)}</span>}
+                {logoUrl ? <img src={photo(logoUrl,128)} width="64" height="64" alt="" loading="lazy" decoding="async"/> : <span class="logo-fallback large" aria-hidden="true">{contest.name.slice(0,1)}</span>}
                 <div><p class="eyebrow">SURAT SUARA {String(contestIndex+1).padStart(2,'0')}</p><h2 id={`title-${contest.organization}`}>{contest.name}</h2></div>
               </div>
               <p class="contest-total"><strong>{contest.votesCast} suara</strong><span>{percentLabel(contest.votesCast,result.eligibleVoters)} dari {result.eligibleVoters} pemilih</span><small>{result.eligibleVoters-contest.votesCast} hak tidak digunakan</small></p>

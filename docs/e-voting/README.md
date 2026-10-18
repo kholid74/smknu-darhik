@@ -18,7 +18,7 @@ Status 17 Oktober 2026: **T01–T09 selesai lokal; T10–T11 dan deployment T12 
 - Ballot tetap anonim tanpa relasi pemilih atau timestamp. Partisipasi hanya status perjenis; tidak mencatat calon. Transaksi atomik dan rekonsiliasi tetap wajib; DB owner/WAL berada dalam batas kepercayaan, bukan anonimitas terhadap operator.
 - Setelah buka dapat ditutup meski absen/parsial atau nol suara dengan roster valid. Lebih awal perlu alasan/password/konfirmasi/audit; tidak perlu turnout100%. Penutupan permanen dan publikasi terpisah. Hasil kandidat hanya setelah close, publik hanya setelah publish. Seri/nol tidak menetapkan pemenang.
 - Hasil target memakai snapshotv2 dinamis, foto besar dan infografis ringan. Media sekolah/R2 digunakan; konversi WebP server tersedia lokal pada T10; object R2/hosted belum diverifikasi.
-- Sampel pemilihan boleh dibersihkan untuk migrasi sesuai izin pengguna; exact manifest/backup/maintenance, tanpa menghapus master sekolah/CMS/media/akun/audit. Runtime hapus-uji tetap dibatasi isTest belum terbit, bukan delete periode nyata.
+- Periode isTest boleh dihapus lewat dashboard termasuk sesudah publish/archive, dengan superadmin+izin, pratinjau, konfirmasi slug, password dan audit. Master sekolah/jenis/CMS/media/akun serta seluruh audit tetap disimpan. Sampel legacy di luar klasifikasi uji mengikuti izin/manifest/backup/maintenance khusus; periode resmi tidak dapat dihapus lewat hapus-uji.
 
 ## Dokumen aktif
 

@@ -2,6 +2,9 @@
 export const prerender = false;
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import MediaPicker from '../../../../components/MediaPicker.astro';
+import DataTable from '../../../../components/ui/DataTable.astro';
+import { thumbnailUrl } from '../../../../lib/image-url';
+import { env } from '../../../../lib/env';
 import { db } from '../../../../lib/prisma';
 import { can } from '../../../../lib/rbac';
 import { canEditElectionSetup } from '../../../../lib/voting/setup-readiness';
@@ -22,6 +25,7 @@ const editable = !!principal && can(principal, 'evoting.kelola') && can(principa
 const organizations = period.contests.map(c=>[c.organization,c.nameSnapshot]);
 const orgLabel = (key: string) => organizations.find(([value]) => value === key)?.[1] ?? key;
 const memberFor = (pair: (typeof candidates)[number], position: string) => pair.members.find((member) => member.position === position);
+const photo = (source: string) => thumbnailUrl(source, 96, Astro.url.origin, env('R2_PUBLIC_URL'));
 ---
 
 <AdminLayout title="Kelola Calon" user={{ role: Astro.locals.session?.role ?? '' }}>
@@ -87,33 +91,50 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
 
   <section aria-labelledby="current-candidates-title">
     <h3 id="current-candidates-title" style="font-size:16px;font-weight:800;margin-bottom:12px">Daftar calon ({candidates.length})</h3>
-    {candidates.length === 0 ? <div class="card" style="padding:24px;color:var(--color-muted);font-size:13px">Belum ada calon.</div> : (
-      <div style="display:grid;gap:12px">
-        {candidates.map((pair) => {
+    <div class="card candidate-table-card">
+      <DataTable id="table-candidates" label="Daftar calon">
+        <table class="candidate-table">
+          <thead><tr><th scope="col">Foto</th><th scope="col">Jenis / No. urut</th><th scope="col">Nama / Kelas</th><th scope="col">Visi dan misi</th>{editable && <th scope="col">Aksi</th>}</tr></thead>
+          <tbody>
+        {candidates.length === 0 ? <tr><td colspan={editable ? 5 : 4} class="candidate-empty">Belum ada calon.</td></tr> : candidates.map((pair) => {
           const chair = memberFor(pair, 'CHAIR');
           const vice = memberFor(pair, 'VICE_CHAIR');
+          const members = [chair, vice].filter(Boolean);
           const formData = JSON.stringify({
             id: pair.id, organization: pair.organization, ballotNumber: pair.ballotNumber,
             vision: pair.vision, mission: pair.mission,
             chair: { studentId: chair?.studentId, name: chair?.nameSnapshot, nisn: chair?.student.nisn, className: chair?.classSnapshot, photoUrl: chair?.photoUrl },
             viceChair: vice ? { studentId: vice.studentId, name: vice.nameSnapshot, nisn: vice.student.nisn, className: vice.classSnapshot, photoUrl: vice.photoUrl } : null,
           });
-          return <article class="card candidate-row" style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
-            <div>
-              <p style="font-size:12px;color:var(--color-muted);font-weight:700">{orgLabel(pair.organization)} · Nomor {pair.ballotNumber}</p>
-              <h4 style="font-size:15px;font-weight:800;margin-top:6px">{chair?.nameSnapshot ?? 'Ketua belum diatur'}{vice && <> <span style="font-weight:500;color:var(--color-muted)">/</span> {vice.nameSnapshot}</>}</h4>
-              <p style="font-size:12px;color:var(--color-muted);margin-top:3px">{chair?.classSnapshot ?? '-'}{vice && <> &middot; {vice.classSnapshot}</>}</p>
-              <p style="font-size:12px;margin-top:9px"><strong>Visi:</strong> {pair.vision}</p>
-              <p style="font-size:12px;margin-top:3px"><strong>Misi:</strong> {pair.mission}</p>
-            </div>
-            {editable && <div style="display:flex;gap:6px">
-              <button type="button" class="btn btn-outline edit-candidate" data-candidate={formData}>Edit</button>
-              <button type="button" class="btn btn-outline delete-candidate" data-candidate={formData} style="color:#b91c1c">Hapus</button>
-            </div>}
-          </article>;
+          return <tr class="candidate-row">
+            <td class="candidate-photos"><div class="candidate-thumbnails">
+              {members.map(member => member.photoUrl
+                ? <img src={photo(member.photoUrl)} width="44" height="56" alt={`Foto ${member.nameSnapshot}`} loading="lazy" decoding="async"/>
+                : <span class="candidate-photo-fallback" role="img" aria-label={`Foto ${member.nameSnapshot} belum tersedia`}>{member.nameSnapshot.slice(0,1)}</span>)}
+            </div></td>
+            <td class="candidate-contest"><strong>{orgLabel(pair.organization)}</strong><span class="candidate-number">No. {pair.ballotNumber}</span></td>
+            <td class="candidate-names">
+              {members.map(member => <div class="candidate-member"><strong>{member.nameSnapshot}</strong><small>{member.classSnapshot}</small></div>)}
+            </td>
+            <td class="candidate-statements">
+              <details>
+                <summary aria-label={`Visi dan misi calon nomor ${pair.ballotNumber}, ${orgLabel(pair.organization)}`}>
+                  <span class="statement-preview"><span><b>Visi:</b> {pair.vision}</span><span><b>Misi:</b> {pair.mission}</span></span>
+                  <span class="statement-expand">Lihat lengkap</span><span class="statement-collapse">Ringkas</span>
+                </summary>
+                <div class="statement-full"><strong>Visi</strong><p>{pair.vision}</p><strong>Misi</strong><p>{pair.mission}</p></div>
+              </details>
+            </td>
+            {editable && <td class="candidate-actions"><div>
+              <button type="button" class="btn btn-outline edit-candidate" data-candidate={formData} aria-label={`Edit calon nomor ${pair.ballotNumber}, ${orgLabel(pair.organization)}`} title="Edit calon"><span class="material-symbols-outlined" aria-hidden="true">edit</span></button>
+              <button type="button" class="btn btn-outline delete-candidate" data-candidate={formData} aria-label={`Hapus calon nomor ${pair.ballotNumber}, ${orgLabel(pair.organization)}`} title="Hapus calon"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
+            </div></td>}
+          </tr>;
         })}
-      </div>
-    )}
+          </tbody>
+        </table>
+      </DataTable>
+    </div>
   </section>
 </AdminLayout>
 
@@ -131,7 +152,24 @@ const memberFor = (pair: (typeof candidates)[number], position: string) => pair.
   .student-results{display:grid;gap:4px}
   .student-results button{padding:8px 10px;text-align:left;background:#f7faf7;border:1px solid var(--color-line);border-radius:7px;color:var(--color-ink)}
   .student-results button:hover{background:#eaf4eb}
-  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}.candidate-row{grid-template-columns:1fr!important}}
+  .candidate-table-card{padding:0;overflow:hidden;min-width:0}
+  .candidate-table{table-layout:fixed;min-width:780px}
+  .candidate-table th:first-child{width:116px}.candidate-table th:nth-child(2){width:150px}.candidate-table th:nth-child(3){width:26%}.candidate-table th:last-child:not(:nth-child(4)){width:116px}
+  .candidate-table td{vertical-align:top;overflow-wrap:anywhere}
+  .candidate-thumbnails{display:flex;align-items:flex-start;gap:6px}
+  .candidate-thumbnails img{display:block;width:44px;height:auto;max-height:56px;object-fit:contain;border-radius:6px;background:#eef3ef}
+  .candidate-photo-fallback{display:grid;place-items:center;width:44px;height:56px;flex:none;border-radius:6px;background:#edf3ef;color:#40654d;font-weight:800}
+  .candidate-contest strong,.candidate-number,.candidate-member strong,.candidate-member small{display:block}
+  .candidate-number{margin-top:6px;font-size:12px;color:var(--color-muted)}
+  .candidate-member+ .candidate-member{margin-top:10px}.candidate-member strong{font-size:12px;line-height:1.5}.candidate-member small{margin-top:3px;color:var(--color-muted);font-size:11px}
+  .candidate-statements details{font-size:12px;line-height:1.6}.candidate-statements summary{cursor:pointer;list-style:none}.candidate-statements summary::-webkit-details-marker{display:none}
+  .statement-preview>span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.statement-preview>span+span{margin-top:4px}
+  .statement-expand,.statement-collapse{font-size:11px;font-weight:700;color:var(--color-accent)}.statement-collapse{display:none}
+  details[open] .statement-preview,details[open] .statement-expand{display:none}details[open] .statement-collapse{display:inline}
+  .statement-full{padding-top:8px}.statement-full p{white-space:pre-line;overflow-wrap:anywhere;margin:3px 0 10px}
+  .candidate-actions>div{display:flex;gap:6px}.candidate-actions .btn{width:36px;min-height:36px;padding:6px}.candidate-actions .material-symbols-outlined{font-size:18px}.delete-candidate{color:#b91c1c}
+  .candidate-empty{text-align:center;padding:28px;color:var(--color-muted)}
+  @media(max-width:700px){.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}}
 </style>
 
 <script>

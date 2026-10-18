@@ -20,10 +20,15 @@ test('cleanup validates confirmation, preview version, password and rejects extr
   }
 });
 
-test('ordinary and published periods are never eligible for test cleanup', () => {
+test('testing periods remain eligible after publication and archival; official periods never do', () => {
   const preview = {isTest: true, publishedAt: null} as TestCleanupPreview;
   assert.doesNotThrow(() => assertTestCleanupAllowed(preview));
   assert.throws(() => assertTestCleanupAllowed(null), /NOT_FOUND/);
   assert.throws(() => assertTestCleanupAllowed({...preview, isTest: false}), /TEST_CLEANUP_NOT_ALLOWED/);
-  assert.throws(() => assertTestCleanupAllowed({...preview, publishedAt: new Date().toISOString()}), /TEST_CLEANUP_NOT_ALLOWED/);
+  for (const state of ['DRAFT', 'SCHEDULED', 'CLOSED', 'ARCHIVED']) {
+    for (const publishedAt of [null, new Date().toISOString()]) {
+      assert.doesNotThrow(() => assertTestCleanupAllowed({...preview, state, publishedAt}));
+      assert.throws(() => assertTestCleanupAllowed({...preview, state, publishedAt, isTest: false}), /TEST_CLEANUP_NOT_ALLOWED/);
+    }
+  }
 });

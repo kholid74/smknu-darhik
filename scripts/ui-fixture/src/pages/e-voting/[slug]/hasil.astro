@@ -1,5 +1,5 @@
 ---
 import Results from '../../../../../../src/pages/e-voting/[slug]/hasil.astro';
-export function getStaticPaths(){return ['1','5','6','zero','tie','archived','draft','scheduled','unpublished','corrupt','error'].map(kind=>({params:{slug:'qa-results-'+kind}}));}
+export function getStaticPaths(){return ['1','5','6','zero','tie','archived','draft','scheduled','unpublished','corrupt','error','late-logo'].map(kind=>({params:{slug:'qa-results-'+kind}}));}
 ---
 <Results/>

@@ -1,6 +1,6 @@
 ---
 import Candidates from '../../../../../../../src/pages/admin/e-voting/[id]/calon.astro';
-export function getStaticPaths(){return [1,2,3,4].map(n=>({params:{id:'10000000-0000-4000-8000-00000000000'+n}}));}
+export function getStaticPaths(){return [1,2,3,4,16,17].map(n=>({params:{id:'10000000-0000-4000-8000-'+String(n).padStart(12,'0')}}));}
 Astro.locals.principal={roles:Astro.params.id?.endsWith('3')?['guru']:['superadmin'],revokes:Astro.params.id?.endsWith('4')?[]:['media.kelola']};
 Astro.locals.session={sub:'qa-admin',role:'superadmin',roles:['superadmin']};
 ---

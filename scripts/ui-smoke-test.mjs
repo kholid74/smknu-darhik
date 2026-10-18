@@ -116,7 +116,34 @@ try{
  socket=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true})});
  socket.addEventListener('message',event=>{const message=JSON.parse(event.data);if(message.id){const call=pending.get(message.id);pending.delete(message.id);if(message.error)call?.reject(new Error(message.error.message));else call?.resolve(message.result)}else if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.exception?.description??message.params.exceptionDetails.text);else if(message.method==='Network.requestWillBeSent'){const url=message.params.request.url;if(/fonts\.(?:googleapis|gstatic)\.com|\.woff2/.test(url))fontRequests.push(url);if(/youtube(?:-nocookie)?\.com\/embed|google\.com\/maps\/embed/.test(url))embedRequests.push(url)}});
  await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Network.enable');
+ await check('result navigation uses uploaded master logos when historical logos are missing, with matching section headings',async()=>{
+   await navigate(origin+'/e-voting/qa-results-late-logo/hasil');
+   assert.deepEqual(await evaluate("[...document.querySelectorAll('.contest-nav a')].slice(0,2).map(a=>a.querySelector('img')?.getAttribute('src').split('?')[0]??null)"),['/api/image/qa/logo-osis-current.png','/api/image/qa/logo-pradana-current.png']);
+   assert.deepEqual(await evaluate("[...document.querySelectorAll('.contest-title')].slice(0,2).map(a=>a.querySelector('img')?.getAttribute('src').split('?')[0]??null)"),['/api/image/qa/logo-osis-current.png','/api/image/qa/logo-pradana-current.png']);
+   assert.equal(await evaluate("document.querySelectorAll('.contest-nav .logo-fallback').length"),3);
+ });
  // Fonts must work locally even when Google Fonts cannot be reached.
+ await check('published and archived test periods offer guarded cleanup, while official periods and viewers cannot delete',async()=>{
+   for(const [n,state,slug]of [[10,'CLOSED','qa-results-5'],[11,'ARCHIVED','qa-results-archived']]){
+     await navigate(origin+'/admin/e-voting/10000000-0000-4000-8000-'+String(n).padStart(12,'0'));
+     assert.equal(await evaluate("!!document.querySelector('[data-cleanup-open]')"),true);
+     await evaluate(`window.fetch=async()=>new Response(JSON.stringify({data:{id:document.querySelector('[data-test-cleanup]').dataset.periodId,slug:${JSON.stringify(slug)},state:${JSON.stringify(state)},isTest:true,publishedAt:'2026-10-17T05:15:00Z',contests:5,candidates:5,members:5,voters:2,pins:2,participation:10,ballots:10,sessions:0,auditEvents:7,version:'a'.repeat(32)}}),{headers:{'Content-Type':'application/json','X-CSRF-Token':'fixture-token'}});document.querySelector('[data-cleanup-open]').click()`);
+     await waitFor(()=>evaluate("document.querySelector('[data-cleanup-preview]').open"),'published test preview');
+     assert.match(await evaluate("document.querySelector('[data-cleanup-summary]').textContent"),/Hasil sudah dipublikasikan; tautan hasil publik tidak akan tersedia/);
+     if(state==='ARCHIVED')assert.match(await evaluate("document.querySelector('[data-cleanup-summary]').textContent"),/sudah diarsipkan/);
+     await evaluate("document.querySelector('[data-cleanup-next]').click()");
+     assert.equal(await evaluate("document.querySelector('[data-cleanup-submit]').disabled"),true);
+     await evaluate(`const f=document.querySelector('[data-cleanup-form]');f.elements.confirmation.value='HAPUS ${slug}';f.elements.adminPassword.value='synthetic-password';f.dispatchEvent(new Event('input',{bubbles:true}))`);
+     assert.equal(await evaluate("document.querySelector('[data-cleanup-submit]').disabled"),false);
+     await evaluate("document.querySelector('[data-cleanup-verify] [data-cleanup-cancel]').click()");
+     await waitFor(()=>evaluate("!document.querySelector('[data-cleanup-verify]').open&&document.querySelector('[name=adminPassword]').value===''"),'cancel clears published cleanup password');
+     assert.equal(await evaluate("document.querySelector('[name=adminPassword]').value"),'');
+   }
+   for(const n of [12,13]){
+     await navigate(origin+'/admin/e-voting/10000000-0000-4000-8000-'+String(n).padStart(12,'0'));
+     assert.equal(await evaluate("!!document.querySelector('[data-test-cleanup]')"),false);
+   }
+ });
  await cdp('Network.setBlockedURLs',{urls:['*fonts.googleapis.com*','*fonts.gstatic.com*']});
  await navigate(origin+'/');
  await waitFor(()=>evaluate("document.querySelector('[data-ui-table]')?.dataset.initialized==='true'"),'fixture and bundled JS');
@@ -561,6 +588,66 @@ try{
    await waitFor(()=>evaluate("document.querySelector('#period-edit-types')?.dataset.ready==='true'&&!document.querySelector('#period-contests-form [type=submit]').disabled"),'saved order reload');
    typeFixtureMode='normal';contestMutationMode='candidates';
  });
+ await check('readiness preview separates icons, labels and explanations for missing, mixed and ready states on desktop/mobile',async()=>{
+   for(const width of [1366,390,320]){
+     await cdp('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+     for(const [n,ready]of [[18,0],[19,2],[20,4]]){
+       await navigate(origin+'/admin/e-voting/10000000-0000-4000-8000-'+String(n).padStart(12,'0'));
+       assert.equal(await evaluate("document.querySelectorAll('.readiness-item').length"),4);
+       assert.equal(await evaluate("document.querySelectorAll('.readiness-item[data-ready=true]').length"),ready);
+       assert.equal(await evaluate("document.querySelector('.readiness-progress').value"),ready);
+       assert.equal(await evaluate("document.querySelector('.readiness-progress').max"),4);
+       assert.equal(await evaluate("document.querySelector('.readiness-count strong').textContent"),ready+' dari 4');
+       assert.equal(await evaluate("document.querySelector('.readiness-heading .status-badge').textContent"),ready===4?'Siap dijadwalkan':'Perlu dilengkapi');
+       for(const check of await evaluate("[...document.querySelectorAll('.readiness-item')].map(e=>({ready:e.dataset.ready==='true',icon:e.querySelector('.readiness-icon').textContent,label:e.querySelector('.status-badge').textContent,description:e.querySelector('p').textContent,iconBackground:getComputedStyle(e.querySelector('.readiness-icon')).backgroundColor}))")){
+         assert.equal(check.icon,check.ready?'✓':'!');assert.equal(check.label,check.ready?'Siap':'Perlu dilengkapi');assert.ok(check.description.length>30);
+       }
+       if(ready===2)assert.equal(await evaluate("getComputedStyle(document.querySelector('.readiness-item[data-ready=true]')).backgroundColor!==getComputedStyle(document.querySelector('.readiness-item[data-ready=false]')).backgroundColor"),true);
+       assert.match(await evaluate("document.querySelector('.readiness-note').textContent"),/diperiksa ulang oleh server/);
+       assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),true);
+       await evaluate("document.querySelector('.readiness-panel').scrollIntoView();window.scrollBy(0,-75)");
+       await writeFile(resolve(artifactRoot,'readiness-'+ready+'-'+width+'.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
+     }
+   }
+   for(const n of [2,13]){
+     await navigate(origin+'/admin/e-voting/10000000-0000-4000-8000-'+String(n).padStart(12,'0'));
+     assert.equal(await evaluate("!!document.querySelector('.readiness-panel')"),false);
+   }
+ });
+ await check('compact candidate table paginates, searches and expands statements, with small thumbnails and labelled icon actions',async()=>{
+   for(const width of [1366,390]){
+     await cdp('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+     await navigate(origin+'/admin/e-voting/10000000-0000-4000-8000-000000000016/calon');
+     await waitFor(()=>evaluate("document.querySelector('[data-ui-table]')?.dataset.initialized==='true'"),'candidate table initialized');
+     assert.deepEqual(await evaluate("[...document.querySelectorAll('.candidate-table th')].map(th=>th.textContent.trim())"),['Foto','Jenis / No. urut','Nama / Kelas','Visi dan misi','Aksi']);
+     assert.equal(await evaluate("document.querySelectorAll('.candidate-row:not([hidden])').length"),10);
+     assert.equal(await evaluate("document.querySelector('[data-table-size]').value"),'10');
+     assert.equal(await evaluate("document.querySelector('.candidate-thumbnails').children.length"),2);
+     assert.equal(await evaluate("document.querySelector('.candidate-thumbnails img').getAttribute('src').includes('?w=96')"),true);
+     assert.equal(await evaluate("document.querySelector('.candidate-thumbnails img').getBoundingClientRect().height<=56"),true);
+     assert.equal(await evaluate("document.querySelector('.candidate-row').getBoundingClientRect().height<180"),true);
+     assert.match(await evaluate("document.querySelector('.edit-candidate').getAttribute('aria-label')"),/Edit calon nomor 1, OSIS/);
+     assert.equal(await evaluate("document.querySelector('.delete-candidate .material-symbols-outlined').textContent"),'delete');
+     await evaluate("document.querySelector('.candidate-statements summary').click()");
+     assert.equal(await evaluate("document.querySelector('.candidate-statements details').open"),true);
+     assert.ok((await evaluate("document.querySelector('.statement-full p').textContent")).length>900);
+     await evaluate("document.querySelector('.candidate-statements summary').click();document.querySelector('[data-table-next]').click()");
+     assert.equal(await evaluate("document.querySelectorAll('.candidate-row:not([hidden])').length"),2);
+     const name=await evaluate("document.querySelector('.candidate-row:not([hidden]) .candidate-member strong').textContent");
+     await evaluate("document.querySelector('.candidate-row:not([hidden]) .edit-candidate').click()");
+     assert.equal(await evaluate("document.querySelector('#chair-search').value"),name);
+     await evaluate("document.querySelector('#cancel-edit').click();const q=document.querySelector('[data-table-search]');q.value='Nama snapshot 12';q.dispatchEvent(new Event('input'))");
+     assert.equal(await evaluate("document.querySelectorAll('.candidate-row:not([hidden])').length"),1);
+     await evaluate("const q=document.querySelector('[data-table-search]');q.value='not a candidate';q.dispatchEvent(new Event('input'))");
+     assert.equal(await evaluate("document.querySelector('[data-table-empty]').hidden"),false);
+     await evaluate("const q=document.querySelector('[data-table-search]');q.value='';q.dispatchEvent(new Event('input'));document.querySelector('#current-candidates-title').scrollIntoView()");
+     assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),true);
+     await writeFile(resolve(artifactRoot,'candidate-table-'+width+'.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
+   }
+   await navigate(origin+'/admin/e-voting/10000000-0000-4000-8000-000000000017/calon');
+   assert.equal(await evaluate("document.querySelector('.candidate-empty').textContent"),'Belum ada calon.');
+   assert.equal(await evaluate("document.querySelectorAll('.candidate-row').length"),0);
+ });
  await check('candidate form uses snapshot modes, master selection, nullable photos and stale guarded edit/delete',async()=>{
    const path='/admin/e-voting/10000000-0000-4000-8000-000000000001/calon';
    await cdp('Emulation.setDeviceMetricsOverride',{width:1366,height:768,deviceScaleFactor:1,mobile:false});
@@ -795,7 +882,7 @@ try{
      assert.equal(await evaluate("document.querySelector('.contest-total span').textContent"),'70,0% dari 10 pemilih');
      assert.equal(await evaluate("document.querySelector('.percentage').textContent"),'57,1%');assert.equal(await evaluate("document.querySelector('.vote-track span').style.width"),'57.1429%');
      assert.equal(await evaluate("document.querySelector('.member-caption strong').textContent"),'Calon 1 <b>historis</b>');assert.equal(await evaluate("document.querySelector('.member-caption strong b')"),null);
-     assert.equal(await evaluate("[...document.querySelectorAll('.contest-title')].every((e,i)=>i%2===0?e.querySelector('img')?.getAttribute('src').startsWith('/api/image/qa/logo-'):!!e.querySelector('.logo-fallback'))"),true);
+     assert.equal(await evaluate("[...document.querySelectorAll('.contest-title')].every((e,i)=>i%2===0?e.querySelector('img')?.getAttribute('src').startsWith('/api/image/qa/logo-'+i+'.png?'):i===1?e.querySelector('img')?.getAttribute('src').startsWith('/api/image/qa/logo-pradana-current.png?'):!!e.querySelector('.logo-fallback'))"),true);
      assert.equal(await evaluate("document.querySelector('.position').textContent"),n===1?'Pradana historis':'Ketua historis');
      assert.equal(await evaluate(`document.querySelectorAll('.candidate .member')[${n===1?2:3}].querySelector('.photo-fallback')!==null`),true);
      assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),true);
