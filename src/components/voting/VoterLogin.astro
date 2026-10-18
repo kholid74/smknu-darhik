@@ -82,8 +82,10 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
       let csrfToken = '';
       let phase = 'CLOSED';
       let prepareTimer=0;
+      let loginPending = false;
       async function prepareSession() {
         window.clearTimeout(prepareTimer);
+        csrfToken = '';
         const periodId = periodSelect instanceof HTMLSelectElement ? periodSelect.value : form?.dataset.periodId;
         if (!periodId) { phase = 'CLOSED'; if (submit instanceof HTMLButtonElement) submit.disabled = true; return; }
         form.dataset.periodId = periodId;
@@ -95,18 +97,22 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
           if (phase !== 'OPEN') {
             if (message) message.textContent = phase === 'BEFORE_OPEN' ? 'Periode pemilihan belum dibuka.' : 'Periode pemilihan tidak sedang dibuka.';
           } else if (message) message.textContent = '';
-          if (submit instanceof HTMLButtonElement) submit.disabled = phase !== 'OPEN';
+          if (submit instanceof HTMLButtonElement) submit.disabled = phase !== 'OPEN' || loginPending;
           form?.querySelectorAll<HTMLInputElement>('input').forEach(input=>input.disabled=phase!=='OPEN');
           if(phase==='BEFORE_OPEN')prepareTimer=window.setTimeout(prepareSession,15000);
+          return phase === 'OPEN';
         } catch {
           if (message) message.textContent = 'Layanan belum dapat dihubungi. Muat ulang halaman untuk mencoba kembali.';
+          return false;
         }
       }
       periodSelect?.addEventListener('change', prepareSession);
       if (form) prepareSession();
       form?.addEventListener('submit', async (event) => {
         event.preventDefault();
-        if (!(form instanceof HTMLFormElement) || !form.reportValidity() || phase !== 'OPEN' || !csrfToken) return;
+        if (!(form instanceof HTMLFormElement) || loginPending || !form.reportValidity() || phase !== 'OPEN') return;
+        loginPending = true;
+        if (periodSelect instanceof HTMLSelectElement) periodSelect.disabled = true;
         const identifier = new FormData(form).get('identifier');
         const teacher = form.dataset.voterType === 'TEACHER';
         const pinInput = document.getElementById('pin');
@@ -114,6 +120,9 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
         if (submit instanceof HTMLButtonElement) submit.disabled = true;
         if (message) message.textContent = 'Memeriksa kredensial…';
         try {
+          // The preauth cookie expires after five minutes and may be replaced by another login tab.
+          if (!await prepareSession()) return;
+          if (message) message.textContent = 'Memeriksa kredensial…';
           const response = await fetch(`/api/e-voting/${form.dataset.periodId}/session`, { method: 'POST', credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }, body: JSON.stringify(teacher ? {voterType: 'TEACHER', code: identifier, pin} : {nisn: identifier, pin}) });
           const data = await response.json();
@@ -123,11 +132,16 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
             if (response.status === 429) throw new Error('Terlalu banyak percobaan. Coba lagi setelah beberapa menit.');
             if (data.error?.code === 'SESSION_CAPACITY') throw new Error('Tiga perangkat masih digunakan. Tunggu pemilih selesai atau keluar, lalu coba kembali.');
             if (response.status === 409) throw new Error('Periode pemilihan tidak sedang dibuka.');
+            if (data.error?.code === 'CSRF_INVALID') throw new Error('Verifikasi halaman sudah kedaluwarsa. Masukkan PIN dan tekan Masuk lagi.');
+            if (response.status >= 500) throw new Error('Server belum dapat memproses login. Coba lagi beberapa saat.');
             throw new Error('Belum dapat masuk. Periksa koneksi lalu coba kembali.');
           }
           location.assign(data.redirectTo);
         } catch (error) {
           if (message) message.textContent = error instanceof Error ? error.message : 'Belum dapat masuk.';
+        } finally {
+          loginPending = false;
+          if (periodSelect instanceof HTMLSelectElement) periodSelect.disabled = false;
           if (submit instanceof HTMLButtonElement) submit.disabled = phase !== 'OPEN';
         }
       });

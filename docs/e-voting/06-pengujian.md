@@ -1,5 +1,13 @@
 # Pengujian — target jenis dinamis
 
+## Regresi login ulang 18 Oktober
+
+Empat kasus pada [tes middleware/API/SQL](../../src/lib/voting/dynamic-voting.test.ts) menguji siswa dan guru setelah expiry idle5menit maupun absolut15menit: satu suara sudah terkirim, sesi lama ditolak, verifikasi login kedaluwarsa301detik/cookie hilang/cookie terganti ditolak403 tanpa mengubah rate bucket, sesi atau suara. GET verifikasi baru dan POST identitas/PIN yang sama berhasil200, mengganti sesi lama dan mempertahankan hash/versi/status PIN; sisa empat suara dapat diselesaikan hingga sesi dicabut. Semua memakai database terisolasi, bukan PIN pemilih Neon.
+
+[Tes browser](../../scripts/ui-smoke-test.mjs) memakai komponen login asli dan respons sintetis. Sebelum perbaikan, invalidasi preauth menghasilkan403 dan pesan persis yang dilaporkan pengguna. Setelah perbaikan, kedua portal memperbarui preauth sebelum POST, menolak submit ganda, membedakan403/503, dapat mencoba kembali dengan kredensial sama, dan tidak mengirim POST jika GET gagal atau periode sudah ditutup. Bukti ini memastikan bug form tersebut; tanpa status HTTP/log kejadian awal, belum memastikan bahwa seluruh laporan login berasal dari penyebab yang sama. Pemeriksaan Neon dilakukan hanya-baca, tanpa login atau perubahan data.
+
+Validasi lokal: suite penuh 241 tes, 240 lulus dan 1 penanda PostgreSQL terpisah dilewati; 42 skenario browser lulus tanpa error JavaScript dan build produksi lulus. Pengujian deployment/perangkat untuk perbaikan login belum dilakukan. [Alur operasional](07-operasional.md#login-ulang-setelah-sesi-berakhir).
+
 **Pembaruan T11, 18 Oktober:** endpoint hasil internal dan status publikasi401/429 diterapkan. Regresi232tes lulus (satu penanda tes DB dilewati dan dijalankan terpisah), PostgreSQL lokal lintas koneksi6/6, browser37skenario, Prisma validate/generate dan build lulus. Penerimaan R2/Vercel/perangkat tetap belum selesai. [Bukti T11](06-pengujian.md#bukti-dan-gerbang-rilis).
 
 **Pembaruan upload 18 Oktober:** T10 sudah diimplementasikan dan diuji lokal (228 tes, 37 skenario browser, build lulus). Verifikasi object R2/hosted belum selesai karena konfigurasi R2 lokal belum tersedia. [Bukti dan batas](../image-upload-webp-study.md#implementasi-t10-dan-bukti-terbaru).

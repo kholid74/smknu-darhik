@@ -1,5 +1,13 @@
 # Operasional dan transisi jenis dinamis
 
+## Login ulang setelah sesi berakhir
+
+Sesi memilih berlaku lima menit idle, maksimum 15 menit sejak login, dan tidak melewati penutupan periode. Setelah sesi habis, pemilih yang belum menyelesaikan seluruh surat suara dapat masuk kembali memakai identitas dan PIN yang sama selama periode masih terbuka dan PIN aktif. Suara yang sudah terkirim tetap tersimpan; portal melanjutkan hak pilih yang belum digunakan.
+
+Verifikasi keamanan **form login** mempunyai masa berlaku terpisah, lima menit. Sebelum perbaikan 18 Oktober, halaman yang dibiarkan terbuka atau nonce yang terganti dari tab lain dapat mengirim verifikasi lama, menerima 403 `CSRF_INVALID`, lalu menampilkan pesan umum “Belum dapat masuk. Periksa koneksi lalu coba kembali.” Form siswa dan guru kini mengambil verifikasi baru setiap tombol Masuk ditekan; submit ganda diblokir selama pemeriksaan. Tidak ada pengulangan POST otomatis.
+
+Jika verifikasi masih ditolak, masukkan PIN dan tekan Masuk lagi. Pesan “Server belum dapat memproses login” menunjukkan respons server 5xx yang perlu diperiksa melalui log/Network, bukan alasan mengganti PIN. Sebelum versi perbaikan dideploy, muat ulang halaman masuk untuk memperbarui verifikasi. Jangan menghapus suara parsial atau mereset PIN hanya karena sesi habis. [Bukti pengujian](06-pengujian.md#regresi-login-ulang-18-oktober).
+
 **Pembaruan T11, 18 Oktober:** endpoint hasil internal dan status publikasi401/429 diterapkan. Regresi232tes lulus (satu penanda tes DB dilewati dan dijalankan terpisah), PostgreSQL lokal lintas koneksi6/6, browser37skenario, Prisma validate/generate dan build lulus. Penerimaan R2/Vercel/perangkat tetap belum selesai. [Bukti T11](06-pengujian.md#bukti-dan-gerbang-rilis).
 
 **Pembaruan upload 18 Oktober:** T10 sudah diimplementasikan dan diuji lokal (228 tes, 37 skenario browser, build lulus). Verifikasi object R2/hosted belum selesai karena konfigurasi R2 lokal belum tersedia. [Bukti dan batas](../image-upload-webp-study.md#implementasi-t10-dan-bukti-terbaru).
