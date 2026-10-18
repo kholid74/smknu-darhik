@@ -1,0 +1,6 @@
+---
+import Types from '../../../../../../src/pages/admin/e-voting/jenis.astro';
+Astro.locals.principal={roles:['staf'],grants:['evoting.lihat']};
+Astro.locals.session={sub:'qa-viewer',role:'staf',roles:['staf']};
+---
+<Types items={[]}/>

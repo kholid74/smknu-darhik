@@ -5,6 +5,7 @@ import { verifyPassword } from '../auth';
 import { requireEnv } from '../env';
 import { PinError, generatePin, pinFingerprint, pinHashMaterial, type PinRequest } from './pin-input';
 import { voterIdentifier } from './voter-identity';
+import { votingProgress } from './contests';
 
 function pinSecret() {
   const secret = requireEnv('VOTING_PIN_SECRET');
@@ -51,7 +52,7 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
   const voters = await db.electionVoter.findMany({
     where: { periodId, id: { in: request.targets.map((target) => target.voterId) } },
     select: { id: true, voterType: true, loginCode: true, nisn: true, name: true, className: true, pinHash: true, pinVersion: true, credentialEnabled: true,
-      participation: { where: { hasVoted: true }, select: { organization: true } } },
+      participation: { select: { organization: true, hasVoted: true } } },
   });
   if (voters.length !== request.targets.length) throw new PinError('NOT_FOUND');
   const versions = new Map(request.targets.map((target) => [target.voterId, target.pinVersion]));
@@ -59,7 +60,6 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
     if (voter.pinVersion !== versions.get(voter.id)) throw new PinError('STALE_CREDENTIALS');
     if (request.mode === 'issue' && (voter.pinHash !== null || voter.credentialEnabled)) throw new PinError('INVALID_CREDENTIAL_STATE');
     if (request.mode === 'reset' && (!voter.pinHash || !voter.credentialEnabled)) throw new PinError('INVALID_CREDENTIAL_STATE');
-    if (request.mode === 'reset' && voter.participation.length >= 4) throw new PinError('COMPLETED_VOTER');
   }
   const secret = pinSecret();
   const snapshots = new Map(voters.map((voter) => [voter.id, voter]));
@@ -79,6 +79,7 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
         if (lockedPeriod[0].state === 'SCHEDULED' && (!beforeClose || (request.mode === 'issue' && !beforeOpen &&
             request.targets.some((target) => target.pinVersion === 0)))) throw new PinError('INVALID_STATE');
         if (!['DRAFT', 'SCHEDULED'].includes(lockedPeriod[0].state)) throw new PinError('INVALID_STATE');
+        const contests = await tx.electionContest.findMany({ where: { periodId }, select: { organization: true, sortOrder: true } });
         const activeActor = await tx.account.findUnique({ where: { id: actorAccountId }, select: { active: true } });
         if (!activeActor?.active) throw new PinError('INVALID_REAUTH');
         for (const id of [...request.targets.map((target) => target.voterId)].sort()) {
@@ -86,14 +87,15 @@ export async function issuePins(periodId: string, request: PinRequest, actorAcco
         }
         const lockedVoters = await tx.electionVoter.findMany({ where: { periodId, id: { in: prepared.map((row) => row.id) } },
           select: { id: true, pinHash: true, pinVersion: true, credentialEnabled: true,
-            participation: { where: { hasVoted: true }, select: { organization: true } } } });
+            participation: { select: { organization: true, hasVoted: true } } } });
         if (lockedVoters.length !== prepared.length) throw new PinError('NOT_FOUND');
         for (const voter of lockedVoters) {
           const target = request.targets.find((row) => row.voterId === voter.id)!;
           if (voter.pinVersion !== target.pinVersion) throw new PinError('STALE_CREDENTIALS');
           if (request.mode === 'issue' && (voter.pinHash !== null || voter.credentialEnabled)) throw new PinError('INVALID_CREDENTIAL_STATE');
           if (request.mode === 'reset' && (!voter.pinHash || !voter.credentialEnabled)) throw new PinError('INVALID_CREDENTIAL_STATE');
-          if (request.mode === 'reset' && voter.participation.length >= 4) throw new PinError('COMPLETED_VOTER');
+          const complete = votingProgress(contests, voter.participation).complete;
+          if (request.mode === 'reset' && complete) throw new PinError('COMPLETED_VOTER');
         }
         const fingerprints = prepared.map((row) => row.pinFingerprint);
         if (await tx.electionVoter.findFirst({ where: { periodId, pinFingerprint: { in: fingerprints } }, select: { id: true } })) {

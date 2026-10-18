@@ -43,6 +43,7 @@ export const POST: APIRoute = async ({ request, params, cookies }) => {
   } catch (error) {
     if (error instanceof StudentAuthError) {
       if (error.code === 'ELECTION_NOT_OPEN') return json({ error: { code: error.code } }, 409);
+      if (error.code === 'SESSION_CAPACITY') return json({ error: { code: error.code } }, 409);
       if (error.code === 'RATE_LIMITED') return json({ error: { code: error.code } }, 429, { 'Retry-After': '900' });
       return json({ error: { code: 'INVALID_CREDENTIALS' } }, 401);
     }

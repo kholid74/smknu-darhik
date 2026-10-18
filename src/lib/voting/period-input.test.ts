@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { PeriodError, validateExpectedPeriodConfig, validatePeriodConfig, validatePeriodExtension, validatePeriodInput, validatePeriodClose } from './period-input';
 
 test('period input allows a validated schedule and trims display values', () => {
-  const input = validatePeriodInput({ slug: 'osis-2026', name: '  Pemilihan OSIS ', academicYear: ' 2026/2027 ', opensAt: '2026-11-01T01:00:00.000Z', closesAt: '2026-11-01T03:00:00.000Z' });
+  const input = validatePeriodInput({ slug: 'osis-2026', name: '  Pemilihan OSIS ', academicYear: ' 2026/2027 ', opensAt: '2026-11-01T01:00:00.000Z', closesAt: '2026-11-01T03:00:00.000Z', organizations: ['OSIS'] });
   assert.equal(input.slug, 'osis-2026');
   assert.equal(input.name, 'Pemilihan OSIS');
   assert.equal(input.academicYear, '2026/2027');
@@ -32,17 +32,24 @@ test('period extension accepts a reason code and reauthentication password only'
 
 test('period close requires a password and explicit boolean early opt-in, without force fields', () => {
   assert.deepEqual(validatePeriodClose({adminPassword: 'secret'}), {adminPassword: 'secret', early: false});
-  assert.deepEqual(validatePeriodClose({adminPassword: 'secret', early: true}), {adminPassword: 'secret', early: true});
+  assert.deepEqual(validatePeriodClose({adminPassword: ' secret ', early: true, reason: '  Siswa absen sesuai berita acara  '}), {adminPassword: ' secret ', early: true, reason: 'Siswa absen sesuai berita acara'});
   assert.equal(validatePeriodClose({adminPassword: 'secret', early: false}).early, false);
   for (const value of [null, [], {}, {adminPassword: ''}, {adminPassword: 'x'.repeat(257)},
     {adminPassword: 'secret', early: 'true'}, {adminPassword: 'secret', early: 1},
-    {adminPassword: 'secret', early: true, force: true}]) {
+    {adminPassword: 'secret', early: true}, {adminPassword: 'secret', early: true, force: true},
+    ...[null, '', ' '.repeat(10), 'x'.repeat(9), 'x'.repeat(501), 123].map(reason => ({adminPassword:'secret', early:true, reason}))]) {
     assert.throws(() => validatePeriodClose(value), PeriodError);
   }
 });
 
+test('close reasons are validated even after the deadline and normal closure may carry a bounded reason', () => {
+  for(const length of [10,500]) assert.equal(validatePeriodClose({adminPassword:'secret',early:true,reason:'x'.repeat(length)}).reason?.length,length);
+  assert.equal(validatePeriodClose({adminPassword:'secret',reason:'Catatan rapat panitia'}).reason,'Catatan rapat panitia');
+  for(const reason of [null,'',' '.repeat(20),'short','x'.repeat(501)]) assert.throws(()=>validatePeriodClose({adminPassword:'secret',early:false,reason}),PeriodError);
+});
+
 test('test classification is explicit at creation and cannot be edited with configuration', () => {
-  const value = {slug: 'uji', name: 'Uji', academicYear: '2026/2027', opensAt: '2026-11-01T01:00Z', closesAt: '2026-11-01T02:00Z'};
+  const value = {slug: 'uji', name: 'Uji', academicYear: '2026/2027', opensAt: '2026-11-01T01:00Z', closesAt: '2026-11-01T02:00Z', organizations: ['OSIS']};
   assert.equal(validatePeriodInput(value).isTest, false);
   assert.equal(validatePeriodInput({...value, isTest: true}).isTest, true);
   assert.throws(() => validatePeriodInput({...value, isTest: 'true'}));

@@ -1,67 +1,169 @@
 ---
 export const prerender = false;
-import { VotingOrganization } from '@prisma/client';
+import '../../../styles/portal-tokens.css';
+import PortalHead from '../../../components/ui/PortalHead.astro';
+import CandidatePortraits from '../../../components/voting/CandidatePortraits.astro';
 import { getPublishedResult } from '../../../lib/voting/public-results';
+import { thumbnailUrl } from '../../../lib/image-url';
+import { env } from '../../../lib/env';
 
 const slug = Astro.params.slug ?? '';
 let published = null;
 try { published = await getPublishedResult({ slug }); }
 catch { Astro.response.status = 503; }
 if (!published && Astro.response.status !== 503) Astro.response.status = 404;
-Astro.response.headers.set('Cache-Control', published ? 'public, max-age=60, stale-while-revalidate=300' : 'private, no-store');
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+Astro.response.headers.set('Referrer-Policy', 'no-referrer');
 Astro.response.headers.set('X-Content-Type-Options', 'nosniff');
-const labels: Record<VotingOrganization, string> = {
-  OSIS: 'OSIS', DEWAN_AMBALAN: 'Dewan Ambalan', IPNU: 'IPNU', IPPNU: 'IPPNU',
-};
-const dateLabel = (date: Date | null) => date ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeZone: 'Asia/Jakarta' }).format(date) : '';
+if (!published) Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+const dateLabel = (date: Date | null) => date ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'long', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(date) + ' WIB' : '';
+const percentage = (count: number, total: number) => total ? count * 100 / total : 0;
+const percentLabel = (count: number, total: number) => new Intl.NumberFormat('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(percentage(count,total)) + '%';
+const photo = (source: string, width: number) => thumbnailUrl(source, width, Astro.url.origin, env('R2_PUBLIC_URL'));
+const result = published?.result;
+const participating = result ? result.complete + result.partial : 0;
+const totalBallots = result?.contests.reduce((sum,contest) => sum + contest.votesCast, 0) ?? 0;
+const segments = result ? [
+  {label:'Lengkap',count:result.complete,color:'#17643f'},
+  {label:'Parsial',count:result.partial,color:'#b27a16'},
+  {label:'Belum mulai',count:result.notStarted,color:'#d8e2dc'},
+] : [];
+let offset = 0;
 ---
-
 <!doctype html>
 <html lang="id">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={published ? `Hasil resmi ${published.period.name} SMKS NU Darul Hikam.` : 'Hasil pemilihan SMKS NU Darul Hikam'} />
+    <PortalHead />
     <title>{published ? `Hasil ${published.period.name}` : 'Hasil pemilihan'} · SMKS NU Darul Hikam</title>
-    <style>
-      :root{font-family:Arial,Helvetica,sans-serif;color:#18231e;background:#f4f7f4}*{box-sizing:border-box}body{margin:0;min-height:100vh}header{background:white;border-bottom:1px solid #dce5df}.wrap{width:min(100% - 32px,960px);margin:auto}header .wrap{padding:20px 0;font-weight:800;color:#145c3b}main{padding:42px 0 70px}h1{margin:0 0 8px;font-size:clamp(1.7rem,4vw,2.4rem)}.muted{color:#58685e;line-height:1.55}.summary{display:flex;gap:12px;flex-wrap:wrap;margin:24px 0}.stat{flex:1 1 150px;padding:16px;border:1px solid #dce5df;border-radius:12px;background:white}.stat strong{display:block;font-size:1.35rem;color:#145c3b}.contest{margin:26px 0;padding:22px;border:1px solid #dce5df;border-radius:16px;background:white}.contest h2{margin:0 0 8px}.candidates{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:18px}.candidate{padding:16px;border:1px solid #e4eae5;border-radius:12px}.candidate h3{margin:0 0 8px}.members{display:grid;gap:8px}.member{display:flex;align-items:center;gap:10px;color:#36443b}.member img{width:44px;height:44px;object-fit:cover;border-radius:50%;background:#edf2ee}.number{color:#17643f;font-weight:800}.votes{display:flex;justify-content:space-between;gap:10px;margin-top:14px;font-weight:700}.tag{font-size:.8rem;color:#145c3b;background:#e5f2e9;border-radius:999px;padding:4px 8px}footer{padding:22px 0;color:#58685e;font-size:.9rem}a{color:#145c3b}a:focus-visible{outline:3px solid #e6a800;outline-offset:3px}@media(max-width:600px){main{padding-top:28px}.contest{padding:16px}}
-    </style>
   </head>
   <body>
-    <header><div class="wrap">SMKS NU Darul Hikam</div></header>
-    <main class="wrap">
-      {published ? <>
-        <p class="muted">Hasil resmi · Tahun ajaran {published.period.academicYear}</p>
-        <h1>{published.period.name}</h1>
-        <p class="muted">Pemungutan suara ditutup {dateLabel(published.period.closedAt)}. Hasil ini menggunakan snapshot resmi saat penutupan.</p>
-        <section class="summary" aria-label="Ringkasan partisipasi">
-          <div class="stat"><strong>{published.result.eligibleVoters}</strong>Pemilih terdaftar</div>
-          <div class="stat"><strong>{published.result.complete}</strong>Partisipasi lengkap</div>
-          <div class="stat"><strong>{published.result.partial}</strong>Partisipasi sebagian</div>
-          <div class="stat"><strong>{published.result.notStarted}</strong>Belum mulai</div>
+    <a class="skip" href="#hasil">Langsung ke hasil</a>
+    <header><div class="wrap topbar">
+      <a class="brand" href="/"><img src="/assets/logo-v1.webp" width="42" height="42" alt=""/><span>SMKS NU Darul Hikam<small>Karanggeneng · Lamongan</small></span></a>
+      {published && <span class="official"><span aria-hidden="true">✓</span> Hasil resmi</span>}
+    </div></header>
+    <main id="hasil" class="wrap">
+      {published && result ? <>
+        <div class="hero">
+          <div><p class="eyebrow">E-VOTING · {published.period.academicYear}</p><h1>{published.period.name}</h1>
+            <p class="muted">Ditutup <time datetime={published.period.closedAt?.toISOString()}>{dateLabel(published.period.closedAt)}</time><br/>
+              Dipublikasikan <time datetime={published.period.publishedAt?.toISOString()}>{dateLabel(published.period.publishedAt)}</time></p>
+          </div>
+          <button id="print-results" type="button" hidden>Cetak hasil</button>
+        </div>
+        <section class="overview" aria-labelledby="participation-title">
+          <div class="participation">
+            <h2 id="participation-title">Partisipasi pemilih</h2>
+            <div class="participation-chart">
+              <svg class="donut" width="184" height="184" viewBox="0 0 200 200" role="img" aria-labelledby="participation-chart-title">
+                <title id="participation-chart-title">{result.complete} lengkap, {result.partial} parsial, {result.notStarted} belum mulai dari {result.eligibleVoters} pemilih</title>
+                {segments.map(segment => {
+                  const length = percentage(segment.count,result.eligibleVoters);
+                  const start = offset; offset += length;
+                  return segment.count > 0 && <circle cx="100" cy="100" r="80" pathLength="100" fill="none" stroke={segment.color} stroke-width="22" stroke-dasharray={`${length} ${100-length}`} stroke-dashoffset={-start} transform="rotate(-90 100 100)"/>;
+                })}
+                <text x="100" y="100" text-anchor="middle" class="donut-value">{participating}</text>
+                <text x="100" y="124" text-anchor="middle" class="donut-label">berpartisipasi</text>
+              </svg>
+              <ul class="legend">{segments.map(segment => <li><span class="swatch" style={`background:${segment.color}`} aria-hidden="true"></span><span>{segment.label}<small>{percentLabel(segment.count,result.eligibleVoters)} dari pemilih</small></span><strong>{segment.count}</strong></li>)}</ul>
+            </div>
+            <p class="muted chart-note">Berpartisipasi berarti sudah mengirim minimal satu surat suara.</p>
+          </div>
+          <dl class="metrics">
+            <div><dt>Pemilih terdaftar</dt><dd data-stat="eligible">{result.eligibleVoters}<small>orang</small></dd></div>
+            <div><dt>Sudah berpartisipasi</dt><dd data-stat="participating">{participating}<small>{percentLabel(participating,result.eligibleVoters)} dari pemilih</small></dd></div>
+            <div><dt>Surat suara terkumpul</dt><dd data-stat="ballots">{totalBallots}<small>dari {result.eligibleVoters * result.contests.length} hak suara</small></dd></div>
+            <div><dt>Jenis pemilihan</dt><dd data-stat="contests">{result.contests.length}<small>surat suara per pemilih</small></dd></div>
+          </dl>
         </section>
-        {published.result.contests.map((contest) => {
-          const highest = Math.max(0, ...contest.candidates.map((candidate) => candidate.votes));
-          const leaders = contest.votesCast ? contest.candidates.filter((candidate) => candidate.votes === highest) : [];
-          return <section class="contest">
-            <h2>{labels[contest.organization]}</h2>
-            <p class="muted">{contest.votesCast} suara tercatat</p>
+        <nav class="contest-nav" aria-label="Hasil per jenis pemilihan">
+          {result.contests.map(contest => <a href={`#hasil-${contest.organization}`}>
+            {contest.logoUrl ? <img src={photo(contest.logoUrl,96)} width="32" height="32" alt="" loading="lazy" decoding="async"/> : <span class="logo-fallback" aria-hidden="true">{contest.name.slice(0,1)}</span>}
+            <span>{contest.name}</span>
+          </a>)}
+        </nav>
+        {result.contests.map((contest,contestIndex) => {
+          const highest = Math.max(0,...contest.candidates.map(candidate => candidate.votes));
+          const leaders = highest > 0 ? contest.candidates.filter(candidate => candidate.votes === highest) : [];
+          return <section class="contest" id={`hasil-${contest.organization}`} aria-labelledby={`title-${contest.organization}`}>
+            <div class="contest-heading">
+              <div class="contest-title">
+                {contest.logoUrl ? <img src={photo(contest.logoUrl,96)} width="48" height="48" alt="" loading="lazy" decoding="async"/> : <span class="logo-fallback large" aria-hidden="true">{contest.name.slice(0,1)}</span>}
+                <div><p class="eyebrow">SURAT SUARA {String(contestIndex+1).padStart(2,'0')}</p><h2 id={`title-${contest.organization}`}>{contest.name}</h2></div>
+              </div>
+              <p class="contest-total"><strong>{contest.votesCast} suara</strong><span>{percentLabel(contest.votesCast,result.eligibleVoters)} dari {result.eligibleVoters} pemilih</span><small>{result.eligibleVoters-contest.votesCast} hak tidak digunakan</small></p>
+            </div>
+            {contest.votesCast === 0 && <p class="notice">Tidak ada suara tercatat pada jenis pemilihan ini.</p>}
+            {leaders.length > 1 && <p class="notice">Perolehan tertinggi sama untuk {leaders.length} calon. Hasil seri tetap ditampilkan setara.</p>}
             <div class="candidates">
-              {[...contest.candidates].sort((a, b) => a.ballotNumber - b.ballotNumber).map((candidate) => <article class="candidate">
-                <h3><span class="number">Nomor {candidate.ballotNumber}</span>{leaders.includes(candidate) && <span class="tag" style="margin-left:8px">{leaders.length > 1 ? 'Seri pada perolehan tertinggi' : 'Perolehan tertinggi'}</span>}</h3>
-                <div class="members">
-                  <div class="member">{candidate.chair.photoUrl && <img src={candidate.chair.photoUrl} alt="" loading="lazy"/>}<span><strong>Ketua:</strong> {candidate.chair.name} <small>({candidate.chair.className})</small></span></div>
-                  {candidate.viceChair && <div class="member">{candidate.viceChair.photoUrl && <img src={candidate.viceChair.photoUrl} alt="" loading="lazy"/>}<span><strong>Wakil:</strong> {candidate.viceChair.name} <small>({candidate.viceChair.className})</small></span></div>}
+              {[...contest.candidates].sort((a,b) => a.ballotNumber-b.ballotNumber).map((candidate,index) => <article class="candidate" data-leading={leaders.includes(candidate) ? 'true' : 'false'} aria-labelledby={`candidate-${candidate.candidateId}`}>
+                <div class="candidate-heading"><h3 id={`candidate-${candidate.candidateId}`}>Nomor <span>{String(candidate.ballotNumber).padStart(2,'0')}</span></h3>
+                  {leaders.includes(candidate) && <span class="leader-tag">{leaders.length > 1 ? 'Seri · Perolehan tertinggi' : 'Perolehan tertinggi'}</span>}
                 </div>
-                <p><strong>Visi</strong><br/>{candidate.vision}</p>
-                <p><strong>Misi</strong><br/>{candidate.mission}</p>
-                <div class="votes"><span>{candidate.votes} suara</span><span>{contest.votesCast ? `${(candidate.votes * 100 / contest.votesCast).toFixed(1)}%` : '—'}</span></div>
+                <CandidatePortraits chair={candidate.chair} viceChair={candidate.viceChair} chairLabel={contest.chairLabel} viceChairLabel={contest.viceChairLabel} eager={contestIndex === 0 && index === 0}/>
+                <div class="candidate-body">
+                  <div class="votes"><strong>{candidate.votes}<small>suara</small></strong><span class="percentage">{percentLabel(candidate.votes,contest.votesCast)}</span></div>
+                  <div class="vote-track" aria-hidden="true"><span style={`width:${percentage(candidate.votes,contest.votesCast)}%`}></span></div>
+                  <p class="vote-denominator">Dari {contest.votesCast} surat suara jenis ini</p>
+                  <details class="statements"><summary>Visi dan misi</summary><div class="statements-content"><h4>Visi</h4><p>{candidate.vision}</p><h4>Misi</h4><p>{candidate.mission}</p></div></details>
+                </div>
               </article>)}
             </div>
           </section>;
         })}
-      </> : <section class="contest"><h1>{Astro.response.status === 503 ? 'Hasil sementara tidak tersedia' : 'Hasil belum tersedia'}</h1><p class="muted">{Astro.response.status === 503 ? 'Silakan coba kembali nanti.' : 'Hasil akan ditampilkan setelah penutupan dan publikasi resmi.'}</p></section>}
+        <p class="result-note">Perolehan tertinggi menunjukkan jumlah suara terbanyak. Penetapan hasil akhir mengikuti keputusan resmi panitia.</p>
+      </> : <section class="unavailable"><span class="official">E-Voting</span><h1>{Astro.response.status === 503 ? 'Hasil sementara tidak tersedia' : 'Hasil belum tersedia'}</h1><p class="muted">{Astro.response.status === 503 ? 'Silakan coba kembali nanti.' : 'Hasil akan ditampilkan setelah penutupan dan publikasi resmi.'}</p><a href="/">Kembali ke beranda</a></section>}
     </main>
     <footer class="wrap">SMKS NU Darul Hikam · <a href="/">Kembali ke beranda</a></footer>
+    <script>
+      const printButton = document.querySelector<HTMLButtonElement>('#print-results');
+      if (printButton) { printButton.hidden = false; printButton.addEventListener('click', () => window.print()); }
+    </script>
   </body>
 </html>
+<style>
+  body{margin:0}a{color:#145c3b}button{font:inherit;cursor:pointer}button,a,summary{-webkit-tap-highlight-color:transparent}
+  .wrap{width:min(1120px,calc(100% - 40px));margin:auto}
+  .skip{position:absolute;top:-70px;left:20px;z-index:10;padding:12px;background:white}.skip:focus{top:12px}
+  header{border-bottom:1px solid var(--color-line);background:white}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 0}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;font-size:14px;font-weight:800}.brand small{display:block;font-size:11px;font-weight:500;color:var(--color-muted);margin-top:4px}
+  .official{display:inline-flex;align-items:center;gap:7px;border-radius:30px;padding:8px 12px;background:#e5f2e9;color:#145c3b;font-size:12px;font-weight:700;white-space:nowrap}
+  main{padding:36px 0 48px}.hero{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:28px}
+  .eyebrow{font-size:11px;font-weight:800;letter-spacing:.1em;color:#27714b;margin:0 0 8px}
+  h1{font-size:clamp(28px,4vw,46px);letter-spacing:-.04em;line-height:1.15;margin:0 0 14px;overflow-wrap:anywhere}
+  .muted{color:var(--color-muted);font-size:13px;line-height:1.7}.hero .muted{margin:0}
+  #print-results{padding:11px 16px;background:white;border:1px solid #adc5b6;border-radius:10px;color:#145c3b;font-size:13px;font-weight:700;white-space:nowrap;min-height:44px}
+  .overview{display:grid;grid-template-columns:1.1fr 1fr;gap:28px;padding:26px;background:white;border:1px solid var(--color-line);border-radius:20px}
+  .participation h2{font-size:17px;margin:0 0 8px}.participation-chart{display:flex;align-items:center;gap:22px}.donut{width:170px;height:170px;flex:none}
+  .donut-value{font-size:40px;font-weight:800;fill:#172b25}.donut-label{font-size:12px;fill:#596b63}.chart-note{margin:4px 0 0;font-size:11px}
+  .legend{list-style:none;padding:0;margin:0;flex:1;display:grid;gap:14px}.legend li{display:flex;align-items:center;gap:9px;font-size:12px}.swatch{width:9px;height:9px;border-radius:50%;flex:none}
+  .legend small{display:block;font-size:10px;color:var(--color-muted);margin-top:3px}.legend strong{margin-left:auto;font-size:16px}
+  .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0}.metrics>div{padding:14px 16px;background:#f5f8f6;border-radius:12px}
+  .metrics dt{font-size:11px;color:var(--color-muted);line-height:1.5}.metrics dd{font-size:30px;line-height:1.3;font-weight:800;margin:6px 0 0;color:#145c3b}.metrics small{display:block;font-size:10px;font-weight:500;color:var(--color-muted);margin-top:3px}
+  .contest-nav{display:flex;flex-wrap:wrap;gap:9px;margin:24px 0 36px}.contest-nav a{display:flex;align-items:center;gap:8px;text-decoration:none;border:1px solid #d6e2d9;border-radius:12px;background:white;padding:8px 12px;font-size:12px;font-weight:700;min-height:48px;max-width:100%;overflow-wrap:anywhere}
+  .contest-nav img,.contest-title img{object-fit:contain;flex:none}.logo-fallback{display:grid;place-items:center;width:32px;height:32px;background:#e8f2eb;border-radius:9px;font-size:14px;flex:none}.logo-fallback.large{width:48px;height:48px;font-size:23px}
+  .contest{margin:0 0 40px;scroll-margin-top:24px}.contest-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:18px}.contest-title{display:flex;align-items:center;gap:14px;min-width:0}.contest-title h2{font-size:clamp(20px,3vw,27px);margin:0;letter-spacing:-.03em;overflow-wrap:anywhere}.contest-title .eyebrow{font-size:9px;margin-bottom:5px}
+  .contest-total{display:grid;gap:4px;margin:0;text-align:right;flex-shrink:0}.contest-total strong{font-size:17px;color:#145c3b}.contest-total span,.contest-total small{font-size:11px;color:var(--color-muted)}
+  .notice{padding:12px 16px;border:1px solid #e5d8ae;border-radius:12px;background:#fcf9ee;color:#795a18;font-size:12px;line-height:1.6}
+  .candidates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.candidate{min-width:0;border:2px solid var(--color-line);border-radius:18px;background:white;overflow:hidden}.candidate[data-leading=true]{border-color:#86b99a}
+  .candidate-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;min-height:68px}.candidate-heading h3{display:flex;align-items:center;gap:8px;margin:0;font-size:11px;font-weight:600;color:var(--color-muted);white-space:nowrap}.candidate-heading h3 span{display:grid;place-items:center;width:38px;height:38px;background:#edf5ef;border-radius:50%;font-size:18px;font-weight:800;color:#145c3b}
+  .leader-tag{display:inline-block;font-size:10px;line-height:1.5;font-weight:700;color:#145c3b;background:#e8f5eb;padding:5px 8px;border-radius:7px;text-align:right}
+  .candidate-body{padding:6px 16px 16px}.votes{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:12px 0}.votes strong{font-size:35px;line-height:1.1;color:#145c3b}.votes strong small{font-size:12px;font-weight:500;color:var(--color-muted);margin-left:7px}.percentage{font-size:23px;font-weight:800;letter-spacing:-.04em}
+  .vote-track{height:8px;border-radius:10px;overflow:hidden;background:#eaf0ec}.vote-track span{display:block;height:100%;background:#27744b;border-radius:10px}
+  .vote-denominator{font-size:10px;color:var(--color-muted);margin:8px 0 14px}
+  .statements{border-top:1px solid var(--color-line);font-size:12px}.statements summary{cursor:pointer;font-weight:700;padding:14px 0 2px;min-height:40px;color:#315d43}.statements-content{padding:4px 0 0}.statements h4{font-size:12px;margin:14px 0 5px}.statements p{color:var(--color-muted);line-height:1.7;white-space:pre-line;overflow-wrap:anywhere;margin:0}
+  .result-note{font-size:12px;line-height:1.7;color:var(--color-muted);padding-top:4px}
+  .unavailable{margin:24px auto;max-width:650px;padding:36px;background:white;border:1px solid var(--color-line);border-radius:20px}.unavailable h1{font-size:30px;margin-top:22px}
+  footer{padding:22px 0 30px;border-top:1px solid var(--color-line);font-size:11px;color:var(--color-muted)}
+  @media(max-width:1000px){.overview{grid-template-columns:minmax(0,1fr)}.metrics{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  @media(max-width:760px){.candidates{grid-template-columns:minmax(0,1fr)}.contest-heading{align-items:start;flex-direction:column;gap:12px}.contest-total{text-align:left;display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}.hero{align-items:start;flex-direction:column;gap:16px}.overview{padding:20px;gap:18px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:420px){.wrap{width:calc(100% - 28px)}.brand{font-size:11px;gap:8px}.brand img{width:34px;height:34px}.brand small{font-size:9px}.official{font-size:10px;padding:7px 9px}.participation-chart{flex-direction:column;gap:12px}.legend{width:100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.legend li{display:grid;grid-template-columns:auto 1fr;gap:5px;align-items:center}.legend li>span:nth-child(2){grid-column:1/-1;grid-row:2;line-height:1.5}.legend .swatch{grid-row:1;grid-column:1}.legend strong{grid-column:2;grid-row:1;margin:0;font-size:20px}.legend small{font-size:9px}.metrics>div{padding:12px}.contest-nav{margin-bottom:28px}main{padding-top:26px}}
+  @media print{
+    @page{size:A4;margin:14mm}
+    :root,body{background:white;color:#111;font-size:10pt;print-color-adjust:exact}
+    .wrap{width:100%;max-width:none}main{padding:6mm 0}.skip,.contest-nav,#print-results{display:none!important}.topbar{padding:0 0 5mm}.hero{display:block;margin-bottom:6mm}h1{font-size:24pt}.overview{padding:5mm;grid-template-columns:1fr 1fr;gap:5mm}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.participation-chart{gap:3mm}.donut{width:32mm;height:32mm}.legend{display:grid;grid-template-columns:1fr;gap:2mm}.legend li{font-size:8pt}.legend small{font-size:7pt}.chart-note{font-size:8pt}.contest{break-before:page;margin:0}.contest-heading{display:flex;flex-direction:row}.contest-total{display:grid;text-align:right}.candidates{grid-template-columns:repeat(2,minmax(0,1fr));gap:4mm}.candidate{break-inside:avoid;border-color:#999}.candidate-heading{min-height:14mm;padding:2mm 3mm}.candidate-body{padding:2mm 3mm 3mm}.votes strong{font-size:24pt}.percentage{font-size:16pt}.statements summary{display:none}.statements::details-content{display:block;content-visibility:visible}.statements-content{display:block!important}.statements p{font-size:8pt}.statements h4{font-size:9pt}.result-note{font-size:8pt}footer{font-size:8pt}
+  }
+</style>

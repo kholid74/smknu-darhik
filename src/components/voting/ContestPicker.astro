@@ -1,0 +1,87 @@
+---
+import type { Contest } from '../../lib/voting/contests';
+interface Props { id: string; initial?: Contest[]; defaults?: boolean; readOnly?: boolean }
+const {id,initial=[],defaults=false,readOnly=false}=Astro.props;
+---
+<fieldset id={`${id}-types`} class="contest-picker" disabled={!readOnly} data-contest-picker={readOnly?undefined:''} data-initial={JSON.stringify(initial)} data-defaults={String(defaults)}>
+  <legend>Jenis dan urutan surat suara</legend>
+  {readOnly ? <><p>Susunan terkunci setelah periode dijadwalkan.</p><ol>{initial.map(c=><li>{c.name} <small>({c.candidateMode==='SINGLE'?'calon tunggal':'wakil opsional'})</small></li>)}</ol></> : <>
+    <p id={`${id}-types-loading`} data-picker-status role="status">Memuat jenis pemilihan…</p>
+    <div id={`${id}-type-options`} class="contest-options" data-picker-options></div>
+    <p class="picker-hint">Pilih 1–20 jenis. Gunakan tombol naik/turun untuk menentukan urutan surat suara. Nama dan jabatan yang sudah terpasang tetap memakai snapshot periode.</p>
+  </>}
+</fieldset>
+<style>
+  .contest-picker{grid-column:1/-1;min-width:0;margin:0;border:1px solid var(--color-border);border-radius:10px;padding:14px}
+  legend{font-size:13px;font-weight:800;padding:0 5px}.contest-picker p,.contest-picker li{font-size:13px;line-height:1.6}.contest-picker ol{padding-left:24px;margin:10px 0 0}.contest-picker small,.picker-hint{color:var(--color-muted)}
+  .contest-options{display:grid;gap:6px;max-height:360px;overflow:auto;margin:10px 0}
+  .contest-options :global(.contest-option){display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-bg,#fff)}
+  .contest-options :global(label){display:flex;flex:1;flex-direction:row;align-items:center;gap:8px;font-size:13px;min-width:0}
+  .contest-options :global(.order-buttons){display:flex;gap:4px;flex-shrink:0}.contest-options :global(button){min-width:34px;min-height:34px;padding:4px}
+  .contest-options :global(input){flex-shrink:0}.contest-options :global(.order-number){font-weight:800;min-width:20px;color:var(--color-accent)}
+</style>
+<script>
+  import type { Contest } from '../../lib/voting/contests';
+  for(const root of document.querySelectorAll<HTMLFieldSetElement>('[data-contest-picker]')){
+    const options=root.querySelector<HTMLElement>('[data-picker-options]')!;
+    const status=root.querySelector<HTMLElement>('[data-picker-status]')!;
+    const initial:Contest[]=JSON.parse(root.dataset.initial!);
+    const types=new Map(initial.map(c=>[c.organization,{code:c.organization,name:c.name}]));
+    let selected=initial.map(c=>c.organization);
+    const submit=root.form?.querySelector<HTMLButtonElement>('[type=submit]');
+    const defaults=new Set(['OSIS','PRADANA_PUTRA','PRADANA_PUTRI','IPNU','IPPNU']);
+    function render(){
+      options.replaceChildren();
+      const codes=[...selected,...[...types.keys()].filter(code=>!selected.includes(code))];
+      for(const code of codes){
+        const type=types.get(code)!,position=selected.indexOf(code),row=document.createElement('div'),label=document.createElement('label');
+        row.className='contest-option';row.dataset.code=code;
+        const input=document.createElement('input'),number=document.createElement('span'),name=document.createElement('span');
+        input.type='checkbox';input.name='organizations';input.value=code;input.checked=position>=0;
+        number.className='order-number';number.textContent=position>=0?String(position+1)+'.':'';
+        name.textContent=type.name;label.append(input,number,name);row.append(label);
+        if(position>=0){
+          const actions=document.createElement('div');actions.className='order-buttons';
+          for(const [direction,delta,icon]of [['Naikkan',-1,'↑'],['Turunkan',1,'↓']] as const){
+            const button=document.createElement('button');button.type='button';button.className='btn btn-outline';button.textContent=icon;
+            button.setAttribute('aria-label',direction+' '+type.name);button.dataset.move=String(delta);button.dataset.code=code;
+            button.disabled=position+delta<0||position+delta>=selected.length;actions.append(button);
+          }
+          row.append(actions);
+        }
+        options.append(row);
+      }
+      const valid=selected.length>=1&&selected.length<=20;
+      status.textContent=types.size?selected.length+' surat suara dipilih'+(valid?' · urutan sesuai nomor di bawah.':'. Pilih 1–20 jenis.'):'Belum ada jenis pemilihan aktif.';
+      if(submit)submit.disabled=root.dataset.ready!=='true'||!valid;
+    }
+    options.addEventListener('change',event=>{
+      const input=event.target;if(!(input instanceof HTMLInputElement))return;
+      selected=input.checked?[...selected,input.value]:selected.filter(code=>code!==input.value);render();
+      options.querySelector<HTMLInputElement>('input[value="'+CSS.escape(input.value)+'"]')?.focus();
+    });
+    options.addEventListener('click',event=>{
+      const button=(event.target as Element).closest<HTMLButtonElement>('button[data-move]');if(!button)return;
+      const i=selected.indexOf(button.dataset.code!),j=i+Number(button.dataset.move);if(i<0||j<0||j>=selected.length)return;
+      [selected[i],selected[j]]=[selected[j],selected[i]];render();
+      options.querySelector<HTMLInputElement>('input[value="'+CSS.escape(button.dataset.code!)+'"]')?.focus();
+    });
+    (async()=>{
+      let cursor:string|null=null;
+      try{
+        do{
+          const response=await fetch('/api/admin/e-voting/types?'+new URLSearchParams({active:'true',limit:'100',...(cursor?{cursor}:{})}),{cache:'no-store',credentials:'same-origin'});
+          if(!response.ok)throw new Error();
+          root.dataset.csrf=response.headers.get('x-csrf-token')??'';
+          const {data}=await response.json();
+          for(const type of data.data){
+            if(!types.has(type.code))types.set(type.code,{code:type.code,name:type.name});
+            if(root.dataset.defaults==='true'&&defaults.has(type.code)&&!selected.includes(type.code))selected.push(type.code);
+          }
+          cursor=data.nextCursor;
+        }while(cursor);
+        root.dataset.ready=String(!!root.dataset.csrf&&types.size>0);root.disabled=root.dataset.ready!=='true';render();
+      }catch{status.textContent='Jenis belum berhasil dimuat. Muat ulang halaman untuk mencoba lagi.';root.dataset.ready='false';if(submit)submit.disabled=true;}
+    })();
+  }
+</script>

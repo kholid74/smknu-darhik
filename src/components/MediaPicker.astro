@@ -12,17 +12,18 @@ interface Props {
   value?: string | null;
   label?: string;
   folder?: string;
+  assetKind?: 'photo' | 'logo';
   required?: boolean;
   hint?: string; // saran ukuran/rasio agar uploader menyesuaikan gambar
 }
 const {
   field, value = '', label = 'Gambar', folder = 'uploads', required = false,
-  hint = 'Format JPG/PNG/WebP · lebar ideal ≥ 1000px · maks 5MB.',
+  hint = 'Format JPG/PNG/WebP statis · lebar ideal ≥ 1000px · maks 5MB.', assetKind = 'photo',
 } = Astro.props;
 const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
 ---
 
-<div class="media-picker" data-uid={uid} data-folder={folder}>
+<div class="media-picker" data-uid={uid} data-folder={folder} data-asset-kind={assetKind}>
   <label style="display:block;font-size:13px;font-weight:700;margin-bottom:4px">{label}</label>
 
   <div class="mp-preview" style={`display:${value ? 'flex' : 'none'};align-items:center;gap:10px;background:#f0f7f1;border-radius:8px;padding:8px 12px;margin-bottom:8px`}>
@@ -66,10 +67,10 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
         <div class="mp-pane-upload" style="display:none">
           <div class="mp-dropzone" style="border:2px dashed #d1d5db;border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all .2s">
             <span class="material-symbols-outlined" style="font-size:36px;color:#9ca3af">cloud_upload</span>
-            <p style="font-size:13px;color:#6f7a6e;margin:8px 0 0">Drag & drop atau <label style="color:#1B7A3D;font-weight:700;cursor:pointer">pilih file<input type="file" accept="image/*" class="mp-file" style="display:none"/></label></p>
-            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Maks 5MB · JPG, PNG, WebP</p>
+            <p style="font-size:13px;color:#6f7a6e;margin:8px 0 0">Drag & drop atau <label style="color:#1B7A3D;font-weight:700;cursor:pointer">pilih file<input type="file" accept="image/jpeg,image/png,image/webp" class="mp-file" style="display:none"/></label></p>
+            <p style="font-size:11px;color:#9ca3af;margin:4px 0 0">Maks 5MB · JPG, PNG, WebP statis · {assetKind==='logo'?'Logo disimpan tanpa kompresi lossy.':'Foto dioptimalkan ke WebP.'}</p>
           </div>
-          <p class="mp-upload-status" style="display:none;text-align:center;font-size:13px;color:#6f7a6e;margin-top:12px"></p>
+          <p class="mp-upload-status" role="status" aria-live="polite" style="display:none;text-align:center;font-size:13px;color:#6f7a6e;margin-top:12px"></p>
         </div>
       </div>
     </div>
@@ -153,7 +154,8 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
             btn.title = it.filename;
             // Request a small thumbnail for the grid; the saved value stays the full URL.
             const thumb = it.url.startsWith('/api/image/') ? `${it.url}?w=200` : it.url;
-            btn.innerHTML = `<img src="${thumb}" alt="${it.filename}" loading="lazy"/>`;
+            const image=document.createElement('img');
+            image.src=thumb;image.alt=String(it.filename??'');image.loading='lazy';btn.append(image);
             btn.addEventListener('click', () => { setValue(it.url); closeModal(); });
             grid.appendChild(btn);
           }
@@ -168,26 +170,30 @@ const uid = 'mp-' + Math.random().toString(36).slice(2, 9);
         searchTimer = setTimeout(() => loadGrid(search.value.trim()), 250);
       });
 
+      let uploading=false;
       async function uploadFile(file: File) {
+        if(uploading)return;
         if (file.size > 5 * 1024 * 1024) { alert('File terlalu besar. Maks 5MB.'); return; }
+        uploading=true;
         uploadStatus.style.display = 'block';
         uploadStatus.textContent = 'Mengupload…';
         const fd = new FormData();
         fd.append('file', file);
         fd.append('folder', folder);
+        fd.append('assetKind', root.dataset.assetKind || 'photo');
         try {
           const res = await fetch('/api/upload', { method: 'POST', body: fd });
           const data = await res.json();
-          if (data.url) {
+          if (res.ok && data.url) {
             setValue(data.url);
-            uploadStatus.textContent = 'Berhasil!';
-            closeModal();
+            uploadStatus.textContent = data.warning || 'Berhasil!';
+            if(!data.warning)closeModal();
           } else {
             throw new Error(data.error || 'Upload gagal');
           }
         } catch (e: any) {
           uploadStatus.textContent = 'Gagal: ' + e.message;
-        }
+        } finally { uploading=false;fileInput.value=''; }
       }
 
       ['dragenter', 'dragover'].forEach((ev) => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); }));

@@ -8,10 +8,7 @@ export function imageWidth(raw: string | null): number | null {
   return IMAGE_WIDTHS.find(size => size >= width) ?? null;
 }
 
-// Only our own media can be resized; this never proxies an arbitrary remote URL.
-export function thumbnailUrl(source: string, width: number, origin: string, mediaBase?: string): string {
-  const size = imageWidth(String(width));
-  if (!size) throw new Error('Invalid thumbnail width');
+export function mediaKey(source: string, origin: string, mediaBase?: string): string | null {
   try {
     const url = new URL(source, origin);
     let key: string | undefined;
@@ -21,7 +18,19 @@ export function thumbnailUrl(source: string, width: number, origin: string, medi
       const base = new URL(mediaBase.replace(/\/$/, '') + '/', origin);
       if (url.origin === base.origin && url.pathname.startsWith(base.pathname)) key = url.pathname.slice(base.pathname.length);
     }
-    if (!key || url.username || url.password || !['http:', 'https:'].includes(url.protocol)) return source;
+    if (!key || url.username || url.password || !['http:', 'https:'].includes(url.protocol)) return null;
+    return key;
+  } catch { return null; }
+}
+
+// Only our own media can be resized; this never proxies an arbitrary remote URL.
+export function thumbnailUrl(source: string, width: number, origin: string, mediaBase?: string): string {
+  const size = imageWidth(String(width));
+  if (!size) throw new Error('Invalid thumbnail width');
+  const key=mediaKey(source,origin,mediaBase);
+  if(!key)return source;
+  try {
+    const url=new URL(source,origin);
     url.searchParams.set('w', String(size));
     return `/api/image/${key}${url.search}${url.hash}`;
   } catch { return source; }

@@ -26,5 +26,5 @@ export async function imageResponse(request: Request, key: string, load: (key: s
       cache = 'no-store';
     }
   }
-  return new Response(bytes, { headers: { 'Content-Type': contentType, 'Cache-Control': cache } });
+  return new Response(bytes, { headers: { 'Content-Type': contentType, 'Cache-Control': cache, 'X-Content-Type-Options':'nosniff', ...(!contentType.startsWith('image/')?{'Content-Disposition':'attachment'}:{}) } });
 }

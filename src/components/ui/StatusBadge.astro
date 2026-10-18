@@ -1,5 +1,5 @@
 ---
-interface Props { label:string; tone?:'success'|'warning'|'danger'|'info'|'neutral' }
-const {label,tone='neutral'}=Astro.props;
+interface Props { label:string; tone?:'success'|'warning'|'danger'|'info'|'neutral'; icon?:string }
+const {label,tone='neutral',icon}=Astro.props;
 ---
-<span class="status-badge" data-tone={tone}>{label}</span>
+<span class="status-badge" data-tone={tone}>{icon && <span aria-hidden="true">{icon}</span>}{label}</span>

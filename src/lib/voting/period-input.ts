@@ -1,18 +1,28 @@
+import { validateOrganizations } from './election-type-input';
+
 export class PeriodError extends Error {
   constructor(public code: string) { super(code); }
 }
 
-export type PeriodInput = { slug: string; name: string; academicYear: string; opensAt: Date; closesAt: Date; isTest: boolean };
+export type PeriodInput = { slug: string; name: string; academicYear: string; opensAt: Date; closesAt: Date; isTest: boolean; organizations: string[] };
 export type PeriodConfig = { name: string; academicYear: string; opensAt: Date; closesAt: Date };
 export type PeriodExtensionInput = { adminPassword: string; reasonCode: string };
 
-export function validatePeriodClose(value: unknown): { adminPassword: string; early: boolean } {
+export function validateCloseReason(early: boolean, value: unknown): string | undefined {
+  if (value === undefined && !early) return undefined;
+  if (typeof value !== 'string' || value.trim().length < 10 || value.trim().length > 500) throw new PeriodError('INVALID_INPUT');
+  return value.trim();
+}
+
+export function validatePeriodClose(value: unknown): { adminPassword: string; early: boolean; reason?: string } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PeriodError('INVALID_INPUT');
   const input = value as Record<string, unknown>;
-  if (Object.keys(input).some((key) => !['adminPassword', 'early'].includes(key)) ||
+  if (Object.keys(input).some((key) => !['adminPassword', 'early', 'reason'].includes(key)) ||
       typeof input.adminPassword !== 'string' || !input.adminPassword || input.adminPassword.length > 256 ||
       (input.early !== undefined && typeof input.early !== 'boolean')) throw new PeriodError('INVALID_INPUT');
-  return { adminPassword: input.adminPassword, early: input.early === true };
+  const early = input.early === true;
+  const reason = validateCloseReason(early, input.reason);
+  return { adminPassword: input.adminPassword, early, ...(reason === undefined ? {} : { reason }) };
 }
 
 export function validatePeriodExtension(value: unknown): PeriodExtensionInput {
@@ -48,7 +58,7 @@ export function validateExpectedPeriodConfig(value: unknown): PeriodConfig {
 export function validatePeriodInput(value: unknown): PeriodInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PeriodError('INVALID_INPUT');
   const v = value as Record<string, unknown>;
-  if (Object.keys(v).some((key) => !['slug', 'name', 'academicYear', 'opensAt', 'closesAt', 'isTest'].includes(key)) ||
+  if (Object.keys(v).some((key) => !['slug', 'name', 'academicYear', 'opensAt', 'closesAt', 'isTest', 'organizations'].includes(key)) ||
       (v.isTest !== undefined && typeof v.isTest !== 'boolean') ||
       typeof v.slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v.slug) || v.slug.length > 64 ||
       typeof v.name !== 'string' || !v.name.trim() || v.name.trim().length > 120 ||
@@ -57,5 +67,5 @@ export function validatePeriodInput(value: unknown): PeriodInput {
   const opensAt = new Date(v.opensAt);
   const closesAt = new Date(v.closesAt);
   if (!Number.isFinite(opensAt.getTime()) || !Number.isFinite(closesAt.getTime()) || closesAt <= opensAt) throw new PeriodError('INVALID_SCHEDULE');
-  return { slug: v.slug, name: v.name.trim(), academicYear: v.academicYear.trim(), opensAt, closesAt, isTest: v.isTest === true };
+  return { slug: v.slug, name: v.name.trim(), academicYear: v.academicYear.trim(), opensAt, closesAt, isTest: v.isTest === true, organizations: validateOrganizations(v.organizations) };
 }

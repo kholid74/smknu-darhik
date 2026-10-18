@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { db } from '../prisma';
 import { requireEnv } from '../env';
 import { isActiveVotingSession, nextStudentSessionExpiry } from './student-session';
+import { votingProgress } from './contests';
 
 export class StudentSessionError extends Error {
   constructor(public code: string) { super(code); }
@@ -33,13 +34,15 @@ export async function extendStudentSession(sessionId: string, voterId: string, p
     const [{ now }] = await tx.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
     const voter = await tx.electionVoter.findUnique({ where: { id: voterId }, select: {
       credentialEnabled: true,
-      participation: { where: { hasVoted: true }, select: { organization: true } },
+      participation: { select: { organization: true, hasVoted: true } },
     } });
+    const contests = await tx.electionContest.findMany({ where: { periodId }, select: { organization: true, sortOrder: true } });
+    const complete = voter ? votingProgress(contests, voter.participation).complete : false;
     if (!sessions.length || !voter || !isActiveVotingSession({
       scope: sessions[0].scope, createdAt: sessions[0].createdAt, expiresAt: sessions[0].expiresAt,
       credentialEnabled: voter.credentialEnabled, periodState: period[0].state,
       opensAt: period[0].opensAt, closesAt: period[0].closesAt,
-      completed: voter.participation.length >= 4,
+      completed: complete,
     }, now)) {
       await tx.votingSession.deleteMany({ where: { id: sessionId, voterId } });
       return null;

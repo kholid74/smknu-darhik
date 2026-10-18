@@ -121,6 +121,7 @@ const dateLabel = (date: Date) => new Intl.DateTimeFormat('id-ID', { dateStyle: 
             if (pinInput instanceof HTMLInputElement) pinInput.value = '';
             if (response.status === 401) throw new Error('Identitas atau PIN tidak valid. Periksa kembali slip dari panitia.');
             if (response.status === 429) throw new Error('Terlalu banyak percobaan. Coba lagi setelah beberapa menit.');
+            if (data.error?.code === 'SESSION_CAPACITY') throw new Error('Tiga perangkat masih digunakan. Tunggu pemilih selesai atau keluar, lalu coba kembali.');
             if (response.status === 409) throw new Error('Periode pemilihan tidak sedang dibuka.');
             throw new Error('Belum dapat masuk. Periksa koneksi lalu coba kembali.');
           }

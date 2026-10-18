@@ -1,5 +1,5 @@
 # SMKDH
-Website sekolah SMKS NU Darul Hikam, dashboard pengelolaan konten dan data siswa, serta Portal Siswa untuk pemilihan empat organisasi.
+Website sekolah SMKS NU Darul Hikam, dashboard pengelolaan konten dan data siswa, serta portal pemilih siswa/guru.
 
 ## Menjalankan lokal
 Node.js >=22.12, npm, PostgreSQL Neon untuk lingkungan aplikasi. Salin .env.example menjadi .env dan isi konfigurasi yang diperlukan.
@@ -32,6 +32,7 @@ Dashboard memakai komponen Astro, Plus Jakarta Sans dengan fallback system-ui, d
 - [Rencana dan hasil pemeriksaan](docs/ui-ux-implementation-plan.md)
 - [Master siswa dan impor CSV](docs/data-siswa.md)
 - [Audit performa dan rencana perbaikan](docs/performance-audit.md)
+- [Kajian konversi upload WebP sebelum R2](docs/image-upload-webp-study.md)
 
 Aset logo, hero, dan foto kepala sekolah memakai varian statis terkompresi di `public/assets`; PNG asli tetap disimpan. Jalankan `npm run assets:optimize` untuk meregenerasi hasil dengan pemeriksaan ukuran/kualitas dasar. Berkas hasil ikut disimpan di Git sehingga build dan kunjungan halaman tidak memerlukan transformasi tambahan. Naikkan versi nama berkas ketika mengganti aset yang sudah diterbitkan; lihat laporan performa untuk ukuran dan hasil verifikasinya.
 
@@ -45,6 +46,7 @@ Cache HTML Vercel dibatasi 60 detik masa fresh pada `/fasilitas`, `/guru`, `/gal
 
 ## Pemilihan
 [Dokumentasi E-Voting](docs/e-voting/README.md) mencakup desain, API, schema, pengujian dan operasional.
+T01–T09 kontrak, schema, mekanisme dinamis dan UI master/susunan periode selesai lokal: [ADR](docs/e-voting/adr/0003-jenis-pemilihan-dinamis.md), [API](docs/e-voting/04-api.md), [status task](docs/e-voting/12-task-implementasi-jenis-dinamis.md). Hak pilih/sesi mengikuti jenis periode, snapshot hasil memakai versi 2. Menu Jenis Pemilihan dan susunan DRAFT tersedia lokal. Form calon mengikuti mode/jabatan snapshot dan kartu berfoto besar. Penutupan dengan pemilih absen/parsial tersedia dengan alasan, password dan konfirmasi; hasil tetap perlu publikasi terpisah. Hasil publik memiliki foto besar, donut partisipasi, grafik per jenis dan tampilan cetak. CTA hasil dashboard selesai dengan tab baru aman. Upload T10 dan implementasi/regresi T11 tersedia lokal: endpoint hasil internal, status publikasi401/429 dan6tes lintas koneksi PostgreSQL lulus. Verifikasi R2/hosted, perangkat dan deployment masih tersisa; Schema Neon sudah dimigrasi 17 Oktober; empat periode sampel dihapus setelah backup teruji, master tetap. [Catatan migrasi](docs/e-voting/13-catatan-migrasi-neon.md). Deployment aplikasi masih tertunda. Jangan deploy paket sebagian. Simulator memakai schema dinamis; pengujian SQL/Prisma memakai PGlite terisolasi (232 tes regresi +6tes PostgreSQL terpisah dan37skenario browser lulus).
 Route utama: /admin/e-voting, /admin/siswa, /admin/kelas, /siswa/masuk, /siswa.
 Kesiapan periode ditampilkan sebagai panduan; validasi akhir tetap dilakukan server dalam transaksi. Ballot anonim tetap immutable dan audit append-only.
 

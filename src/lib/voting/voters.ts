@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { newTeacherCode, voterIdentifier } from './voter-identity';
 import { db } from '../prisma';
-import { VotingOrganization } from '@prisma/client';
+import { orderedContests } from './contests';
 import { PeriodError } from './period-input';
 import { RosterError, type RosterStudentInput, type RosterVoterSnapshot } from './voter-roster-input';
 import { reauthenticateAdmin } from './periods';
@@ -39,6 +39,7 @@ export async function syncMasterRoster(periodId: string, actorAccountId: string,
   return db.$transaction(async (tx) => {
     await assertRosterEditable(tx, periodId, true);
     const period = await tx.electionPeriod.findUniqueOrThrow({ where: { id: periodId }, select: { academicYear: true } });
+    const organizations = orderedContests(await tx.electionContest.findMany({ where: { periodId }, select: { organization: true, sortOrder: true } })).map(c => c.organization);
     const students = await tx.student.findMany({ where: { id: { in: selected }, schoolClass: { academicYear: period.academicYear } }, select: { id: true, nisn: true, name: true, className: true } });
     if (students.length !== selected.length) throw new RosterError('STUDENT_NOT_ELIGIBLE');
     const existing = await tx.electionVoter.findMany({ where: { periodId }, select: { studentId: true, nisn: true } });
@@ -46,7 +47,7 @@ export async function syncMasterRoster(periodId: string, actorAccountId: string,
     if (plan.nisnConflict) throw new RosterError('NISN_ALREADY_ROSTERED');
     if (existing.length + plan.additions.length > 99) throw new RosterError('ROSTER_LIMIT');
     if (plan.additions.length) {
-      const inserts = buildMasterRosterInserts(periodId, plan.additions, Object.values(VotingOrganization));
+      const inserts = buildMasterRosterInserts(periodId, plan.additions, organizations);
       await tx.electionVoter.createMany({ data: inserts.voters });
       await tx.voterParticipation.createMany({ data: inserts.participation });
     }
@@ -147,6 +148,7 @@ export async function removeVoterFromRoster(periodId: string, voterId: string, e
 export async function syncTeacherRoster(periodId: string, teacherIds: string[], actorAccountId: string) {
   return db.$transaction(async (tx) => {
     await assertRosterEditable(tx, periodId, true);
+    const organizations = orderedContests(await tx.electionContest.findMany({ where: { periodId }, select: { organization: true, sortOrder: true } })).map(c => c.organization);
     const teachers = await tx.teacher.findMany({ where: { id: { in: teacherIds } }, select: { id: true, name: true } });
     if (teachers.length !== teacherIds.length) throw new RosterError('TEACHER_NOT_FOUND');
     const existing = await tx.electionVoter.findMany({ where: { periodId }, select: { teacherId: true } });
@@ -157,7 +159,7 @@ export async function syncTeacherRoster(periodId: string, teacherIds: string[], 
       teacherId: teacher.id, loginCode: newTeacherCode(), name: teacher.name, className: 'Guru', credentialEnabled: false}));
     if (voters.length) {
       await tx.electionVoter.createMany({data: voters});
-      await tx.voterParticipation.createMany({data: voters.flatMap(voter => Object.values(VotingOrganization).map(organization => ({voterId: voter.id, periodId, organization})))});
+      await tx.voterParticipation.createMany({data: voters.flatMap(voter => organizations.map(organization => ({voterId: voter.id, periodId, organization})))});
     }
     await tx.votingAuditEvent.create({data: {periodId, actorAccountId, event: 'ROSTER_TEACHERS_SYNCED', targetId: periodId,
       detail: {selected: teacherIds.length, added: additions.length, teacherIds}}});

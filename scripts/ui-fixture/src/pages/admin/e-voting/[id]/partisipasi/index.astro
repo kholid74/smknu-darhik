@@ -1,0 +1,7 @@
+---
+import Participation from '../../../../../../../../src/pages/admin/e-voting/[id]/partisipasi/index.astro';
+export function getStaticPaths(){return [{params:{id:'10000000-0000-4000-8000-000000000001'}}];}
+Astro.locals.principal={roles:['superadmin']};
+Astro.locals.session={sub:'qa-admin',role:'superadmin',roles:['superadmin']};
+---
+<Participation/>

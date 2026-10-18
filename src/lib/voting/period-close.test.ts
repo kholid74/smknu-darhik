@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import {readFile, readdir} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {PGlite} from '@electric-sql/pglite';
-import {VotingOrganization, type Prisma} from '@prisma/client';
+import type {Prisma} from '@prisma/client';
 import {closePeriodTransaction} from './period-close';
 
 // Real PostgreSQL aggregates and rollback, with only the Prisma delegates replaced; no environment or Neon access.
 const pg = new PGlite();
 const periodId = '10000000-0000-4000-8000-000000000010';
 const studentIds = [randomUUID(), randomUUID()];
-const organizations = Object.values(VotingOrganization);
+const organizations = ['OSIS','CLUB','IPNU','IPPNU'];
 let queries: string[];
 
 before(async () => {
@@ -18,6 +18,7 @@ before(async () => {
   for (const entry of (await readdir(root, {withFileTypes: true})).filter(item => item.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
     await pg.exec(await readFile(new URL(entry.name + '/migration.sql', root), 'utf8'));
   }
+  await pg.exec(`INSERT INTO "ElectionType" (code,name,"candidateMode","chairLabel","viceChairLabel","sortOrder") VALUES ('CLUB','Club','OPTIONAL_VICE','Chair','Vice',6)`);
 });
 after(async () => { await pg.close(); });
 beforeEach(async () => {
@@ -30,12 +31,13 @@ beforeEach(async () => {
 });
 afterEach(async () => { await pg.exec('ROLLBACK'); });
 
-async function seed(votes = [4, 4], id = periodId, chairOnly = false, teacherIndex = -1) {
+async function seed(votes = [4, 4], id = periodId, chairOnly = false, teacherIndex = -1, deadline = false, future = false) {
+  const cast: Array<{voterId:string;organization:string}>=[];
   await pg.query(`INSERT INTO "ElectionPeriod" (id,slug,name,"academicYear","opensAt","closesAt")
     VALUES ($1,$2,'Synthetic close test','2026/2027',now()+interval '1 day',now()+interval '2 days')`, [id, 'test-' + id]);
-  for (const organization of organizations) {
+  for (const [i, organization] of organizations.entries()) {
     const candidateId = randomUUID();
-    await pg.query('INSERT INTO "ElectionContest" ("periodId",organization) VALUES ($1,$2)', [id, organization]);
+    await pg.query('INSERT INTO "ElectionContest" ("periodId",organization,"sortOrder") VALUES ($1,$2,$3)', [id, organization, i+1]);
     await pg.query('INSERT INTO "CandidatePair" (id,"periodId",organization,"ballotNumber",vision,mission) VALUES ($1,$2,$3,1,$4,$5)', [candidateId, id, organization, 'Vision', 'Mission']);
     for (const [index, studentId] of studentIds.entries()) {
       if (chairOnly && index === 1) continue;
@@ -54,13 +56,17 @@ async function seed(votes = [4, 4], id = periodId, chairOnly = false, teacherInd
     }
     for (const [orgIndex, organization] of organizations.entries()) {
       const voted = orgIndex < voteCount;
-      await pg.query('INSERT INTO "VoterParticipation" ("voterId","periodId",organization,"hasVoted") VALUES ($1,$2,$3,$4)', [voterId, id, organization, voted]);
-      if (voted) await pg.query(`INSERT INTO "Ballot" (id,"periodId",organization,"candidateId")
-        SELECT $1,$2,$3,id FROM "CandidatePair" WHERE "periodId"=$2 AND organization=$3`, [randomUUID(), id, organization]);
+      await pg.query('INSERT INTO "VoterParticipation" ("voterId","periodId",organization) VALUES ($1,$2,$3)', [voterId, id, organization]);
+      if(voted)cast.push({voterId,organization});
     }
     await pg.query(`INSERT INTO "VotingSession" (id,"voterId","tokenHash","lastSeenAt","expiresAt") VALUES ($1,$2,$3,now(),now()+interval '5 minutes')`, [randomUUID(), voterId, randomUUID().replaceAll('-', '').repeat(2)]);
   }
-  if (id === periodId) await pg.query(`UPDATE "ElectionPeriod" SET state='SCHEDULED',"opensAt"=now()-interval '1 hour',"closesAt"=now()+interval '1 hour' WHERE id=$1`, [id]);
+  if (id === periodId) await pg.query(`UPDATE "ElectionPeriod" SET state='SCHEDULED',"opensAt"=clock_timestamp()+($2 * interval '1 hour'),"closesAt"=clock_timestamp()+($3 * interval '1 second') WHERE id=$1`, [id,future?1:-1,deadline?1:7200]);
+  for(const {voterId,organization} of cast){
+    await pg.query('UPDATE "VoterParticipation" SET "hasVoted"=true WHERE "voterId"=$1 AND organization=$2',[voterId,organization]);
+    await pg.query(`INSERT INTO "Ballot" (id,"periodId",organization,"candidateId") SELECT $1,$2,organization,id FROM "CandidatePair" WHERE "periodId"=$2 AND organization=$3`,[randomUUID(),id,organization]);
+  }
+  if(deadline)await new Promise(resolve=>setTimeout(resolve,1100));
   await pg.exec('SET CONSTRAINTS ALL IMMEDIATE; SET CONSTRAINTS ALL DEFERRED');
 }
 
@@ -74,11 +80,13 @@ const tx = {
   electionPeriod: {
     findUniqueOrThrow: async ({where}: {where: {id: string}}) => {
       const period = (await pg.query('SELECT * FROM "ElectionPeriod" WHERE id=$1', [where.id])).rows[0];
-      const voters = (await pg.query('SELECT id FROM "ElectionVoter" WHERE "periodId"=$1', [where.id])).rows;
+      const voters = (await pg.query<any>('SELECT id FROM "ElectionVoter" WHERE "periodId"=$1', [where.id])).rows;
+      for(const voter of voters) voter.participation=(await pg.query('SELECT organization,"hasVoted" FROM "VoterParticipation" WHERE "voterId"=$1',[voter.id])).rows;
+      const stored=(await pg.query<any>('SELECT * FROM "ElectionContest" WHERE "periodId"=$1 ORDER BY "sortOrder"',[where.id])).rows;
       const candidates = (await pg.query<{id: string; organization: string}>('SELECT * FROM "CandidatePair" WHERE "periodId"=$1', [where.id])).rows;
       const members = (await pg.query<{candidatePairId: string}>('SELECT * FROM "CandidateMember" WHERE "periodId"=$1', [where.id])).rows;
-      return {...period, voters, contests: organizations.map(organization => ({organization,
-        candidates: candidates.filter(item => item.organization === organization).map(candidate => ({...candidate, members: members.filter(member => member.candidatePairId === candidate.id)}))}))};
+      return {...period, voters, contests: stored.map(contest => ({...contest,
+        candidates: candidates.filter(item => item.organization === contest.organization).map(candidate => ({...candidate, members: members.filter(member => member.candidatePairId === candidate.id)}))}))};
     },
     update: async ({where, data}: {where: {id: string}; data: {state: string; closedAt: Date; resultSnapshot: unknown}}) =>
       pg.query('UPDATE "ElectionPeriod" SET state=$2,"closedAt"=$3,"resultSnapshot"=$4::jsonb WHERE id=$1', [where.id, data.state, data.closedAt, JSON.stringify(data.resultSnapshot)]),
@@ -91,10 +99,10 @@ const tx = {
       [randomUUID(), data.periodId, data.actorAccountId, data.event, data.targetId, data.reasonCode, JSON.stringify(data.detail)])},
 } as unknown as Prisma.TransactionClient;
 
-async function close(early = true) {
+async function close(early = true, reason: string | undefined = early ? 'Keputusan panitia sesuai berita acara' : undefined) {
   await pg.exec('SAVEPOINT close_attempt');
   try {
-    const result = await closePeriodTransaction(tx, periodId, 'close-admin', early);
+    const result = await closePeriodTransaction(tx, periodId, 'close-admin', early, reason);
     await pg.exec('RELEASE SAVEPOINT close_attempt');
     return result;
   } catch (error) {
@@ -131,45 +139,50 @@ test('all four votes per voter permit early closure; schedule, master, anonymous
   assert.equal((await pg.query('SELECT * FROM "Student"')).rows.length, 2);
   assert.equal((await pg.query('SELECT * FROM "VotingSession"')).rows.length, 1);
   const audit = (await pg.query<{reasonCode: string; detail: {earlyClose: boolean; scheduledClosesAt: string}}> ('SELECT * FROM "VotingAuditEvent"')).rows[0];
-  assert.equal(audit.reasonCode, 'ALL_VOTERS_COMPLETED');
+  assert.equal(audit.reasonCode, 'COMMITTEE_EARLY_CLOSE');
   assert.equal(audit.detail.earlyClose, true);
   assert.equal(audit.detail.scheduledClosesAt, originalSchedule.toISOString());
   await close();
   await pg.query('UPDATE "ElectionPeriod" SET state=$2 WHERE id=$1', [periodId, 'ARCHIVED']);
   assert.equal((await close()).state, 'ARCHIVED');
   assert.equal((await pg.query('SELECT * FROM "VotingAuditEvent"')).rows.length, 1);
+  await pg.query('UPDATE "Account" SET active=false');
+  await assert.rejects(close(),{code:'INVALID_REAUTH'});
 });
 
-test('early close waits for teachers as well as students and publishes one combined tally',async()=>{
+test('early close preserves partial teacher votes in one combined tally without publishing',async()=>{
   await seed([4,3],periodId,true,1);
-  await assert.rejects(close(),{code:'EARLY_CLOSE_INCOMPLETE'});
-  assert.ok(!queries.some(sql=>sql.includes('FROM "Ballot"')));
-  await pg.query(`UPDATE "VoterParticipation" SET "hasVoted"=true WHERE "periodId"=$1 AND organization='IPPNU'`,[periodId]);
-  await pg.query(`INSERT INTO "Ballot" (id,"periodId",organization,"candidateId") SELECT $1,"periodId",organization,id FROM "CandidatePair" WHERE "periodId"=$2 AND organization='IPPNU'`,[randomUUID(),periodId]);
   await close();
   const snapshot=(await storedPeriod()).resultSnapshot!;
-  assert.equal(snapshot.eligibleVoters,2);assert.equal(snapshot.complete,2);
-  assert.ok(snapshot.contests.every(contest=>contest.votesCast===2));
+  assert.equal(snapshot.eligibleVoters,2);assert.equal(snapshot.complete,1);assert.equal(snapshot.partial,1);
+  assert.deepEqual(snapshot.contests.map(contest=>contest.votesCast),[2,2,2,1]);
+  assert.equal((await storedPeriod()).publishedAt,null);
   assert.doesNotMatch(JSON.stringify(snapshot),/teacherId|studentId|voterType|byType|GURU-/);
 });
 
-for (const votes of [[4, 3], [4, 0], []]) {
-  test('early closure rejects incomplete/empty roster before reading candidate tally: ' + JSON.stringify(votes), async () => {
+for (const votes of [[4, 3], [4, 0], [2,0], [0,0]]) {
+  test('early closure accepts partial/absent/disabled voters and never invents ballots: ' + JSON.stringify(votes), async () => {
     await seed(votes);
     await pg.query('UPDATE "ElectionVoter" SET "credentialEnabled"=false,"pinHash"=NULL,"pinFingerprint"=NULL WHERE nisn=$1', ['9900000001']);
-    await assert.rejects(close(), {code: 'EARLY_CLOSE_INCOMPLETE'});
-    assert.ok(!queries.some(sql => sql.includes('FROM "Ballot"')));
-    assert.equal((await pg.query('SELECT * FROM "VotingSession"')).rows.length, votes.length);
-    await assertOpen();
+    await close();
+    const snapshot=(await storedPeriod()).resultSnapshot!;
+    assert.equal(snapshot.complete,votes.filter(v=>v===4).length);
+    assert.equal(snapshot.partial,votes.filter(v=>v>0&&v<4).length);
+    assert.equal((await pg.query('SELECT * FROM "VotingSession"')).rows.length,0);
+    assert.equal((await pg.query('SELECT * FROM "ElectionVoter"')).rows.length,2);
+    assert.equal((await pg.query('SELECT * FROM "Ballot"')).rows.length,votes.reduce((a,b)=>a+b,0));
+    assert.equal(snapshot.contests.reduce((a,c)=>a+c.votesCast,0),votes.reduce((a,b)=>a+b,0));
   });
 }
 
 test('early closure requires explicit opt-in, an opened period and an active actor', async () => {
-  await seed();
+  await seed([0,0],periodId,false,-1,false,true);
   await assert.rejects(close(false), {code: 'BEFORE_DEADLINE'});
+  await assert.rejects(close(), {code: 'BEFORE_DEADLINE'});
   await pg.query(`UPDATE "ElectionPeriod" SET "opensAt"=now()+interval '10 minutes' WHERE id=$1`, [periodId]);
   await assert.rejects(close(), {code: 'BEFORE_DEADLINE'});
   await pg.query(`UPDATE "ElectionPeriod" SET "opensAt"=now()-interval '1 hour' WHERE id=$1`, [periodId]);
+  await assert.rejects(close(false), {code: 'BEFORE_DEADLINE'});
   await pg.query('UPDATE "Account" SET active=false');
   await assert.rejects(close(), {code: 'INVALID_REAUTH'});
   await assertOpen();
@@ -177,11 +190,13 @@ test('early closure requires explicit opt-in, an opened period and an active act
 
 for (const early of [false, true]) {
   test('normal deadline closure preserves partial turnout, including a stale early-close form: ' + early, async () => {
-    await seed([4, 2]);
-    await pg.query(`UPDATE "ElectionPeriod" SET "closesAt"=now()-interval '1 minute' WHERE id=$1`, [periodId]);
+    await seed([4, 2],periodId,false,-1,true);
+    if(early){await assert.rejects(close(true,'short'),{code:'INVALID_INPUT'});await assertOpen();}
     await close(early);
     assert.equal((await storedPeriod()).resultSnapshot!.partial, 1);
     assert.equal((await pg.query<{reasonCode: string}>('SELECT "reasonCode" FROM "VotingAuditEvent"')).rows[0].reasonCode, 'DEADLINE_REACHED');
+    const audit=(await pg.query<{detail:{reason?:string}}>('SELECT detail FROM "VotingAuditEvent"')).rows[0];
+    assert.equal(audit.detail.reason,early?'Keputusan panitia sesuai berita acara':undefined);
   });
 }
 
@@ -192,14 +207,30 @@ test('completion does not bypass ballot reconciliation', async () => {
   await assertOpen();
 });
 
-test('audit failure rolls back closed state, snapshot and session revocation together', async () => {
-  await seed();
-  await pg.exec(`CREATE FUNCTION force_close_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture audit failure'; END $$;
-    CREATE TRIGGER force_close_failure BEFORE INSERT ON "VotingAuditEvent" FOR EACH ROW EXECUTE FUNCTION force_close_failure();`);
-  await assert.rejects(close(), /fixture audit failure/);
+for(const shape of ['missing-right','unknown-right','missing-contest','empty-roster'])test('close rejects inconsistent reads with a safe reconciliation code: '+shape,async()=>{
+  await seed([0,0]);
+  // Inject a corrupt read without weakening the isolated database's integrity triggers.
+  const broken={...tx,electionPeriod:{...tx.electionPeriod,findUniqueOrThrow:async(args:any)=>{
+    const record=await tx.electionPeriod.findUniqueOrThrow(args) as any;
+    if(shape==='missing-right')record.voters[0].participation.pop();
+    if(shape==='unknown-right')record.voters[0].participation[0].organization='UNKNOWN';
+    if(shape==='missing-contest')record.contests=[];
+    if(shape==='empty-roster')record.voters=[];
+    return record;
+  }}} as unknown as Prisma.TransactionClient;
+  await assert.rejects(closePeriodTransaction(broken,periodId,'close-admin',true,'Keputusan panitia sesuai berita acara'),{code:'RECONCILIATION_FAILED'});
+  await assertOpen();assert.equal((await pg.query('SELECT * FROM "VotingSession"')).rows.length,2);
+});
+
+for(const phase of ['snapshot','revoke','audit'])test(phase+' failure rolls back closed state, snapshot and session revocation together', async () => {
+  await seed([2,0]);
+  const action=phase==='snapshot'?'UPDATE ON "ElectionPeriod"':phase==='revoke'?'DELETE ON "VotingSession"':'INSERT ON "VotingAuditEvent"';
+  await pg.exec(`CREATE FUNCTION force_close_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'fixture close failure'; END $$;
+    CREATE TRIGGER force_close_failure BEFORE ${action} FOR EACH ROW EXECUTE FUNCTION force_close_failure();`);
+  await assert.rejects(close(), /fixture close failure/);
   await assertOpen();
   assert.equal((await pg.query('SELECT * FROM "VotingSession"')).rows.length, 2);
-  assert.equal((await pg.query('SELECT * FROM "Ballot"')).rows.length, 8);
+  assert.equal((await pg.query('SELECT * FROM "Ballot"')).rows.length, 2);
 });
 
 test('chair-only candidates pass deferred DB constraints, close and project as a valid public snapshot', async () => {
@@ -220,9 +251,9 @@ test('database still rejects a vice without a chair and prevents editing a runni
   await pg.exec('SAVEPOINT invalid_candidate');
   const draftId=randomUUID(),candidateId=randomUUID();
   await pg.query(`INSERT INTO "ElectionPeriod" (id,slug,name,"academicYear","opensAt","closesAt") VALUES ($1,$2,'Draft','2026/2027',now()+interval '1 day',now()+interval '2 days')`,[draftId,'draft-'+draftId]);
-  await pg.query('INSERT INTO "ElectionContest" ("periodId",organization) VALUES ($1,$2)',[draftId,'OSIS']);
+  await pg.query('INSERT INTO "ElectionContest" ("periodId",organization,"sortOrder") VALUES ($1,$2,1)',[draftId,'OSIS']);
   await pg.query('INSERT INTO "CandidatePair" (id,"periodId",organization,"ballotNumber",vision,mission) VALUES ($1,$2,$3,1,$4,$5)',[candidateId,draftId,'OSIS','Vision','Mission']);
   await pg.query(`INSERT INTO "CandidateMember" ("candidatePairId","periodId",organization,"studentId",position,"nameSnapshot","classSnapshot") VALUES ($1,$2,$3,$4,'VICE_CHAIR','Synthetic','QA')`,[candidateId,draftId,'OSIS',studentIds[0]]);
-  await assert.rejects(pg.exec('SET CONSTRAINTS ALL IMMEDIATE'),/one chair/);
+  await assert.rejects(pg.exec('SET CONSTRAINTS ALL IMMEDIATE'),/candidate composition/);
   await pg.exec('ROLLBACK TO SAVEPOINT invalid_candidate; RELEASE SAVEPOINT invalid_candidate');
 });

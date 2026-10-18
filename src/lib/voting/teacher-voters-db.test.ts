@@ -9,7 +9,8 @@ const legacyPeriod=randomUUID(),legacyStudent=randomUUID(),legacyVoter=randomUUI
 let period: string;
 before(async()=>{
   const root=new URL('../../../prisma/migrations/',import.meta.url);
-  for(const entry of (await readdir(root,{withFileTypes:true})).filter(item=>item.isDirectory()).sort((a,b)=>a.name.localeCompare(b.name))) {
+  // Historical teacher migration regression; dynamic migration is tested separately.
+  for(const entry of (await readdir(root,{withFileTypes:true})).filter(item=>item.isDirectory() && item.name <= '20261016120000_draft_setup_editability').sort((a,b)=>a.name.localeCompare(b.name))) {
     if(entry.name==='20261016100000_teacher_election_voters') {
       await pg.query(`INSERT INTO "Student" (id,nisn,name,"className") VALUES ($1,'0012345678','Legacy','X')`,[legacyStudent]);
       await pg.query(`INSERT INTO "ElectionPeriod" (id,slug,name,"academicYear","opensAt","closesAt") VALUES ($1,'legacy','Legacy','2026/2027',now()+interval '1 day',now()+interval '2 days')`,[legacyPeriod]);

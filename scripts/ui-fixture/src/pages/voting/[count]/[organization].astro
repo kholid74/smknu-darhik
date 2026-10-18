@@ -1,0 +1,7 @@
+---
+import Ballot from '../../../../../../src/pages/siswa/e-voting/[slug]/pilih/[organization].astro';
+import {votingFixture,session} from '../../../voting';
+export function getStaticPaths(){return [1,5,6].map(n=>({params:{count:String(n),organization:n===1?'PRADANA_PUTRI':n===5?'IPPNU':'NEW_TYPE'}}));}
+Astro.locals.votingSession=session;
+---
+<Ballot data={votingFixture(Number(Astro.params.count)).data}/>

@@ -7,6 +7,8 @@ import { db } from './lib/prisma';
 import { tokenHash } from './lib/voting/student-auth';
 import { isActiveVotingSession, isStudentSessionCookie, studentRouteAccess, VOTING_SESSION_COOKIE } from './lib/voting/student-session';
 import { voterPortal } from './lib/voting/voter-identity';
+import { json as votingJson } from './lib/voting/admin-http';
+import { votingProgress } from './lib/voting/contests';
 
 // Gerbang otorisasi terpusat untuk realm Internal (/admin + API tulis).
 // Guard inline di tiap halaman tetap ada sebagai defense-in-depth (dihapus bertahap).
@@ -54,6 +56,7 @@ function apiCapability(path: string, method: string): string | undefined {
     if (/\/test-cleanup\/?$/.test(path)) return 'evoting.hapus-uji';
     if (method === 'GET' && /\/participation\/voters\/?$/.test(path)) return 'evoting.partisipasi';
     if (method === 'GET' && /\/participation\/?$/.test(path)) return 'evoting.partisipasi';
+    if (method === 'GET' && /\/results\/?$/.test(path)) return 'evoting.hasil';
     if (method === 'POST' && /\/voters(?:\/teachers)?\/?$/.test(path)) return 'evoting.pemilih';
     if (['PATCH', 'DELETE'].includes(method) && /\/voters\/[0-9a-f-]+\/?$/i.test(path)) return 'evoting.pemilih';
     if (method === 'POST' && /\/close\/?$/.test(path)) return 'evoting.tutup';
@@ -66,6 +69,11 @@ function apiCapability(path: string, method: string): string | undefined {
     return method === 'GET' ? 'evoting.lihat' : 'evoting.kelola';
   }
   return undefined;
+}
+
+function apiDenied(path: string, status: 401 | 403) {
+  const code = status === 401 ? 'UNAUTHORIZED' : 'FORBIDDEN';
+  return path.startsWith('/api/admin/e-voting/') ? votingJson({ error: { code } }, status) : new Response(status === 401 ? 'Unauthorized' : 'Forbidden', { status });
 }
 
 const authorization = defineMiddleware(async (context, next) => {
@@ -87,17 +95,23 @@ const authorization = defineMiddleware(async (context, next) => {
       where: { tokenHash: tokenHash(rawToken) },
       select: { id: true, scope: true, voterId: true, createdAt: true, lastSeenAt: true, expiresAt: true,
         voter: { select: { periodId: true, voterType: true, credentialEnabled: true,
-          participation: { where: { hasVoted: true }, select: { organization: true } },
-          period: { select: { slug: true, state: true, opensAt: true, closesAt: true } },
+          participation: { select: { organization: true, hasVoted: true } },
+          period: { select: { slug: true, state: true, opensAt: true, closesAt: true,
+            contests: { select: { organization: true, sortOrder: true } } } },
         } },
       },
     }) : null;
     const [{ now }] = await db.$queryRaw<[{ now: Date }]>`SELECT clock_timestamp() AS "now"`;
-    const active = record && isActiveVotingSession({
+    let validRights = false, completed = false;
+    if (record) {
+      try { completed = votingProgress(record.voter.period.contests, record.voter.participation).complete; validRights = true; }
+      catch { /* Invalid rights must not open a voting session. */ }
+    }
+    const active = record && validRights && isActiveVotingSession({
       scope: record.scope, createdAt: record.createdAt, expiresAt: record.expiresAt,
       credentialEnabled: record.voter.credentialEnabled, periodState: record.voter.period.state,
       opensAt: record.voter.period.opensAt, closesAt: record.voter.period.closesAt,
-      completed: record.voter.participation.length >= 4,
+      completed,
     }, now);
     if (!active) {
       if (rawToken) context.cookies.delete(VOTING_SESSION_COOKIE, { path: '/', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
@@ -132,7 +146,7 @@ const authorization = defineMiddleware(async (context, next) => {
   const token = context.cookies.get('smkdh_token')?.value;
   const session = token ? await verifyToken(token) : null;
   if (!session) {
-    if (apiCap) return new Response('Unauthorized', { status: 401 });
+    if (apiCap) return apiDenied(path, 401);
     return context.redirect('/admin/login');
   }
 
@@ -148,7 +162,7 @@ const authorization = defineMiddleware(async (context, next) => {
     });
   }
   if (!principal) {
-    if (apiCap) return new Response('Unauthorized', { status: 401 });
+    if (apiCap) return apiDenied(path, 401);
     return context.redirect('/admin/login');
   }
 
@@ -176,7 +190,7 @@ const authorization = defineMiddleware(async (context, next) => {
       (needsVoterManagement && !can(principal, 'evoting.pemilih')) ||
       (needsVotingManagement && !can(principal, 'evoting.kelola')) ||
       (needsPinManagement && (!can(principal, 'evoting.pin') || !can(principal, 'evoting.pemilih')))) {
-    if (apiCap) return new Response('Forbidden', { status: 403 });
+    if (apiCap) return apiDenied(path, 403);
     return context.redirect('/admin?forbidden=1');
   }
 

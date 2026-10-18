@@ -1,0 +1,6 @@
+---
+import Periods from '../../../../../../src/pages/admin/e-voting/index.astro';
+Astro.locals.principal = { roles: ['superadmin'] };
+Astro.locals.session = { sub: 'qa-admin', role: 'superadmin', roles: ['superadmin'] };
+---
+<Periods />

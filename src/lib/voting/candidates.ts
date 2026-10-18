@@ -1,4 +1,3 @@
-import type { VotingOrganization } from '@prisma/client';
 import { db } from '../prisma';
 import { retryDatabaseRead } from '../database-read';
 import { CandidateError, type CandidateInput, type ExpectedCandidate } from './candidate-input';
@@ -14,9 +13,10 @@ async function lockEditablePeriod(tx: any, periodId: string) {
   const [{ now }] = await tx.$queryRawUnsafe('SELECT clock_timestamp() AS "now"');
   if (!['DRAFT', 'SCHEDULED'].includes(rows[0].state)) throw new CandidateError('INVALID_STATE');
   if (!canEditElectionSetup(rows[0], new Date(now))) throw new CandidateError('CANDIDATES_LOCKED');
+  return rows[0];
 }
 
-async function resolveMembers(tx: any, input: CandidateInput) {
+async function resolveMembers(tx: any, input: CandidateInput, previous: any[] = []) {
   const members = [
     { ...input.chair, position: 'CHAIR' },
     ...(input.viceChair ? [{ ...input.viceChair, position: 'VICE_CHAIR' }] : []),
@@ -25,33 +25,43 @@ async function resolveMembers(tx: any, input: CandidateInput) {
   if (students.length !== members.length) throw new CandidateError('INVALID_STUDENT');
   const byId = new Map<string, any>(students.map((student: any) => [student.id, student] as const));
   for (const member of members) {
-    if (member.photoUrl && !await tx.media.findFirst({ where: { url: member.photoUrl, kind: 'image' }, select: { id: true } })) {
+    if (member.photoUrl && !(await tx.$queryRawUnsafe('SELECT id FROM "Media" WHERE url=$1 AND kind=\'image\' LIMIT 1 FOR SHARE',member.photoUrl)).length) {
       throw new CandidateError('INVALID_PHOTO');
     }
   }
   return members.map((member) => {
     const student = byId.get(member.studentId) as any;
-    return { ...member, photoUrl: member.photoUrl ?? null, nameSnapshot: student.name, classSnapshot: student.className };
+    const historical = previous.find(old => old.studentId === member.studentId);
+    return { ...member, photoUrl: member.photoUrl ?? null, nameSnapshot: historical?.nameSnapshot ?? student.name, classSnapshot: historical?.classSnapshot ?? student.className };
   });
+}
+
+function assertExpected(pair: any, expected?: ExpectedCandidate) {
+  const chair = pair.members.find((member: any) => member.position === 'CHAIR');
+  const vice = pair.members.find((member: any) => member.position === 'VICE_CHAIR');
+  if (!expected || pair.ballotNumber !== expected.ballotNumber || pair.vision !== expected.vision || pair.mission !== expected.mission ||
+      chair?.studentId !== expected.chairStudentId || (vice?.studentId ?? null) !== expected.viceChairStudentId ||
+      (chair?.photoUrl ?? null) !== expected.chairPhotoUrl || (vice?.photoUrl ?? null) !== expected.viceChairPhotoUrl) {
+    throw new CandidateError('STALE_CANDIDATE');
+  }
 }
 
 export async function saveCandidatePair(periodId: string, input: CandidateInput, actorAccountId: string, candidateId?: string, expected?: ExpectedCandidate) {
   return db.$transaction(async (tx: any) => {
     await lockEditablePeriod(tx, periodId);
-    const members = await resolveMembers(tx, input);
-    if (!await tx.electionContest.findUnique({ where: { periodId_organization: { periodId, organization: input.organization } }, select: { periodId: true } })) {
+    const contest = await tx.electionContest.findUnique({ where: { periodId_organization: { periodId, organization: input.organization } }, select: { candidateModeSnapshot: true } });
+    if (!contest) {
       throw new CandidateError('INVALID_ORGANIZATION');
     }
-
+    if (contest.candidateModeSnapshot === 'SINGLE' && input.viceChair) throw new CandidateError('INVALID_CANDIDATE_MODE');
     let pair: any;
     if (candidateId) {
       pair = await tx.candidatePair.findFirst({ where: { id: candidateId, periodId, organization: input.organization }, include: { members: true } });
       if (!pair) throw new CandidateError('NOT_FOUND');
-      if (!expected || pair.ballotNumber !== expected.ballotNumber || pair.vision !== expected.vision || pair.mission !== expected.mission ||
-          pair.members.find((member: any) => member.position === 'CHAIR')?.studentId !== expected.chairStudentId ||
-          (pair.members.find((member: any) => member.position === 'VICE_CHAIR')?.studentId ?? null) !== expected.viceChairStudentId) {
-        throw new CandidateError('STALE_CANDIDATE');
-      }
+      assertExpected(pair, expected);
+    }
+    const members = await resolveMembers(tx, input, pair?.members);
+    if (candidateId) {
       await tx.candidatePair.update({ where: { id: pair.id }, data: { ballotNumber: input.ballotNumber, vision: input.vision, mission: input.mission } });
       await tx.candidateMember.deleteMany({ where: { candidatePairId: pair.id } });
       await tx.candidateMember.createMany({ data: members.map((member) => ({ ...member, candidatePairId: pair!.id, periodId, organization: input.organization })) });
@@ -67,15 +77,16 @@ export async function saveCandidatePair(periodId: string, input: CandidateInput,
   });
 }
 
-export async function deleteCandidatePair(periodId: string, candidateId: string, actorAccountId: string) {
+export async function deleteCandidatePair(periodId: string, candidateId: string, actorAccountId: string, expected: ExpectedCandidate) {
   return db.$transaction(async (tx: any) => {
-    await lockEditablePeriod(tx, periodId);
+    const period = await lockEditablePeriod(tx, periodId);
     const pair = await tx.candidatePair.findFirst({
-      where: { id: candidateId, periodId }, include: { _count: { select: { ballots: true } } },
+      where: { id: candidateId, periodId }, include: { members: true, _count: { select: { ballots: true } } },
     });
     if (!pair) throw new CandidateError('NOT_FOUND');
+    assertExpected(pair, expected);
     if (pair._count.ballots) throw new CandidateError('CANDIDATE_HAS_BALLOTS');
-    if (await tx.candidatePair.count({ where: { periodId, organization: pair.organization } }) <= 1) throw new CandidateError('LAST_CANDIDATE');
+    if (period.state !== 'DRAFT' && await tx.candidatePair.count({ where: { periodId, organization: pair.organization } }) <= 1) throw new CandidateError('LAST_CANDIDATE');
     await tx.candidateMember.deleteMany({ where: { candidatePairId: candidateId } });
     await tx.candidatePair.delete({ where: { id: candidateId } });
     await tx.votingAuditEvent.create({ data: {

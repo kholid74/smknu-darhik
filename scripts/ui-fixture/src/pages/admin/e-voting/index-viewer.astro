@@ -1,0 +1,6 @@
+---
+import Periods from '../../../../../../src/pages/admin/e-voting/index.astro';
+Astro.locals.principal = { roles: ['guru'], grants: ['evoting.lihat'] };
+Astro.locals.session = { sub: 'qa-viewer', role: 'guru', roles: ['guru'] };
+---
+<Periods/>

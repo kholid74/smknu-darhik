@@ -1,273 +1,108 @@
-# Proposal Prisma dan invariant database
+# Schema dan constraint — target T01
 
-Status: fondasi schema dan migration additive sudah diterapkan di `prisma/schema.prisma` dan `prisma/migrations/20261011090000_e_voting_foundation`; `prisma validate`, `format`, dan `generate` lulus. Seluruh migrasi dan cleanup sampel diuji pada PostgreSQL dalam memori; pengujian transaksi suara end-to-end pada Neon belum dilakukan. Generator/provider yang ada dipertahankan. Perubahan tidak mengubah Alumni menjadi Student atau menjadikan role siswa internal sebagai daftar pemilih.
+**Pembaruan Neon 17 Oktober 2026:** migrasi schema dan cleanup empat periode yang disetujui sudah berhasil setelah backup teruji. Master dan audit lama tetap; deployment belum dilakukan. [Catatan pelaksanaan](13-catatan-migrasi-neon.md).
 
-## Ekstensi pemilih guru, 16 Oktober 2026
+Status: **T01–T04 selesai lokal 17 Oktober 2026; schema sudah diterapkan pada Neon; aplikasi belum dirilis**. [Prisma](../../prisma/schema.prisma), [migration](../../prisma/migrations/20261017090000_dynamic_election_types/migration.sql), [17 uji SQL](../../src/lib/voting/dynamic-types-db.test.ts), [uji runtime Prisma](../../src/lib/voting/dynamic-voting.test.ts), [ADR 0003](adr/0003-jenis-pemilihan-dinamis.md), [API](04-api.md), [operasional](07-operasional.md). Student/Teacher dan master sekolah tidak diganti. Parser dan rekonsiliasi snapshot v2 sudah dipakai lokal.
 
-Teacher master yang sudah ada mendapat relasi balik `electionVoters ElectionVoter[]`. Teacher.accountId tetap opsional dan tidak dipakai login voting. ElectionVoter memiliki tepat satu sumber master: STUDENT dengan studentId/NISN dan tanpa teacherId/loginCode, atau TEACHER dengan teacherId/loginCode dan tanpa studentId/NISN. Unique per Teacher/periode dan kode/periode, FK Restrict, serta CHECK format diterapkan dalam `20261016100000_teacher_election_voters`. Nama dan kode adalah snapshot; className guru berisi label kelompok Guru. Ballot tidak berubah.
+## Model dan kamus field
 
-Trigger menolak perubahan jenis, pemilik, periode atau kode login. INSERT/DELETE roster tersedia dalam DRAFT tanpa batas tanggal lama, atau SCHEDULED sebelum opensAt; cleanup uji yang terotorisasi tetap dapat menghapus data turunannya. Migrasi `20261016120000_draft_setup_editability` menyamakan aturan calon, voter dan penghapusan participation false, tanpa mengubah kolom/data. Participation true tetap monotonic dan Ballot immutable. Koreksi NISN siswa tidak mengganti pemilik. Semua agregat/batas 99 menghitung roster terpilih gabungan; hasil tanpa breakdown jenis. [Alur guru](09-usulan-pemilih-guru.md), [pilihan siswa dan DRAFT](10-daftar-pemilih-dan-draft.md).
+Konvensi tabel/kolom existing dipertahankan. Semua UUID pemilu v4; waktu timestamptz(3) UTC. String input di-trim sebelum validasi; kode tidak diubah case secara diam-diam. Enum `VotingOrganization` diganti varchar(32) pada **seluruh** kolom organization, termasuk CandidateMember dan Ballot. Enum baru `CandidateMode` hanya `SINGLE | OPTIONAL_VICE`; CandidatePosition tetap `CHAIR | VICE_CHAIR`.
 
-## Model yang diusulkan
-
-`Student` adalah master persisten tanpa kredensial; `ElectionVoter` adalah snapshot dan kredensial siswa atau guru pada satu periode. Satu Student dapat memiliki banyak ElectionVoter dan CandidateMember lintas tahun. PIN tetap di ElectionVoter untuk MVP, bukan pada Student atau Account; belum perlu tabel akun permanen. `VoterParticipation` tidak memiliki candidateId. `Ballot` tidak memiliki studentId, voterId atau sessionId. Tidak ada relasi balik terselubung melalui receipt, transaction ID aplikasi, batch vote, atau timestamp.
-
-```prisma
-enum ElectionState {
-  DRAFT
-  SCHEDULED
-  CLOSED
-  ARCHIVED
-}
-
-enum VotingOrganization {
-  OSIS
-  DEWAN_AMBALAN
-  IPNU
-  IPPNU
-}
-
-enum CandidatePosition {
-  CHAIR
-  VICE_CHAIR
-}
-
-enum VotingSessionScope {
-  ELECTION_VOTING
-}
-
-model Student {
-  id        String          @id @default(uuid()) @db.Uuid
-  nisn      String          @unique @db.VarChar(10)
-  name      String          @db.VarChar(120)
-  className String          @db.VarChar(40)
-  voters               ElectionVoter[]
-  candidateMemberships CandidateMember[]
-}
-
-model ElectionPeriod {
-  id             String        @id @default(uuid()) @db.Uuid
-  slug           String        @unique @db.VarChar(64)
-  name           String        @db.VarChar(120)
-  academicYear   String        @db.VarChar(20)
-  isTest         Boolean       @default(false)
-  state          ElectionState @default(DRAFT)
-  opensAt        DateTime       @db.Timestamptz(3)
-  closesAt       DateTime       @db.Timestamptz(3)
-  extensionUsedAt DateTime?      @db.Timestamptz(3)
-  closedAt       DateTime?      @db.Timestamptz(3)
-  publishedAt    DateTime?      @db.Timestamptz(3)
-  resultSnapshot Json?
-  createdAt      DateTime       @default(now()) @db.Timestamptz(3)
-  contests       ElectionContest[]
-  voters         ElectionVoter[]
-}
-
-model ElectionContest {
-  periodId      String             @db.Uuid
-  organization  VotingOrganization
-  period        ElectionPeriod     @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  candidates    CandidatePair[]
-  participation VoterParticipation[]
-
-  @@id([periodId, organization])
-}
-
-model CandidatePair {
-  id            String             @id @default(uuid()) @db.Uuid
-  periodId      String             @db.Uuid
-  organization  VotingOrganization
-  ballotNumber  Int
-  vision        String             @db.VarChar(2000)
-  mission       String             @db.VarChar(2000)
-  contest       ElectionContest    @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
-  members       CandidateMember[]
-  ballots       Ballot[]
-
-  @@unique([periodId, organization, ballotNumber])
-  @@unique([id, periodId, organization])
-}
-
-model CandidateMember {
-  candidatePairId String             @db.Uuid
-  periodId        String             @db.Uuid
-  organization    VotingOrganization
-  studentId       String             @db.Uuid
-  position        CandidatePosition
-  nameSnapshot    String             @db.VarChar(120)
-  classSnapshot   String             @db.VarChar(40)
-  photoUrl        String?            @db.VarChar(1024)
-  pair            CandidatePair      @relation(fields: [candidatePairId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
-  student         Student            @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-
-  @@id([candidatePairId, position])
-  @@unique([periodId, organization, studentId])
-  @@index([studentId, periodId])
-}
-
-enum ElectionVoterType {
-  STUDENT
-  TEACHER
-}
-
-model ElectionVoter {
-  id                String               @id @default(uuid()) @db.Uuid
-  voterType         ElectionVoterType    @default(STUDENT)
-  studentId         String?              @db.Uuid
-  teacherId         String?
-  loginCode         String?              @db.VarChar(32)
-  periodId          String               @db.Uuid
-  nisn              String?              @db.VarChar(10)
-  name              String               @db.VarChar(120)
-  className         String               @db.VarChar(40)
-  credentialEnabled Boolean              @default(true)
-  pinHash           String?              @db.VarChar(60)
-  pinFingerprint    String?              @db.Char(64)
-  pinVersion        Int                  @default(0)
-  period            ElectionPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  student           Student?             @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  teacher           Teacher?             @relation(fields: [teacherId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  participation     VoterParticipation[]
-  session           VotingSession?
-
-  @@unique([periodId, nisn])
-  @@unique([periodId, studentId])
-  @@unique([periodId, teacherId])
-  @@unique([periodId, loginCode])
-  @@unique([periodId, pinFingerprint])
-  @@unique([id, periodId])
-  @@index([studentId])
-  @@index([periodId, className])
-}
-
-model VoterParticipation {
-  voterId      String             @db.Uuid
-  periodId     String             @db.Uuid
-  organization VotingOrganization
-  hasVoted     Boolean            @default(false)
-  voter        ElectionVoter      @relation(fields: [voterId, periodId], references: [id, periodId], onDelete: Restrict, onUpdate: Restrict)
-  contest      ElectionContest    @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
-
-  @@id([voterId, organization])
-  @@index([periodId, organization, hasVoted])
-}
-
-model Ballot {
-  id           String             @id @default(uuid()) @db.Uuid
-  periodId     String             @db.Uuid
-  organization VotingOrganization
-  candidateId  String             @db.Uuid
-  candidate    CandidatePair      @relation(fields: [candidateId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
-
-  @@index([periodId, organization, candidateId])
-}
-
-model VotingSession {
-  id         String        @id @default(uuid()) @db.Uuid
-  scope      VotingSessionScope @default(ELECTION_VOTING)
-  voterId    String        @unique @db.Uuid
-  tokenHash  String        @unique @db.Char(64)
-  createdAt  DateTime      @default(now()) @db.Timestamptz(3)
-  lastSeenAt DateTime      @db.Timestamptz(3)
-  expiresAt  DateTime      @db.Timestamptz(3)
-  voter      ElectionVoter @relation(fields: [voterId], references: [id], onDelete: Cascade, onUpdate: Restrict)
-
-  @@index([expiresAt])
-}
-
-model VotingRateBucket {
-  key       String   @id @db.Char(64)
-  attempts  Int      @default(0)
-  expiresAt DateTime @db.Timestamptz(3)
-
-  @@index([expiresAt])
-}
-
-model VotingAuditEvent {
-  id             String          @id @default(uuid()) @db.Uuid
-  periodId       String?         @db.Uuid
-  actorAccountId String?
-  event          String          @db.VarChar(64)
-  targetId       String?         @db.VarChar(64)
-  reasonCode     String?         @db.VarChar(64)
-  detail         Json?
-  createdAt      DateTime         @default(now()) @db.Timestamptz(3)
-  actor          Account?        @relation(fields: [actorAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-
-  @@index([periodId, createdAt])
-  @@index([actorAccountId, createdAt])
-}
-```
-
-Tambahkan relasi balik berikut pada **model Account yang sudah ada**, bukan membuat Account baru:
-
-```prisma
-votingAuditEvents VotingAuditEvent[]
-```
-
-`Account.id` saat ini string CUID tanpa native UUID; `actorAccountId` sengaja tetap String biasa. Semua UUID pemilu harus acak v4; pastikan semantik default Prisma terkunci saat validasi, dan gunakan `crypto.randomUUID()` eksplisit saat insert ballot. Jangan ganti menjadi UUID yang dapat diurutkan berdasarkan waktu.
-
-## Constraint SQL tambahan wajib
-
-Prisma schema tidak merepresentasikan seluruh kebijakan berikut. Migration SQL additive harus menyertakannya; tes dengan database nyata, bukan hanya `prisma validate`.
-
-| Constraint/policy | Implementasi yang direncanakan |
+| Model/field | Tipe, kewajiban dan aturan |
 | --- | --- |
-| Master independen | Student.nisn unik global, Student tanpa pinHash/passwordHash/role/session; FK Student → ElectionVoter restriktif, tidak cascade dari periode/roster ke master |
-| Eligibility per siswa | Unique `(periodId, studentId)` selain `(periodId, nisn)`; koreksi NISN tidak dapat membuat hak pilih kedua untuk Student yang sama |
-| CandidateMember FK/uniqueness | Candidate pair FK mencakup pair/period/organization; Student FK restrict; unique `(periodId, organization, studentId)` mencegah assignment ganda lintas pasangan; primary key `(candidatePairId, position)` membatasi satu anggota per posisi |
-| Komposisi calon | Tepat satu `CHAIR`, nol atau satu `VICE_CHAIR`; jika ada wakil, studentId harus berbeda. Deferred constraint trigger/service memvalidasi satu atau dua anggota setelah CRUD dan saat dijadwalkan. CandidatePair tetap menjadi pilihan ballot; tidak membuat anggota wakil kosong |
-| Candidate history/snapshot | `nameSnapshot` dan `classSnapshot` disalin dari Student oleh server saat penetapan anggota; update master tidak mengubah snapshot. Index `CandidateMember.studentId` mendukung pencarian riwayat calon. Tidak ada model masa jabatan/officeholder |
-| Candidate edits | Seluruh mutasi pair/member/audit satu transaksi; DRAFT tanpa batas tanggal lama atau SCHEDULED sebelum opensAt. Trigger/service dengan lock periode menolak perubahan saat/selepas pembukaan SCHEDULED; candidate set tervalidasi sebelum menjadwalkan |
-| PIN unik per periode | Unique `(periodId, pinFingerprint)`; NULL sebelum diterbitkan. CHECK pinHash dan fingerprint sama-sama NULL atau sama-sama terisi; service memastikan fingerprint HMAC dan regenerasi collision |
-| Scope sesi | Enum hanya ELECTION_VOTING; periode didapat lewat voter FK, tidak dari parameter browser. Guard scope/time juga berlaku pada dashboard, tidak ada session Student umum |
-| Jadwal valid | CHECK `opensAt < closesAt`; `extensionUsedAt` nullable menandai satu-satunya perpanjangan; perubahan `closesAt` menyimpan nilai sebelum/sesudah, aktor dan alasan di audit |
-| Bentuk NISN, nomor calon, versi | CHECK NISN regex `^[0-9]{10}$`, ballotNumber > 0, pinVersion ≥ 0, attempts ≥ 0 |
-| Satu periode terjadwal | Partial unique index pada state untuk baris `state = 'SCHEDULED'`; periode lama harus ditutup sebelum menjadwalkan berikutnya |
-| State dan snapshot konsisten | DRAFT/SCHEDULED: closedAt, publishedAt, resultSnapshot SQL NULL; CLOSED/ARCHIVED: closedAt dan snapshot non-null; publishedAt hanya boleh setelah closedAt |
-| Waktu penutupan | Service memeriksa waktu DB sesudah lock: closedAt ≥ opensAt; sebelum closesAt hanya jika seluruh pemilih terdaftar selesai empat suara dan rekonsiliasi cocok. closesAt tetap menyimpan jadwal asli. Tidak memakai CHECK closedAt ≥ closesAt karena menolak penutupan lebih awal |
-| Empat organisasi dan empat hak per voter | Create period membuat empat contest; sinkronisasi master membuat empat participation atomik. Gate schedule menghitung seluruh kelengkapan di bawah lock periode |
-| Surat suara tak berubah | Runtime role: INSERT/SELECT yang diperlukan, tanpa UPDATE/DELETE/TRUNCATE atas Ballot. Trigger menolak UPDATE/DELETE untuk defense in depth; runtime bukan owner dan tidak punya DDL |
-| Partisipasi monoton | Trigger menolak perubahan key dan true → false; DELETE hanya sebelum schedule dan ketika false, lewat service DRAFT yang mengunci periode |
-| Kandidat/roster/jadwal beku | Membership roster/calon/jadwal beku saat dibuka; exception koreksi NISN hanya untuk voter belum memilih dengan dua pemeriksa, Student ID tetap dan reissue PIN. Perpanjangan sekali maksimal 60 menit dicatat di extensionUsedAt dan audit. Perubahan kredensial dibatasi kolomnya dan tidak mengubah hak pilih |
-| Hasil immutable | Setelah CLOSED, snapshot, jadwal, kandidat dan roster tidak dapat berubah; hanya publikasi sekali, archive dan cleanup sesi yang diizinkan |
-| Audit append-only | Runtime dapat insert/read, tidak update/delete; FK Restrict mencegah Account panitia dihapus selama masih dirujuk audit. Nonaktifkan akun selama retensi |
+| ElectionType.code | PK varchar(32), regex `^[A-Z][A-Z0-9_]{1,31}$`, immutable; kode duplikat ditolak |
+| name | varchar(120), 1–120 karakter |
+| logoUrl | varchar(1024) nullable; Media image sekolah/R2 yang valid; tanpa URL pihak ketiga |
+| candidateMode | CandidateMode wajib |
+| chairLabel | varchar(80), 1–80 karakter |
+| viceChairLabel | varchar(80) nullable; SINGLE wajib null; OPTIONAL_VICE wajib 1–80 karakter |
+| active | boolean wajib, default true di DB; input CRUD eksplisit |
+| sortOrder | integer 0–9999; urutan master, tidak harus unik |
+| revision | integer >=0 default 0; setiap perubahan efektif naik satu |
+| createdAt | timestamptz(3), default now; immutable |
+| ElectionPeriod.contestsRevision | integer >=0 default 0, guard optimistic untuk susunan; create berikut contest awal tetap revision 0 |
+| ElectionContest | PK `(periodId, organization)` existing, FK period RESTRICT dan organization → ElectionType.code RESTRICT untuk update/delete |
+| nameSnapshot, logoUrlSnapshot | nama/logo disalin saat pemasangan; batas dan nullability mengikuti master |
+| candidateModeSnapshot | CandidateMode; bukan lookup master saat menampilkan periode |
+| chairLabelSnapshot, viceChairLabelSnapshot | batas/aturan nullability sesuai mode snapshot |
+| sortOrder (contest) | integer 1–20; urutan kontigu 1..N dalam satu periode |
 
-Contoh index yang harus ada pada SQL migrasi:
+Master aktif tidak membatasi contest yang sudah terpasang. Snapshot dipilih server, tidak pernah diterima sebagai input CRUD periode. Pada reorder, field snapshot retained tidak berubah. Tidak ada refresh otomatis atau endpoint refresh pada paket ini. Snapshot semua contest terkunci setelah SCHEDULED; susunan hanya berubah di DRAFT. Delete master terpakai ditolak; nonaktifkan untuk mencegah pemasangan baru.
 
-```sql
-CREATE UNIQUE INDEX "ElectionPeriod_one_scheduled"
-ON "ElectionPeriod" ("state")
-WHERE "state" = 'SCHEDULED';
+## Relasi, uniqueness dan index
+
+| Bagian | Ketentuan wajib |
+| --- | --- |
+| ElectionType | index `(active, sortOrder, code)`; FK pemakaian RESTRICT. Tidak cascade ke periode |
+| ElectionContest | unique `(periodId, sortOrder)` **DEFERRABLE INITIALLY DEFERRED** agar tukar urutan atomik; index organization untuk lookup penggunaan master |
+| CandidatePair | FK `(periodId, organization)` → contest; unique `(periodId, organization, ballotNumber)`; unique `(id, periodId, organization)` sebagai target FK member/ballot; ballotNumber 1..2147483647; vision/mission 1–2000 karakter |
+| CandidateMember | PK `(candidatePairId, position)`; FK `(candidatePairId, periodId, organization)` → pair; Student FK RESTRICT; unique `(periodId, organization, studentId)` lintas pasangan; index studentId untuk riwayat pencalonan |
+| Snapshot anggota | nameSnapshot varchar(120)/classSnapshot varchar(40) existing disalin dari Student ketika anggota ditambahkan atau studentId diganti; edit foto/visi/misi anggota yang sama mempertahankan snapshot. photoUrl opsional Media image, <=1024. Tidak menerima nama/kelas bebas |
+| Komposisi | SINGLE tepat satu CHAIR tanpa VICE_CHAIR; OPTIONAL_VICE tepat satu CHAIR dan nol/satu VICE_CHAIR. Student berbeda dijamin uniqueness; constraint trigger deferred memeriksa keadaan akhir pair/member |
+| ElectionVoter | Tepat satu Student atau Teacher sesuai voterType; FK master RESTRICT; unique period+studentId, period+teacherId, period+login identifier; total gabungan <=99. Kode guru `GURU-` +12 heksadesimal unik per periode; Student memakai NISN 10 angka. Tidak membuat Student dari guru |
+| VoterParticipation | PK voterId+organization; composite FK voterId+periodId → voter dan periodId+organization → contest; tepat himpunan N contest periode per voter pada akhir transaksi |
+| Ballot | Hanya id UUIDv4, periodId, organization, candidateId; FK composite ke contest dan candidate pair yang sama. Index `(periodId, organization, candidateId)`. Tanpa voterId/memberId/studentId/sessionId, timestamp, receipt atau nomor urut suara |
+| Sesi/PIN | VotingSession voterId unik, tokenHash unik; scope hanya ELECTION_VOTING. PIN hash dan HMAC fingerprint null bersama/terisi bersama; unique periodId+pinFingerprint; versi >=0. Tidak memindahkan kredensial ke Student/Teacher |
+| Jadwal | opensAt < closesAt; partial unique index state SCHEDULED; isTest/slug immutable. DRAFT/SCHEDULED belum punya closedAt/publishedAt/snapshot; CLOSED/ARCHIVED harus closedAt+snapshot; publishedAt >=closedAt |
+| Audit | VotingAuditEvent.periodId nullable tanpa FK penghapusan periode; guard INSERT memeriksa periode existing jika nonnull. actorAccountId CUID FK Account RESTRICT; audit append-only. Master events periodId=null,targetId=code |
+
+FK yang sudah ada tidak boleh hilang ketika mengubah tipe organization. Primary key/unique tetap menjaga tenant periode/jenis; tidak mengganti relasi dengan JSON. Constraint lintas baris membutuhkan trigger + lock service, bukan CHECK yang melakukan query tabel lain. [Dokumentasi PostgreSQL constraint trigger](https://www.postgresql.org/docs/current/trigger-definition.html).
+
+## Guard dan transaksi yang harus dibawa ke migrasi
+
+Nama existing di bawah sudah dicocokkan dengan migrasi repo pada T02; inventaris schema Neon sudah cocok dengan target setelah migrasi; role/grants runtime nonowner masih wajib diverifikasi. Guard contest memakai `evoting_protect_contest`/`ElectionContest_protect_snapshot`; validasi himpunan memakai `evoting_validate_period_shape`/constraint trigger deferred. Jangan mengedit migrasi historis. Prisma hanya merepresentasikan unique order; sifat DEFERRABLE tetap berasal dari migration SQL dan tidak boleh diganti index immediate lewat db push.
+
+| Guard | Perubahan/ketentuan target |
+| --- | --- |
+| `evoting_validate_candidate_pair_id` | Ganti logika komposisi mengikuti candidateModeSnapshot; deferred memeriksa pair yang masih ada saat commit |
+| `evoting_lock_candidate_before_open` | Pair/member DRAFT boleh, SCHEDULED hanya sebelum opensAt; lock periode FOR UPDATE dan waktu DB sesudah lock; sesudah buka ditolak |
+| `evoting_participation_monotonic` | Tolak perubahan key dan true→false. Delete false hanya saat mutasi roster sebelum buka atau melepas contest DRAFT yang sah; jangan membuka delete sesudah close |
+| `evoting_protect_voter_identity` | Tetap melindungi Student/Teacher reference dan snapshot; koreksi NISN existing yang belum memilih mengikuti dua pemeriksa dan pencabutan PIN/sesi |
+| Guard contest baru | Tolak snapshot update; hanya sortOrder dapat berubah di DRAFT. Insert/delete hanya DRAFT di bawah lock periode; ada candidate/ballot/true participation menolak pelepasan |
+| Validasi himpunan baru | Deferred constraint trigger pada period/contest/voter/participation memeriksa 1–20 jenis, urutan kontigu dan tepat N hak tiap voter saat commit. Menunda validasi selama compound create/replace/roster; tidak membolehkan keadaan akhir tanpa contest. Periode yang sudah dihapus lewat cleanup sah tidak diperiksa lagi |
+| `evoting_reject_ballot_change` | UPDATE/DELETE tetap ditolak runtime; larangan TRUNCATE/grant tetap. Tidak ada perubahan izin demi migrasi harian |
+| `evoting_protect_period_identity` | Pertahankan state/identity/freeze/snapshot immutable; tambahkan contestsRevision hanya untuk penggantian DRAFT, larang close sebelum opensAt. Hapus syarat turnout penuh, bukan rekonsiliasi |
+| Audit insert/existing period + append-only | Audit master dengan periodId null valid. Event close/CRUD dan mutasi satu transaksi; insert cleanup sebelum parent dihapus, audit UUID periode tetap tersimpan |
+| `evoting_test_cleanup_allowed`, `evoting_delete_test_period` | Runtime cleanup existing tetap exact satu periode isTest dan belum dipublikasi; sesuaikan cascade eksplisit children contest. Tidak menjadi jalan hapus master atau audit |
+
+Semua operasi periode memakai lock urut periode → voter → sesi. Vote memakai FOR SHARE pada periode; mutasi administrasi/close FOR UPDATE. CRUD master hanya lock master, sementara penggantian contest lock periode lalu master terurut code; master tidak mengambil lock periode. Hindari deadlock dan validasi berdasarkan clock sebelum menunggu lock. Lihat [desain](02-desain.md).
+
+Constraint deferred row hak/voter memeriksa himpunan pemilih yang berubah; event periode/contest memeriksa seluruh roster dengan agregat JOIN. Ini menghindari pemeriksaan ulang seluruh roster untuk setiap hak pada batch 99×20, tanpa melewati validasi pemilih yang tidak mendapat event ketika jenis baru dipasang. Tidak memakai flag transaksi untuk mematikan constraint.
+
+Revisi stale ditolak sebelum no-op. No-op revision cocok tidak menambah audit/revision. Penggantian contest membuat/menghapus participation false atomik bersama audit, tanpa mengubah PIN atau snapshot identitas. Jika salah satu bagian gagal, rollback seluruhnya.
+
+## Snapshot hasil versi 2
+
+Sumber struktur ketat adalah schema `ResultSnapshot` pada [OpenAPI](contracts/e-voting-v2.openapi.json). Bentuk:
+
+```text
+{ version:2, eligibleVoters, notStarted, partial, complete, contests:[
+  { organization, name, logoUrl, candidateMode, chairLabel, viceChairLabel,
+    sortOrder, votesCast, candidates:[
+      { candidateId, ballotNumber, vision, mission,
+        chair:{name,className,photoUrl}, viceChair:null|{name,className,photoUrl}, votes }
+    ] }
+] }
 ```
 
-Penambahan CHECK/trigger yang membaca lintas baris tidak menggantikan urutan lock pada service. Uji deadlock antara edit DRAFT, schedule, submit, reset, logout dan close. Jadwalkan hanya setelah seluruh import/cetak selesai.
+Tidak ada studentId/NISN/teacherId/voter/sesi/timestamp per suara/breakdown kelompok di snapshot publik. CandidateMember.studentId tetap dapat dicari internal untuk riwayat, tanpa officeholder/masa jabatan MVP. Snapshot menyalin metadata contest dan snapshot anggota, tidak membaca Student/master jenis terbaru. Foto/logo memakai key immutable; alur media wajib menjaga referensi snapshot.
 
-## Apa yang dijamin, dan apa yang tidak
+Validator semantik wajib setelah validasi struktur:
 
-- Primary key partisipasi dan update conditional mencegah penggunaan hak pilih dua kali dalam jalur transaksi resmi. Composite FK memastikan voter/contest/candidate tidak tertukar periode atau organisasi.
-- Tidak ada FK yang membuktikan ballot tertentu milik partisipasi tertentu, karena tautan itu sengaja ditiadakan. Kesetaraan jumlah lintas dua tabel bergantung pada transaksi resmi dan rekonsiliasi; jangan mengklaim unique index saja menjamin semua integritas ini.
-- Runtime yang dibajak atau operator DB berprivilege dapat menyisipkan ballot di luar service atau menonaktifkan trigger. Least privilege mengurangi dampak tetapi tidak membuktikan sistem tahan administrator jahat. Batas ini ada di [ADR](adr/0001-integrasi-dan-batas-kerahasiaan.md).
-- UUID ballot, row order, MVCC dan waktu sesi tetap dapat dikorelasikan oleh operator. Sesi menyimpan waktu karena expiry membutuhkannya; retensi singkat mengurangi jejak, bukan menghapus historinya di backup.
+- N=1..20; organization unik, sortOrder tepat 1..N, kandidat ID/nomor unik per contest, minimal satu kandidat valid dan mode/anggota cocok.
+- eligibleVoters=1..99; notStarted+partial+complete=eligibleVoters. N=1 mensyaratkan partial=0.
+- Per jenis: jumlah candidate votes = votesCast = jumlah participation true <=eligibleVoters. Semua kandidat termasuk nol tetap ada.
+- Total ballot=sum(votesCast); `complete*N + partial <= total <= complete*N + partial*(N-1)`. Periksa pula setiap votesCast >=complete dan <=complete+partial. Tidak cukup hanya memvalidasi total.
+- Snapshot harus cocok dengan hitungan ledger/ballot pada transaksi close. Tidak ada foreign key pemilih-ke-ballot untuk membuktikan tautan individual; anonimitas dan rekonsiliasi aggregate tetap terpisah.
 
-## Bentuk snapshot hasil
+Nol ballot sah dengan roster nonkosong; seluruhnya notStarted. Persentase dihitung untuk tampilan, bukan disimpan sebagai sumber kebenaran. Seri tetap seri; tidak ada winner otomatis. Versi 1 sampel boleh dibersihkan; runtime v2-only baru dirilis bila tidak ada snapshot legacy tersisa. Jangan menafsirkan versi 1 sebagai lima jenis atau menghapus data di luar manifest.
 
-`resultSnapshot` adalah objek versi 1, tervalidasi ketat sebelum tersimpan; bukan dump ORM. Memuat `version`, `eligibleVoters`, `notStarted`, `partial`, `complete`, serta empat `contests` berisi organization, `votesCast`, dan daftar pasangan `{candidateId, ballotNumber, vision, mission, chair:{name,className,photoUrl}, viceChair:null atau {name,className,photoUrl}, votes}`. Semua kandidat, termasuk nol, dimuat. Label dan foto kandidat disalin dari CandidateMember snapshot agar hasil arsip tidak berubah ketika master Student diperbarui. Snapshot publik tidak memuat studentId; riwayat internal dicari melalui FK dan index CandidateMember.studentId. Tidak memuat voter, sesi, timestamp per suara, atau breakdown pemilih.
+## Transisi dan retensi
 
-Snapshot dibuat sekali di transaksi close. Sum candidate votes = votesCast = count partisipasi true untuk organisasi itu. `notStarted + partial + complete = eligibleVoters`; jumlah partisipasi seluruh organisasi berada antara complete × 4 dan eligibleVoters × 4. Presentase dihitung untuk tampilan dengan pembulatan, bukan sumber hitungan.
+Urutan migrasi T02/T12: inventaris enum/FK/trigger/function/index → backup → maintenance writer → cleanup exact sampel → buat master/seed lima → ubah kolom enum menjadi varchar secara eksplisit → bangun ulang FK/check/trigger dinamis → verifikasi. Jangan `DROP ... CASCADE`; daftar dependency harus eksplisit. Bila data nonsampel ditemukan, hentikan transisi dan rancang backfill/compatibility; tidak memaksa cleanup semua tabel.
 
-Ballot tetap menyimpan hanya UUID ballot, periodId, organization dan candidateId pasangan. CandidateMember menghubungkan calon ke Student untuk administrasi/riwayat, tetapi Ballot tidak menyimpan studentId maupun memberId dan transaksi vote tidak menambah relasi pemilih-ke-calon. Semua lock, conditional update partisipasi, insert ballot atomik, idempotensi penolakan, close lock dan rekonsiliasi yang disepakati tetap berlaku.
+Migration T02 menolak semua data pemilihan yang masih tersisa dengan `EVOTING_MIGRATION_REQUIRES_EMPTY_ELECTION_DATA`; tidak menghapus sampel otomatis atau menafsirkan snapshot v1. Audit lama boleh tetap ada. Seed lima ada di migration yang sama, bukan menjalankan seed CMS/demo. Cleanup offline terpisah hanya memakai manifest exact dan memulihkan definisi trigger dalam transaksi. Rollback memakai backup/restore schema+data+code yang sesuai; rehearsal PGlite telah diuji, restore Neon belum.
 
-## Migrasi dan retensi
+Seed: OSIS/IPNU/IPPNU mode OPTIONAL_VICE dengan label Ketua/Wakil Ketua; PRADANA_PUTRA/PRADANA_PUTRI mode SINGLE dengan label Pradana Putra/Pradana Putri, viceChairLabel null; logo null sampai aset resmi dipilih. sortOrder awal 1..5. Kode DEWAN_AMBALAN tidak dipasang pada periode baru; hanya hapus master legacy setelah seluruh referensinya bersih. Tidak membuat periode, voter atau akun demo di Neon.
 
-Master Student diisi dari sumber resmi dan disahkan registrar; jangan mengambil Account ber-role siswa atau Alumni secara otomatis atau mencocokkan otomatis berdasarkan nama. Pemilih periode diambil dari Student yang terhubung ke SchoolClass pada tahun ajaran periode; Student tanpa kelas terhubung dikecualikan. Sinkronisasi sebelum buka hanya menambah Student yang belum ada, tidak membuat/mengubah Student, dan mempertahankan snapshot roster yang sudah ada. Koreksi NISN perlu dua pemeriksa, mempertahankan studentId, dan tidak boleh dilakukan setelah siswa memberi suara. Sebelum buka atau untuk pemilih belum memilih setelah buka, sinkronisasi snapshot eksplisit mencabut hash/fingerprint/sesi dan memerlukan PIN baru. Tidak ada endpoint penggantian studentId pada roster. Pemeriksa kedua adalah prosedur operasional; field/audit mencatat saksi tetapi aplikasi tidak membuktikan kehadiran dua orang.
-
-Penutupan, pencabutan PIN, cleanup sesi atau penghapusan roster sebelum buka tidak menghapus master. Setelah masa sanggah 30 hari, hash/fingerprint PIN dan sesi dibersihkan; roster/audit disimpan satu tahun dan hasil agregat lintas periode. Pembersihan kredensial tidak boleh mengubah snapshot, ledger atau ballot setelah close. Penghapusan PII master adalah kebijakan terpisah. Akun permanen, reset password, data akademik dan relasi Account?Student tidak ditambahkan dalam MVP.
-
-Migrasi awal hanya membuat enum/tabel/index/constraint/trigger serta relasi Account balik pada client; tidak ada backfill wajib pada data website. Tidak menjalankan seed demo untuk membuat periode produksi. Fixture sintetis berada di test terpisah.
-
-Hapus sesi kedaluwarsa dan bucket limiter lewat cleanup berkala. Tidak ada cascade dari periode/candidate/voter ke ballot. Setelah masa retensi disahkan, penghapusan PII/ledger memerlukan prosedur offline terpisah beserta penyesuaian trigger/constraint yang direview; untuk periode biasa tidak tersedia tombol hapus permanen. Pengecualian periode uji yang diotorisasi dijelaskan pada bagian berikut. Snapshot aggregate dan periode tahunan dapat dipertahankan tanpa menyimpan PIN mentah (yang memang tidak pernah disimpan).
-
-## Migrasi pembersihan data uji ? 15 Oktober 2026
-
-20261015140000_test_period_cleanup menambah ElectionPeriod.isTest (default false, immutable), menandai dua sampel legacy berdasarkan UUID+slug yang disetujui operator, dan mencatat klasifikasinya. FK VotingAuditEvent.periodId diganti trigger validasi INSERT; UUID audit tetap tersimpan sesudah periode uji dihapus, tanpa mengubah baris audit lama. FK aktor dan append-only tetap aktif. Fungsi cleanup bertransaksi menghapus hanya satu periode uji yang belum dipublikasikan; DELETE biasa maupun UPDATE ballot tetap ditolak. [Aturan dan urutan penghapusan](08-pembersihan-data-uji.md).
+Tidak ada cascade dari periode ke Student/Teacher/SchoolClass/Department/Account/CMS/Media. Setelah masa sanggah 30 hari hapus PIN hash/fingerprint dan sesi; roster/audit satu tahun, aggregate lintas tahun. Penghapusan PII/ledger setelah retensi memerlukan prosedur offline tersendiri agar tidak merusak snapshot/constraint; bukan delete runtime biasa. Master sekolah mengikuti kebijakan terpisah. Runtime role nonowner/grants harus diverifikasi pada T12, bukan diasumsikan sudah terpasang.

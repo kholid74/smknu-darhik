@@ -33,6 +33,9 @@ const fileIcon = (name: string) => FILE_ICON[name.split('.').pop()?.toLowerCase(
 
 <AdminLayout title="Pustaka Media" user={{ role: session.role }}>
   <PageHeader title="Pustaka Media"/>
+  {Astro.url.searchParams.get('delete')==='in-use'&&<p class="feedback" data-tone="warning" role="status">Media masih digunakan oleh jenis pemilihan, calon atau hasil historis. Penghapusan dibatalkan.</p>}
+  {Astro.url.searchParams.get('delete')==='failed'&&<p class="feedback" data-tone="error" role="status">Media belum dapat dihapus. Muat ulang dan coba lagi.</p>}
+  {Astro.url.searchParams.get('delete')==='storage-pending'&&<p class="feedback" data-tone="warning" role="status">Entri pustaka dihapus, tetapi file storage belum dapat dibersihkan. Hubungi pengelola; jangan mengulang upload otomatis.</p>}
   <div class="card" style="margin-bottom:20px">
     <h3 style="font-size:15px;font-weight:700;margin-bottom:4px">Unggah Gambar</h3>
     <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">File yang diunggah tersimpan di pustaka dan bisa dipakai ulang di form mana pun.</p>

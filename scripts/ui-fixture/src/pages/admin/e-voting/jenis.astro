@@ -1,0 +1,7 @@
+---
+import Types from '../../../../../../src/pages/admin/e-voting/jenis.astro';
+Astro.locals.principal={roles:['superadmin']};
+Astro.locals.session={sub:'qa-admin',role:'superadmin',roles:['superadmin']};
+const items=Array.from({length:15},(_,i)=>({code:i?'TYPE_'+i:'OSIS',name:i?'Jenis sintetis '+i:'OSIS',logoUrl:null,candidateMode:i%2?'SINGLE':'OPTIONAL_VICE',chairLabel:'Ketua',viceChairLabel:i%2?null:'Wakil Ketua',sortOrder:i,active:i!==14,revision:2,createdAt:new Date()}));
+---
+<Types items={items}/>

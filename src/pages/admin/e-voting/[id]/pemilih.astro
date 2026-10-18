@@ -55,7 +55,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
   </section>}
   {editable && <section class="card" style="margin-bottom:18px" id="teacher-roster" data-csrf={selectionCsrf} data-current-count={voters.length}>
     <h3 style="font-size:16px;font-weight:800;margin-bottom:6px">Pemilih dari master guru</h3>
-    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Pilih guru yang berhak. Guru tidak otomatis menjadi pemilih. Masing-masing memperoleh empat suara dengan bobot sama, kode guru, dan PIN periode. Maksimal 99 pemilih gabungan.</p>
+    <p style="font-size:12px;color:var(--color-muted);margin-bottom:12px">Pilih guru yang berhak. Guru tidak otomatis menjadi pemilih. Masing-masing memperoleh hak suara sesuai jenis pada periode dengan bobot sama, kode guru, dan PIN periode. Maksimal 99 pemilih gabungan.</p>
     <DataTable id="table-teacher-selection" label="Guru"><table><thead><tr><th>Pilih</th><th>Nama guru</th><th>Jabatan / kelompok</th></tr></thead><tbody>
       {teachers.length ? teachers.map(teacher => <tr><td><input type="checkbox" class="teacher-choice" value={teacher.id} data-name={teacher.name} disabled={registeredTeachers.has(teacher.id)} aria-label={'Pilih ' + teacher.name}/>{registeredTeachers.has(teacher.id) && 'Sudah terdaftar'}</td><td>{teacher.name}</td><td>{teacher.position} / {teacher.level}</td></tr>) : <tr><td colspan="3">Belum ada data guru di master.</td></tr>}
     </tbody></table></DataTable>
@@ -103,7 +103,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
       if(total > 99) preview.textContent += ' Melebihi batas gabungan. Kurangi pilihan.';
     });
     button.addEventListener('click', async () => {
-      if(!selected.length || !await confirmAction('Tambahkan hanya ' + selected.length + ' siswa dari pratinjau sebagai pemilih empat organisasi?')) return;
+      if(!selected.length || !await confirmAction('Tambahkan hanya ' + selected.length + ' siswa dari pratinjau sebagai pemilih untuk seluruh jenis periode?')) return;
       button.disabled = true;
       try {
         const response = await fetch('/api/admin/e-voting/' + location.pathname.split('/')[3] + '/voters', {
@@ -202,7 +202,7 @@ const canSyncFromMaster = Astro.locals.principal ? can(Astro.locals.principal, '
       if(total > 99) preview.textContent += ' Melebihi batas gabungan. Kurangi pilihan.';
     });
     button.addEventListener('click', async () => {
-      if(!selected.length || !await confirmAction('Tambahkan ' + selected.length + ' guru dari pratinjau sebagai pemilih empat organisasi?')) return;
+      if(!selected.length || !await confirmAction('Tambahkan ' + selected.length + ' guru dari pratinjau sebagai pemilih untuk seluruh jenis periode?')) return;
       button.disabled = true;
       try {
         const response = await fetch('/api/admin/e-voting/' + location.pathname.split('/')[3] + '/voters/teachers', {

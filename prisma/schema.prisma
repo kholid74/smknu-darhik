@@ -16,11 +16,9 @@ enum ElectionState {
   ARCHIVED
 }
 
-enum VotingOrganization {
-  OSIS
-  DEWAN_AMBALAN
-  IPNU
-  IPPNU
+enum CandidateMode {
+  SINGLE
+  OPTIONAL_VICE
 }
 
 enum CandidatePosition {
@@ -106,16 +104,16 @@ model Achievement {
 }
 
 model Teacher {
-  id        String   @id @default(cuid())
-  name      String
-  title     String? // "S.E.,M.Pd."
-  position  String // Kepala Sekolah | Waka Kurikulum | Guru Mapel
-  subject   String?
-  photoUrl  String?
-  level     String   @default("Guru") // Yayasan | Kepala Sekolah | Waka | Kaprog | Guru | Staf
-  order     Int      @default(0)
-  accountId String?  @unique // tautan ke akun guru (realm Internal), opsional
-  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  id             String          @id @default(cuid())
+  name           String
+  title          String? // "S.E.,M.Pd."
+  position       String // Kepala Sekolah | Waka Kurikulum | Guru Mapel
+  subject        String?
+  photoUrl       String?
+  level          String          @default("Guru") // Yayasan | Kepala Sekolah | Waka | Kaprog | Guru | Staf
+  order          Int             @default(0)
+  accountId      String?         @unique // tautan ke akun guru (realm Internal), opsional
+  account        Account?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
   electionVoters ElectionVoter[]
 }
 
@@ -286,41 +284,69 @@ model StudentAuditEvent {
 }
 
 model ElectionPeriod {
-  id              String             @id @default(uuid()) @db.Uuid
-  slug            String             @unique @db.VarChar(64)
-  name            String             @db.VarChar(120)
-  academicYear    String             @db.VarChar(20)
-  isTest          Boolean            @default(false)
-  state           ElectionState      @default(DRAFT)
-  opensAt         DateTime           @db.Timestamptz(3)
-  closesAt        DateTime           @db.Timestamptz(3)
-  extensionUsedAt DateTime?          @db.Timestamptz(3)
-  closedAt        DateTime?          @db.Timestamptz(3)
-  publishedAt     DateTime?          @db.Timestamptz(3)
-  resultSnapshot  Json?
-  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
-  contests        ElectionContest[]
-  voters          ElectionVoter[]
+  id               String            @id @default(uuid()) @db.Uuid
+  slug             String            @unique @db.VarChar(64)
+  name             String            @db.VarChar(120)
+  academicYear     String            @db.VarChar(20)
+  isTest           Boolean           @default(false)
+  state            ElectionState     @default(DRAFT)
+  opensAt          DateTime          @db.Timestamptz(3)
+  closesAt         DateTime          @db.Timestamptz(3)
+  extensionUsedAt  DateTime?         @db.Timestamptz(3)
+  closedAt         DateTime?         @db.Timestamptz(3)
+  publishedAt      DateTime?         @db.Timestamptz(3)
+  resultSnapshot   Json?
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  contestsRevision Int               @default(0)
+  contests         ElectionContest[]
+  voters           ElectionVoter[]
+}
+
+model ElectionType {
+  code           String            @id @db.VarChar(32)
+  name           String            @db.VarChar(120)
+  logoUrl        String?           @db.VarChar(1024)
+  candidateMode  CandidateMode
+  chairLabel     String            @db.VarChar(80)
+  viceChairLabel String?           @db.VarChar(80)
+  active         Boolean           @default(true)
+  sortOrder      Int
+  revision       Int               @default(0)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  contests       ElectionContest[]
+
+  @@index([active, sortOrder, code])
 }
 
 model ElectionContest {
-  periodId      String               @db.Uuid
-  organization  VotingOrganization
-  period        ElectionPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  candidates    CandidatePair[]
-  participation VoterParticipation[]
+  periodId               String               @db.Uuid
+  organization           String               @db.VarChar(32)
+  nameSnapshot           String               @db.VarChar(120)
+  logoUrlSnapshot        String?              @db.VarChar(1024)
+  candidateModeSnapshot  CandidateMode
+  chairLabelSnapshot     String               @db.VarChar(80)
+  viceChairLabelSnapshot String?              @db.VarChar(80)
+  sortOrder              Int
+  type                   ElectionType         @relation(fields: [organization], references: [code], onDelete: Restrict, onUpdate: Restrict, map: "ElectionContest_type_fkey")
+  period                 ElectionPeriod       @relation(fields: [periodId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  candidates             CandidatePair[]
+  participation          VoterParticipation[]
+  ballots                Ballot[]
 
   @@id([periodId, organization])
+  // SQL migration makes this constraint DEFERRABLE INITIALLY DEFERRED.
+  @@unique([periodId, sortOrder], map: "ElectionContest_period_order_key")
+  @@index([organization])
 }
 
 model CandidatePair {
-  id           String             @id @default(uuid()) @db.Uuid
-  periodId     String             @db.Uuid
-  organization VotingOrganization
+  id           String            @id @default(uuid()) @db.Uuid
+  periodId     String            @db.Uuid
+  organization String            @db.VarChar(32)
   ballotNumber Int
-  vision       String             @db.VarChar(2000)
-  mission      String             @db.VarChar(2000)
-  contest      ElectionContest    @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+  vision       String            @db.VarChar(2000)
+  mission      String            @db.VarChar(2000)
+  contest      ElectionContest   @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
   members      CandidateMember[]
   ballots      Ballot[]
 
@@ -329,16 +355,16 @@ model CandidatePair {
 }
 
 model CandidateMember {
-  candidatePairId String             @db.Uuid
-  periodId        String             @db.Uuid
-  organization    VotingOrganization
-  studentId       String             @db.Uuid
+  candidatePairId String            @db.Uuid
+  periodId        String            @db.Uuid
+  organization    String            @db.VarChar(32)
+  studentId       String            @db.Uuid
   position        CandidatePosition
-  nameSnapshot    String             @db.VarChar(120)
-  classSnapshot   String             @db.VarChar(40)
-  photoUrl        String?            @db.VarChar(1024)
-  pair            CandidatePair      @relation(fields: [candidatePairId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
-  student         Student            @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  nameSnapshot    String            @db.VarChar(120)
+  classSnapshot   String            @db.VarChar(40)
+  photoUrl        String?           @db.VarChar(1024)
+  pair            CandidatePair     @relation(fields: [candidatePairId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+  student         Student           @relation(fields: [studentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@id([candidatePairId, position])
   @@unique([periodId, organization, studentId])
@@ -381,23 +407,24 @@ model ElectionVoter {
 }
 
 model VoterParticipation {
-  voterId      String             @db.Uuid
-  periodId     String             @db.Uuid
-  organization VotingOrganization
-  hasVoted     Boolean            @default(false)
-  voter        ElectionVoter      @relation(fields: [voterId, periodId], references: [id, periodId], onDelete: Restrict, onUpdate: Restrict)
-  contest      ElectionContest    @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+  voterId      String          @db.Uuid
+  periodId     String          @db.Uuid
+  organization String          @db.VarChar(32)
+  hasVoted     Boolean         @default(false)
+  voter        ElectionVoter   @relation(fields: [voterId, periodId], references: [id, periodId], onDelete: Restrict, onUpdate: Restrict)
+  contest      ElectionContest @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict)
 
   @@id([voterId, organization])
   @@index([periodId, organization, hasVoted])
 }
 
 model Ballot {
-  id           String             @id @default(uuid()) @db.Uuid
-  periodId     String             @db.Uuid
-  organization VotingOrganization
-  candidateId  String             @db.Uuid
-  candidate    CandidatePair      @relation(fields: [candidateId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+  id           String          @id @default(uuid()) @db.Uuid
+  periodId     String          @db.Uuid
+  organization String          @db.VarChar(32)
+  candidateId  String          @db.Uuid
+  candidate    CandidatePair   @relation(fields: [candidateId, periodId, organization], references: [id, periodId, organization], onDelete: Restrict, onUpdate: Restrict)
+  contest      ElectionContest @relation(fields: [periodId, organization], references: [periodId, organization], onDelete: Restrict, onUpdate: Restrict, map: "Ballot_contest_fkey")
 
   @@index([periodId, organization, candidateId])
 }
@@ -424,15 +451,15 @@ model VotingRateBucket {
 }
 
 model VotingAuditEvent {
-  id             String          @id @default(uuid()) @db.Uuid
-  periodId       String?         @db.Uuid
+  id             String   @id @default(uuid()) @db.Uuid
+  periodId       String?  @db.Uuid
   actorAccountId String?
-  event          String          @db.VarChar(64)
-  targetId       String?         @db.VarChar(64)
-  reasonCode     String?         @db.VarChar(64)
+  event          String   @db.VarChar(64)
+  targetId       String?  @db.VarChar(64)
+  reasonCode     String?  @db.VarChar(64)
   detail         Json?
-  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
-  actor          Account?        @relation(fields: [actorAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  actor          Account? @relation(fields: [actorAccountId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([periodId, createdAt])
   @@index([actorAccountId, createdAt])

@@ -1,6 +1,6 @@
 ---
 import VotingPage from '../../../../siswa/e-voting/[slug]/pilih/[organization].astro';
-import {BallotPageError, getOrganizationCandidates, ORGANIZATIONS} from '../../../../../lib/voting/ballot-pages';
+import {BallotPageError, getOrganizationCandidates} from '../../../../../lib/voting/ballot-pages';
 export const prerender = false;
 Astro.response.headers.set('Cache-Control','private, no-store');
 Astro.response.headers.set('Referrer-Policy','no-referrer');
@@ -8,11 +8,10 @@ Astro.response.headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
 Astro.response.headers.set('X-Frame-Options','DENY');
 const session=Astro.locals.votingSession;
 if(!session)return Astro.redirect('/pemilih/masuk');
-const organization=ORGANIZATIONS.find(({id})=>id===Astro.params.organization);
-if(!organization)return new Response('Not Found',{status:404});
 let data;
-try {data=await getOrganizationCandidates(session.periodId,Astro.params.slug!,session.voterId,organization.id);}
+try {data=await getOrganizationCandidates(session.periodId,Astro.params.slug!,session.voterId,Astro.params.organization!);}
 catch(error) {
+  if(error instanceof BallotPageError && error.code==='INVALID_ORGANIZATION')return new Response('Not Found',{status:404});
   if(error instanceof BallotPageError && error.code==='ALREADY_VOTED')return Astro.redirect(`/pemilih/e-voting/${Astro.params.slug}/pilih`);
   return Astro.redirect(error instanceof BallotPageError && error.code==='UNAUTHENTICATED'?'/pemilih/masuk':'/pemilih');
 }

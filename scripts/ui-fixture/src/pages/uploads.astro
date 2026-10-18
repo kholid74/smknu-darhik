@@ -1,0 +1,11 @@
+---
+import AdminLayout from '../../../../src/layouts/AdminLayout.astro';
+import MediaPicker from '../../../../src/components/MediaPicker.astro';
+import FileUpload from '../../../../src/components/FileUpload.astro';
+import UploadWidget from '../../../../src/components/UploadWidget.astro';
+Astro.locals.principal={roles:['superadmin']};
+---
+<AdminLayout title="Upload QA" user={{role:'superadmin'}}>
+  <section class="card"><h1>Upload sintetis</h1><MediaPicker field="qaPhoto" label="Foto QA" folder="e-voting"/><MediaPicker field="qaLogo" label="Logo QA" folder="e-voting" assetKind="logo"/><FileUpload field="qaDocument" label="Dokumen QA"/></section>
+  <section class="card"><UploadWidget/></section>
+</AdminLayout>

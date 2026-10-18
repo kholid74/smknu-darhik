@@ -1,126 +1,121 @@
-# Kontrak API dan mutasi form
+# Kontrak API — target T01
 
-Status: kontrak pemilu dengan tambahan pemilih guru yang disetujui 16 Oktober 2026. Semua handler dinamis (`prerender = false`). Base pemilu bersama `/api/e-voting`, dashboard siswa `/api/siswa/dashboard`, dashboard guru `/api/pemilih/dashboard`, panitia `/api/admin/e-voting`, master siswa `/api/admin/students`. `[periodId]` adalah UUID, bukan slug. Organisasi hanya `OSIS`, `DEWAN_AMBALAN`, `IPNU`, `IPPNU`. Bagian rencana yang belum tersedia tetap memerlukan verifikasi terhadap handler aktual.
+**Pembaruan T11, 18 Oktober:** endpoint hasil internal dan status publikasi401/429 diterapkan. Regresi232tes lulus (satu penanda tes DB dilewati dan dijalankan terpisah), PostgreSQL lokal lintas koneksi6/6, browser37skenario, Prisma validate/generate dan build lulus. Penerimaan R2/Vercel/perangkat tetap belum selesai. [Bukti T11](06-pengujian.md#bukti-dan-gerbang-rilis).
 
-## Tambahan kontrak guru
+**Pembaruan upload 18 Oktober:** T10 sudah diimplementasikan dan diuji lokal (228 tes, 37 skenario browser, build lulus). Verifikasi object R2/hosted belum selesai karena konfigurasi R2 lokal belum tersedia. [Bukti dan batas](../image-upload-webp-study.md#implementasi-t10-dan-bukti-terbaru).
 
-- POST sesi siswa tetap tepat `{nisn,pin}`. Guru memakai endpoint yang sama dengan tepat `{voterType:"TEACHER",code,pin}`; kode `GURU-` + 12 digit heksadesimal dinormalisasi ke huruf besar. Tidak menerima teacherId, accountId atau NISN buatan. Respons guru menuju `/pemilih` atau `/pemilih/selesai`, tanpa identitas. Limiter lima percobaan/15 menit memakai namespace teacher-login terpisah dari student-login.
-- GET `/api/pemilih/dashboard` hanya menerima sesi guru aktif. Struktur sama dengan dashboard siswa, href E-Voting memakai `/pemilih/e-voting/<slug>/pilih`; tidak memuat kartu personal/akademik. Sesi guru ditolak pada API siswa dan sebaliknya. Status/activity/votes/logout bersama tetap memeriksa periode, scope, CSRF dan masa sesi. Suara keempat guru mengembalikan redirect `/pemilih/selesai`.
-- POST `/api/admin/e-voting/[periodId]/voters/teachers` menerima tepat `{teacherIds:[...]}`: 1–99 ID master unik, setiap ID string 1–128 karakter alfanumerik, underscore atau minus. Izin `evoting.lihat` + `evoting.pemilih`; origin dan CSRF wajib. Sukses `200 {data:{added,alreadyPresent,total}}`. Tidak perlu izin pengelolaan master untuk memilihnya. Tidak menerima nama bebas atau otomatis seluruh staf. Server membaca master ulang, mengunci periode, memeriksa waktu DB dan total gabungan maksimal 99, lalu membuat roster, empat eligibility dan audit atomik. Duplikat yang sudah ada tidak ditambahkan ulang. `400 INVALID_INPUT`, `404 TEACHER_NOT_FOUND`/`NOT_FOUND`, `409 ROSTER_LIMIT`/`INVALID_STATE`; kegagalan DB/audit membatalkan transaksi dan memberi 503.
-- GET roster menambahkan `teacherId`, `voterType`, `loginCode`; `nisn` nullable. Detail partisipasi menambahkan voterType/loginCode, dengan izin partisipasi + pemilih. Tetap tanpa hash/PIN/pilihan kandidat. Untuk DELETE guru, body tepat `{expectedSnapshot:{loginCode,name,className:"Guru"}}`; siswa tetap memakai snapshot NISN/nama/kelas. PATCH sinkronisasi/koreksi NISN hanya siswa. Identitas pemilik dan kode guru tidak dapat diganti.
-- PIN issue/reset/print memakai target voterId yang sama untuk kedua jenis. Slip guru memuat kode dan URL lengkap Portal Pemilih. Kesiapan, batas 99, partisipasi, close dan denominator hasil menghitung gabungan. Snapshot hasil tidak menambahkan voterType atau breakdown kelompok.
+**Pembaruan Neon 17 Oktober 2026:** migrasi schema dan cleanup empat periode yang disetujui sudah berhasil setelah backup teruji. Master dan audit lama tetap; deployment belum dilakukan. [Catatan pelaksanaan](13-catatan-migrasi-neon.md).
 
-Rincian: [pemilih guru](09-usulan-pemilih-guru.md). Kontrak siswa berikut tetap berlaku khusus siswa; endpoint bersama berlaku bagi kedua jenis melalui sesi yang sudah diverifikasi.
+Status 17 Oktober 2026: **T03 backend konfigurasi dan T04 hak pilih/sesi/suara/rekap dinamis selesai lokal.** [OpenAPI 3.1](contracts/e-voting-v2.openapi.json) memuat 21 operasi target. Master/create/susunan serta Dashboard, VotingStatus, ParticipationSummary, VoteRecorded dan PublicResults sudah diperiksa terhadap respons aktual pada fixture SQL/Prisma. Kontrak edit/hapus calon lengkap sudah diterapkan T06; penutupan tanpa turnout penuh beserta alasan sudah diterapkan T07. [Schema](03-schema.md), [desain](02-desain.md). Schema sudah dimigrasikan ke Neon; aplikasi belum dirilis.
 
 ## Aturan bersama
 
-Persiapan mengikuti [aturan DRAFT dan pilihan siswa](10-daftar-pemilih-dan-draft.md): DRAFT tetap dapat dikelola meski tanggal lama lewat; SCHEDULED terkunci saat opensAt. Penyimpanan jadwal baru/schedule tetap mewajibkan opensAt di masa depan. Penambahan siswa tidak lagi menerima body kosong untuk seluruh master.
+- Sukses JSON `{data:...}`, gagal `{error:{code}}`; tidak mengganti envelope repo. Dashboard khusus tetap `{data:...,csrfToken}`. Upload/cetak memiliki format terpisah di bawah.
+- Internal memakai cookie `smkdh_token`, akun aktif dan izin DB terbaru. Semua endpoint panitia membutuhkan `evoting.lihat` serta izin tindakan. Sesi PIN tidak sah untuk admin, alumni atau upload.
+- Mutasi memerlukan Origin same-origin dan `X-CSRF-Token` terikat akun/sesi; token GET admin berumur lima menit. Login memakai nonce preauth dan CSRF yang sama polanya dengan runtime; vote token 15 menit dibatasi umur sesi. Tidak menerima actorId dari body.
+- JSON maksimum 16KiB, content-type application/json, unknown field ditolak. UUID v4 untuk ID pemilu; code organization uppercase regex schema. Semua string teks di-trim; password/PIN/token tidak di-trim/di-log. URL media diverifikasi server, bukan sekadar regex URL.
+- `400 INVALID_INPUT`, `401 UNAUTHORIZED`/sesi tidak aktif, `403 FORBIDDEN`/`CSRF_REJECTED` (candidate existing memakai `CSRF_INVALID`), `404 NOT_FOUND`, `409` konflik state/stale/integritas, `413 BODY_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`, `429 RATE_LIMITED`, `503 TEMPORARILY_UNAVAILABLE`. Jangan meneruskan object Prisma, pesan SQL atau parameter sensitif ke klien/log.
+- Semua respons pemilihan, termasuk hasil publik, `Cache-Control: private, no-store` sesuai middleware. Tidak mengaktifkan cache roster/status/tally. Read dengan retry terbatas boleh; jangan retry mutasi yang commit-nya tidak diketahui. Setelah vote timeout, cek status/login ulang; duplikat `409 ALREADY_VOTED` tidak mengungkap calon tersimpan.
 
-- JSON success `{ "data": ... }`; JSON error `{ "error": { "code": "...", "message": "pesan aman" } }`. Tidak ada stack trace, raw Prisma error, NISN, PIN atau kandidat pilihan dalam error.
-- POST JSON wajib `Content-Type: application/json` dan `X-CSRF-Token`. Form URL-encoded memakai `_csrf`; parsing hanya field kontrak, tolak key tak dikenal. Tidak ada mutasi GET atau method override.
-- Maksimal body normal 16 KiB; impor 64 KiB. Terapkan sebelum membaca body penuh pada adapter/handler yang diuji, jangan hanya percaya `Content-Length`. Print request maksimal 25 target. Pagination cursor opaque, page size maksimum 100.
-- Cookie dan CSRF seperti [desain](02-desain.md). Semua response, termasuk 4xx/5xx, `private, no-store`, no-referrer. Tidak ada response kandidat pilihan setelah submit atau ID ballot sebagai receipt.
-- `400 INVALID_INPUT`, `401 UNAUTHENTICATED` (login: `INVALID_CREDENTIALS` generik), `403 FORBIDDEN`/`CSRF_INVALID`, `404 NOT_FOUND`, `405 METHOD_NOT_ALLOWED` + Allow, `409` konflik domain, `413 BODY_TOO_LARGE`, `415 UNSUPPORTED_MEDIA_TYPE`, `429 RATE_LIMITED` + Retry-After, `503 TEMPORARILY_UNAVAILABLE`.
-- Hanya detail periode/candidate yang sudah diizinkan yang diekspos; ownership di server, bukan dari request body. Route/action tak dikenal ditolak. Auth API tidak redirect ke HTML login.
-- Form Astro memanggil service yang sama; sukses mutasi biasa menggunakan 303 redirect. Print adalah pengecualian: POST langsung membalas HTML sensitif satu kali. Tidak perlu internal HTTP fetch dari server ke API sendiri.
+## Master jenis dan susunan periode
 
-## Siswa
+Base panitia: `/api/admin/e-voting`. Semua detail field/range/required terdapat pada schema OpenAPI, tanpa free-text class/name untuk calon.
 
-Allowlist sesi `ELECTION_VOTING` hanya mencakup dashboard dan endpoint pemilu di bawah (kecuali hasil terbit yang publik). Guard memeriksa scope, periode, credentialEnabled, idle/absolute expiry dan jendela waktu pada semua request terlindungi. Sesi yang hilang/expired mendapat 401; sesi yang masih terverifikasi tetapi periodenya tak lagi valid ditolak 409 `ELECTION_NOT_OPEN` serta dicabut. Halaman mengarahkan ke login netral; tidak membuka data akademik lewat cookie yang kebetulan ada. Login menerima periode eksplisit; tidak fallback ke PIN periode lain atau password Account. Tidak ada API student registration, password create/reset, ubah PIN atau master Student untuk siswa.
+Implementasi T03: [service](../../src/lib/voting/election-types.ts), [validator](../../src/lib/voting/election-type-input.ts), [uji middleware/endpoint/SQL](../../src/lib/voting/election-types-api.test.ts). Origin/CSRF dan izin terkini wajib; GET master/susunan memberi token mutasi. POST memberi Location, DELETE tanpa body respons. Master active/nonaktif melalui PATCH; tidak ada endpoint tambahan yang menduplikasi tindakan itu. Semua target pada tabel berikut sudah diuji lokal, bukan sudah tersedia di Neon.
 
-| Method/path | Input | Gate | Success dan konflik |
-| --- | --- | --- | --- |
-| GET `/api/e-voting/[periodId]/session` | Tidak ada | Public; terbatas limiter | `200 {csrfToken, phase}`; buat preauth nonce cookie. Tidak mengembalikan data siswa |
-| POST `/api/e-voting/[periodId]/session` | `{nisn, pin}` | CSRF preauth, lima percobaan per NISN/periode dalam 15 menit, periode sedang buka, hash valid dalam roster periode | `200 {complete:false, redirectTo:"/siswa",csrfToken}` + cookie sesi ELECTION_VOTING; bila lengkap `200 {complete:true, redirectTo:"/siswa/selesai"}` + clear cookie, tanpa sesi baru. `409 ELECTION_NOT_OPEN`, `401 INVALID_CREDENTIALS`, `429 RATE_LIMITED` |
-| GET `/api/siswa/dashboard` | Tidak ada | Sesi ELECTION_VOTING aktif, periode valid diturunkan dari sesi | `200 {data:{scope,period,participation,complete,nextOrganization,services},csrfToken}`; dashboard ringkas tanpa master/profile/NISN/PIN/nilai; tidak memperpanjang idle |
-| POST `/api/e-voting/logout` | `{}` | Origin sama + CSRF terikat sesi atau nonce preauth yang sah | `204`, revoke sesi di DB dan clear cookie dengan atribut yang sama |
-| GET `/api/e-voting/[periodId]/status` | Tidak ada | Sesi aktif periode tersebut | `200` empat boolean dan phase; tidak memperpanjang idle secara otomatis. `401` bila sesi selesai/dicabut/expired |
-| POST `/api/e-voting/[periodId]/activity` | `{}` | Sesi aktif, Origin sama, CSRF terikat sesi, maks. 60 request/menit/sesi | `200 {idleExpiresAt, absoluteExpiresAt, csrfToken}`; hanya dipanggil interaksi eksplisit, tidak polling. `429 RATE_LIMITED` |
-| POST `/api/e-voting/[periodId]/votes` | `{organization, candidateId}` | Sesi ELECTION_VOTING + CSRF + predicate jadwal dalam transaksi; maks. 60 request/menit/sesi | `201 {organization, recorded:true, complete, nextOrganization}`; jika complete tambahkan `redirectTo:"/siswa/selesai"`, revoke sesi atomik dan clear cookie. `409 ALREADY_VOTED` atau `ELECTION_NOT_OPEN`; `400 INVALID_CANDIDATE` untuk kandidat salah scope; `429 RATE_LIMITED` |
-| GET `/api/e-voting/[periodId]/results` | Tidak ada | CLOSED/ARCHIVED dan publishedAt ada | `200` snapshot agregat; sebelum publikasi `404 NOT_FOUND`, tidak pernah early tally |
+| Method/path | Izin tambahan | Kontrak/perilaku |
+| --- | --- | --- |
+| GET `/types` | — | q nama/kode <=120, active optional boolean, cursor opaque, limit default20 max100; sortOrder lalu code. `{data:{data:[ElectionType],nextCursor}}`; header X-CSRF-Token |
+| POST `/types` | kelola | code,name,logoUrl,candidateMode,chairLabel,viceChairLabel,active,sortOrder eksplisit; `201 {data:ElectionType}` revision0 |
+| PATCH `/types/{code}` | kelola | expectedRevision dan >=1 field mutable; merge lalu validasi mode/label; `200`. code tidak dapat dikirim/diganti |
+| DELETE `/types/{code}` | kelola | `{expectedRevision}`; `204` jika belum pernah dipakai. Ulang setelah hilang404 |
+| POST `/periods` | kelola | name,slug,academicYear,opensAt,closesAt,**organizations** ordered1–20 unik, isTest optional defaultfalse; `201 {data:PeriodConfig}`. DRAFT dan contestsRevision0; API tidak memilih default tersembunyi |
+| GET `/{periodId}/contests` | — | `{data:{contests:[Contest],contestsRevision}}` metadata snapshot ordered; header token; tanpa PII |
+| PUT `/{periodId}/contests` | kelola | `{organizations:[code...],expectedRevision}` mengganti susunan DRAFT atomik; respons sama GET. Setelah SCHEDULED409 |
 
-Halaman `/siswa/e-voting/[slug]/pilih/[organization]` merender daftar kandidat lewat query server dengan sesi, scope organisasi dan eligibility. Login dari deep link tetap menuju `/siswa`, lalu kartu E-Voting melanjutkan organisasi yang belum selesai; `returnTo` bebas tidak diterima. Tidak perlu API candidate list tersendiri untuk versi awal. Urutan UI tetap OSIS → Dewan Ambalan → IPNU → IPPNU, tetapi server boleh menerima organisasi belum selesai mana pun; tidak boleh bergantung pada urutan browser untuk keamanan.
+Singkatan izin berarti `evoting.<nama>`. Master inactive tidak dapat dipasang baru; retained inactive boleh tetap/reorder. Setiap pemasangan baru mengambil snapshot master di bawah lock. Retained snapshot tidak direfresh; perubahan master hanya berlaku untuk pemasangan baru. Tidak ada endpoint refresh. Lepas contest berisi calon409 `CONTEST_HAS_CANDIDATES`; hapus calon lebih dulu lewat alur sah. Ada hak true/ballot pada DRAFT409 `RECONCILIATION_FAILED`.
 
-`services` pada dashboard adalah allowlist presentasi: satu `{id:"e-voting",status:"available",href:"/siswa/e-voting/<slug>/pilih"}` untuk periode sesi, dan kartu masa depan `{id,label,status:"coming_soon"}` tanpa href/action/endpoint. Kartu tidak meminta data personal. Adanya entri kartu bukan grant server. Route layanan masa depan belum dibuat (404); uji guard memastikan sesi pemilu mendapat 403 ketika diminta scope layanan personal/akademik lain. Hasil terbit tetap publik melalui `/e-voting/[slug]/hasil`, di luar sesi dan jadwal pemungutan.
+Kode konflik: `DUPLICATE_TYPE`, `TYPE_IN_USE`, `STALE_CONFIG`, `INVALID_STATE`, `TYPE_INACTIVE`, `CONTEST_HAS_CANDIDATES`, `RECONCILIATION_FAILED`. Kode tidak dikenal pada input master/periode400 `INVALID_ORGANIZATION`. Revision stale409 bahkan bila payload no-op; no-op cocok200 tanpa increment/audit. Snapshot/type membership dan hak false+audit commit bersama. FK restrict mencegah race master delete dengan attach.
 
-Contoh status (tanpa NISN, nama calon pilihan atau waktu pengiriman):
+Logo baru harus cocok dengan baris Media kind=image dan origin/path sekolah atau R2 yang diizinkan; kegagalan400 `INVALID_LOGO`. URL relatif `/api/image/<key>` sah, sehingga schema MediaUrl memakai URI-reference (bukan URI absolut saja). Tidak menerima data/javascript URL atau prefix domain tiruan. Perubahan master tanpa mengganti logo tidak memaksa refresh snapshot. Penghapusan master tidak menghapus file Media/R2; proteksi semua alur hapus aset terpakai tetap penerimaan T10. Query list menerima cursor kanonis, filter literal nama/kode, limit1–100 dan menolak query ambigu/unknown dengan400 INVALID_INPUT/INVALID_CURSOR.
 
-```json
-{
-  "data": {
-    "phase": "OPEN",
-    "participation": {
-      "OSIS": true,
-      "DEWAN_AMBALAN": false,
-      "IPNU": false,
-      "IPPNU": false
-    },
-    "complete": false,
-    "nextOrganization": "DEWAN_AMBALAN",
-    "idleExpiresAt": "2026-10-20T01:05:00.000Z",
-    "absoluteExpiresAt": "2026-10-20T01:15:00.000Z"
-  }
-}
-```
+GET `/periods` tetap daftar periode existing tanpa snapshot/PII. GET `/{periodId}` menambahkan contests+contestsRevision pada detail/config existing. PATCH `/{periodId}` tetap name/academicYear/jadwal + expected configuration values existing; **tidak menerima organizations/snapshot**. Susunan diubah lewat PUT khusus. Slug/isTest immutable. Schedule `POST /{periodId}/schedule {}` kelola: roster1–99, Ncontest/calon/PIN/hak tepat dan jadwal siap; `409 NOT_READY`/`ANOTHER_SCHEDULED_PERIOD`. Kandidat/roster SCHEDULED masih dapat disiapkan sebelum buka, tetapi susunan sudah terkunci.
 
-Tanggal contoh bukan jadwal sekolah yang ditetapkan. `nextOrganization` null jika lengkap. POST vote yang timeout: UI menyatakan “status pengiriman belum diketahui”, revalidasi status; jika `401`, login ulang. Jangan menyatakan gagal sebelum mengecek kemungkinan commit. Submit duplikat selalu `409 ALREADY_VOTED`, tidak menyatakan kandidat yang dipilih pada request duplikat adalah kandidat tersimpan. Suara keempat mencabut sesi, sehingga response hilang diselesaikan lewat login ulang dan pesan selesai generik.
+POST `/{periodId}/extend {reasonCode,adminPassword}` perpanjang: satu kali <=60 menit; tidak mengubah slate/jenis atau membuka CLOSED. POST `/{periodId}/archive {}` kelola: hanya CLOSED→ARCHIVED, retry idempoten; tidak mengubah snapshot.
 
-## Panitia: daftar dan konfigurasi
+## Calon, Student dan media
 
-Master siswa terpisah dari periode: `GET /api/admin/students` (cursor/limit, ringkasan id/NISN/nama/kelas), `POST /api/admin/students` (`{nisn,name,className}`, 201), dan `PATCH /api/admin/students/[studentId]` (field tersebut + expected old values, 200). Semua memerlukan akun internal aktif + `student.kelola`, CSRF untuk mutasi, validasi NISN/string, audit dan conflict 409 pada NISN duplikat/stale. Tidak ada hard-delete master dalam MVP. Mutasi master tidak membuat PIN/Account/hak pilih, tidak mengubah snapshot ElectionVoter, dan tidak membutuhkan periode aktif. Endpoint ini menolak sesi pemilu tanpa memandang studentId target.
+| Method/path | Izin tambahan | Ketentuan |
+| --- | --- | --- |
+| GET `/{periodId}/students/search?q=...&limit=20` | pemilih | Pilihan Student `{id,name,nisn,className}` (id terpilih dikirim sebagai studentId), header token; ketik teks memunculkan suggestion DB, hanya studentId terpilih dapat disimpan |
+| POST `/{periodId}/candidates` | kelola+pemilih | `{organization,ballotNumber,chair:{studentId,photoUrl?},viceChair?:null|{studentId,photoUrl?},vision,mission}`; `201 {data:{candidateId}}` existing |
+| PATCH `/{periodId}/candidates/{candidateId}` | kelola+pemilih | Payload penuh di atas + expected; organization immutable untuk pair; `200 {data:{updated:true}}` existing |
+| DELETE `/{periodId}/candidates/{candidateId}` | kelola+pemilih | `{expected}`; 204. DRAFT boleh sementara tanpa calon; SCHEDULED sebelum buka harus tersisa >=1 valid; setelah buka ditolak |
 
-Semua route berikut butuh akun aktif, `evoting.lihat`, dan kapabilitas tambahan dalam tabel. Data viewer hanya mendapat field non-PII, bukan `include` seluruh relasi. Kapabilitas hasil tetap tunduk pada gate state, termasuk superadmin.
+Expected membandingkan `ballotNumber,chairStudentId,viceChairStudentId,chairPhotoUrl,viceChairPhotoUrl,vision,mission`; vice/photo kosong bernilai null. **Dua field foto serta body expected saat DELETE sudah diterapkan pada T06** bersama validator/form agar perubahan serentak tidak saling menimpa. Validasi input/API, SQL/Prisma, snapshot dan audit diuji lokal. Student sama/duplikat lintas pair pada contest/periode409 `DUPLICATE_CANDIDATE`; ID Student tidak valid400 `INVALID_STUDENT`; nomor ganda409 `DUPLICATE_CANDIDATE` mengikuti mapping existing; stale409 `STALE_CANDIDATE`.
 
-| Method/path (sesudah base panitia) | Input | Izin tambahan | Output/ketentuan |
-| --- | --- | --- | --- |
-| GET `/periods` | cursor, limit | — | `200` daftar periode tanpa snapshot/roster |
-| POST `/periods` | name ≤120, slug ≤64, academicYear ≤20, opensAt, closesAt, isTest? boolean (default false) | kelola | `201` DRAFT dengan empat contest otomatis; slug duplikat `409`; klasifikasi uji tidak dapat diedit |
-| GET `/[periodId]` | — | — | `200` konfigurasi, phase dan kandidat dengan snapshot anggota; tidak ada PIN/roster/tally |
-| PATCH `/[periodId]` | name, academicYear, opensAt, closesAt, expected configuration values | kelola | DRAFT atau sebelum opensAt; setelah dibuka hanya extension satu kali; optimistic conditional update; `409 STALE_CONFIG`/`INVALID_STATE` |
-| GET `/[periodId]/students/search` | `q` (nama/NISN/kelas), `limit` ≤20 | pemilih | `200` pilihan master `{studentId,name,nisn,className}`; tanpa PIN/kredensial. Header `X-CSRF-Token` memberi token mutasi singkat untuk akun aktif |
-| POST `/[periodId]/candidates` | `{organization,ballotNumber,chair:{studentId,photoUrl?},viceChair?:null atau {studentId,photoUrl?},vision,mission}` | kelola + pemilih | `201`; DRAFT atau sebelum opensAt. Server mengambil snapshot dari Student; studentId berbeda dan belum ditugaskan di organisasi/periode, nomor ballot unik. `400 INVALID_STUDENT`/`409 DUPLICATE_CANDIDATE` |
-| PATCH `/[periodId]/candidates/[candidateId]` | payload pair di atas + `expected:{ballotNumber,chairStudentId,viceChairStudentId,vision,mission}` | kelola + pemilih | `200`; DRAFT atau sebelum opensAt, perubahan satu/dua anggota atomik; audit satu transaksi; menolak ID tidak valid/duplikat/stale |
-| DELETE `/[periodId]/candidates/[candidateId]` | expected old values | kelola | `204`; DRAFT atau SCHEDULED sebelum opensAt, jika masih ada calon valid lain untuk organisasi dan tanpa ballot; audit tetap wajib |
-| POST `/[periodId]/schedule` | `{}` | kelola | `200 SCHEDULED`; roster resmi, empat contest/roster/PIN lengkap. Roster dapat diedit sebelum buka lalu dibekukan atomik saat dibuka. `409 NOT_READY`/`ANOTHER_SCHEDULED_PERIOD` |
-| POST `/[periodId]/extend` | `{reasonCode,adminPassword}` | `evoting.perpanjang` | Satu kali maksimal 60 menit sebelum close; ketua pemilu terpilih harus berbeda dari pengelola PIN menurut prosedur. Aplikasi mencatat aktor/alasan, tetapi tidak mengesahkan pemisahan dua peran. `409 EXTENSION_UNAVAILABLE` setelah dipakai atau periode ditutup |
-| POST `/[periodId]/archive` | `{}` | kelola | `200 ARCHIVED`; hanya CLOSED, snapshot tetap sama |
+SINGLE menolak wakil, OPTIONAL_VICE menerima nol/satu; objek wakil kosong invalid. Server menyalin nama/kelas hanya ketika anggota ditambahkan/Student ID diganti. Edit metadata/foto dengan Student sama mempertahankan snapshot; perubahan Student master tidak merombak riwayat. photoUrl boleh null untuk menghapus foto; omission pada full replace dianggap null. Mode dari contest snapshot, bukan master terkini. Kandidat/anggota/audit satu transaksi dan beku sesudah buka termasuk race.
 
-Singkatan izin pada tabel berarti `evoting.<nama>`. Pencarian Student memakai izin baca master terbatas `evoting.pemilih`; kombinasi izin ini dengan `evoting.kelola` diperlukan untuk CRUD calon karena anggota mengandung PII. Tidak ada DELETE periode. Slug tidak diubah setelah create agar tautan/kertas tidak rusak. Konflik optimistic memakai field allowlist yang dibandingkan di dalam lock, bukan timestamp pada ballot.
+Master siswa dan import Excel/CSV tetap di menu `/admin/siswa`, memakai Student/SchoolClass/Department existing. Tidak ada import roster pemilu kedua, akun permanen atau relasi akun siswa baru. Izin `student.kelola` tidak otomatis memberi kelola pemilihan.
 
-`viceChair` boleh dihilangkan atau null untuk calon tanpa wakil. Objek wakil kosong/ID tidak valid tetap ditolak. `expected.viceChairStudentId` wajib null jika sebelumnya tanpa wakil, atau UUID anggota sebelumnya; perubahan susunan tetap memakai stale guard. Server mengabaikan nama/kelas dari request karena field itu tidak diterima, lalu menyalin snapshot dari Student terpilih. Jumlah pasangan dinamis tanpa batas tetap selain minimal satu calon valid (ketua wajib, wakil opsional) per organisasi saat pembukaan. Create/edit/delete dicatat di `VotingAuditEvent` bersama mutasi; perubahan candidate ditolak setelah `opensAt`, termasuk race dengan transaksi pembukaan. Foto per anggota opsional dan memakai aset media sekolah yang valid/diizinkan.
+### Kontrak upload T10
 
-## Panitia: pemilih dan kredensial
+Route tetap sama; implementasi sekarang endpoint .ts. Origin wajib sama dengan request URL. Multipart dibaca dengan cap5MiB+64KiB sebelum parse, file maksimal5MiB; duplicate/unknown fields ditolak400. Folder yang didukung: uploads, artikel, testimoni, alumni, guru, e-voting, ekskul, galeri, downloads, fasilitas, prestasi, mitra, jurusan, pengumuman. Default assetKind mengikuti signature file; ekstensi dan kontainer harus sesuai allowlist. Dokumen PDF/DOC/DOCX/XLS/XLSX/PPT/PPTX/ZIP/RAR hanya diperiksa signature kontainer, bukan isi atau malware. Office lama memakai OLE, OOXML memakai ZIP; disajikan attachment/nosniff.
 
-| Method/path | Input | Izin tambahan | Output/ketentuan |
-| --- | --- | --- | --- |
-| GET `/[periodId]/voters` | cursor, limit, className? | pemilih | `200` roster terbatas: id, NISN, name, className, credentialEnabled, pinIssued boolean, pinVersion; tidak ada pinHash |
-| GET `/[periodId]/voters/master-preview` | — | pemilih | `200 {data:{academicYear,eligibleCount,currentCount,alreadyPresent,additions,projectedCount,canSync,students:[{id,nisn,name,className,alreadyPresent}]}}`; ringkasan sumber tahun ajaran, proyeksi jika seluruh sumber dipilih; DRAFT atau SCHEDULED sebelum buka |
-| POST `/[periodId]/voters` | Tepat `{studentIds:[...]}`, 1–99 UUID unik | pemilih | `200 {data:{academicYear,selected,added,alreadyPresent,total}}`; hanya siswa terpilih yang memenuhi tahun ajaran, tambahan atomik tanpa mengganti existing, batas gabungan 99; DRAFT atau SCHEDULED sebelum buka. Body `{}` ditolak 400, ID tidak ada/tahun ajaran berbeda 404 STUDENT_NOT_ELIGIBLE |
-| PATCH `/[periodId]/voters/[voterId]` | Sebelum buka: `{syncFromMaster:true,expectedSnapshot}`. Saat berlangsung: `{syncFromMaster:true,expectedSnapshot,adminPassword,reviewerAccountId,reviewerPassword}` | pemilih + student.kelola; pemeriksa kedua juga harus punya kedua kapabilitas | Sebelum buka, sinkronkan snapshot dari master. Saat berlangsung, hanya NISN yang boleh berubah, Student ID tetap, nama/kelas harus tetap cocok, pemilih belum memilih, dua akun aktif berbeda autentikasi ulang; cabut PIN/sesi dan wajib issue PIN baru. Tidak setelah pemilih memilih |
-| DELETE `/[periodId]/voters/[voterId]` | expected old values | pemilih | `204`, sebelum buka, belum ada partisipasi true; hapus participation false |
-| POST `/[periodId]/credentials` | `{voterId,enabled,reasonCode,adminPassword}` | pin + pemilih | `200`, autentikasi ulang; revoke sesi saat disable. Tidak menghapus status atau mengubah denominator |
-| POST `/[periodId]/pins` | `{targets:[{voterId,pinVersion}], mode:"issue" atau "reset", reasonCode?, adminPassword}` | pin + pemilih | `200 text/html` slip cetak sekali, bukan JSON; CSRF, auth ulang, limit 25 dan 5 batch/15 menit/akun. Issue sebelum buka, atau untuk roster yang ditandai koreksi NISN selama periode berlangsung; reset sampai tutup untuk pemilih belum lengkap. `409 STALE_CREDENTIALS`/`COMPLETED_VOTER`, `429 RATE_LIMITED` |
+Reuse `/api/upload` (media.kelola internal) dan `/api/alumni/upload` (sesi alumni terpisah, foto saja). Kontrak ini sudah diterapkan lokal pada T10; penerimaan hosted belum selesai. Tidak memperluas izin PIN atau mendesain ulang autentikasi upload. Pemeriksaan same-origin/izin existing tetap harus lulus; boundary upload diverifikasi pada T10.
 
-`credentials` menerima `adminPassword` juga untuk reautentikasi, tidak pernah mencatatnya. Autentikasi ulang dicocokkan dengan **akun session**, bukan identifier dari body; limiter admin berlaku. PIN hanya dibuat untuk DRAFT/SCHEDULED sebelum deadline; siswa yang lengkap tidak di-reset. Pemberian `evoting.pin` untuk anggota panitia diasumsikan juga diberikan `evoting.pemilih` agar dapat memilih target; handler tetap mengecek keduanya untuk print/credential endpoints yang menyingkap roster.
+Multipart admin: file wajib, folder opsional sesuai allowlist server, `assetKind` opsional `photo|logo|document`. Default image→photo/nonimage→document menjaga caller lama; alumni hanya photo/folder dipaksa alumni, tidak menerima pemilihan folder/logo/document. Server memeriksa tipe file aktual dan allowlist; SVG/animasi tidak masuk jalur raster baru, ditolak415 bila belum ada jalur aman yang terpisah. Jangan fallback menyimpan image korup sebagai raw original.
 
-Tidak ada endpoint impor TSV roster. Pengunggahan spreadsheet siswa hanya dilakukan pada menu master siswa; untuk periode pemilihan, roster dibentuk dari master berdasarkan tahun ajaran.
+Input limit existing5MiB tetap, decode raster maksimal40 juta pixel; rotate EXIF, buang metadata EXIF, resize <=1800×1800 tanpa enlarge. Photo→WebP85, logo eksplisit→WebP lossless dengan alpha. File dokumen yang diizinkan tetap byte asli. MIME output/ekstensi/object Content-Type/Media.size mengikuti **hasil konversi**, Media.filename tetap nama input. Helper `uploadToR2` mengembalikan `{url,mimeType,size,kind}`; semua caller harus diperbarui. Tidak mengubah gambar lama massal atau transform thumbnail on-demand.
 
-Data saksi dua orang untuk penerbitan PIN, penutupan dan publikasi merupakan catatan prosedural yang diverifikasi panitia di luar aplikasi. Aplikasi mengaudit aktor yang login, tetapi tidak membuktikan saksi hadir atau mencegah superadmin menjalankan aksi sendirian.
+Respons admin tetap flat `{url,id,kind}` ditambah `{mimeType,size}`; alumni tetap `{url}` ditambah metadata tersebut. `id` admin tetap nullable bila indexing gagal sesuai perilaku lama; tampilkan kegagalan indexing secara aman, jangan mengaku Media tercatat. Error upload tetap format route existing `{error:string}` dengan pesan aman; 400 file kosong/jenis input,413 ukuran,415 tipe tak didukung,422 decode,503 storage. Tidak memakai envelope pemilu pada upload. Ukuran efektif hosting bisa lebih rendah dari5MiB; uji multipart Vercel pada T10/T12. [Kajian WebP](../image-upload-webp-study.md).
 
-## Panitia: partisipasi dan hasil
+## Pemilih, PIN dan login (pola existing dipertahankan)
 
-| Method/path | Input | Izin tambahan | Output/ketentuan |
-| --- | --- | --- | --- |
-| GET `/[periodId]/participation` | — | partisipasi | `200 {eligible,notStarted,partial,complete,byOrganization}` dari ledger; tanpa kandidat |
-| GET `/[periodId]/participation/voters` | cursor/limit | partisipasi + pemilih | `200` daftar status empat organisasi per siswa, tanpa waktu suara/pilihan; hanya untuk pendampingan |
-| POST `/[periodId]/close` | `{adminPassword, early?: boolean}` | tutup | `200 {state,closedAt}`; early default false. Setelah deadline atau lebih awal dengan seluruh pemilih selesai empat suara; transaksi lock/reconciliation/snapshot. Respons hanya state/waktu, tanpa tally |
-| GET `/[periodId]/results` | — | hasil | `200` snapshot setelah CLOSED/ARCHIVED; sebelumnya `409 RESULTS_NOT_AVAILABLE`, tanpa melakukan query tally |
-| POST `/[periodId]/publish` | `{adminPassword}` | publikasi | `200 {publishedAt}`; CLOSED saja, idempotent setelah sudah terbit; tidak ada unpublish atau edit hasil versi awal |
+| Endpoint | Izin/input utama | Perilaku |
+| --- | --- | --- |
+| GET `/{periodId}/voters/master-preview` | pemilih | Tahun ajaran, kandidat sumber, additions/projectedCount; bukan auto-include semua siswa |
+| GET/POST `/{periodId}/voters` | pemilih; POST tepat `{studentIds:[1..99 UUID unik]}` | Tambah hanya Student terpilih yang sesuai kelas/tahun ajaran; response academicYear/selected/added/alreadyPresent/total existing; batas gabungan99; invalid404 STUDENT_NOT_ELIGIBLE |
+| POST `/{periodId}/voters/teachers` | pemilih; `{teacherIds:[1..99 ID unik]}` | Guru dipilih Teacher master melalui pratinjau roster yang ada; Teacher ID string existing <=128 alnum/_/-; kode GURU terpisah |
+| PATCH `/{periodId}/voters/{voterId}` | pemilih+student.kelola | syncFromMaster+expectedSnapshot; setelah buka hanya koreksi NISN sebelum memilih, tambah adminPassword/reviewerAccountId/reviewerPassword, dua akun aktif berbeda; cabut PIN/sesi |
+| DELETE `/{periodId}/voters/{voterId}` | pemilih + expected existing | Hanya sebelum buka dan belum memilih; hapus hak false tanpa menghapus master |
+| POST `/{periodId}/credentials` | pin+pemilih; voterId/enabled/reasonCode/adminPassword | Reauth caller; disable mencabut sesi, tidak mengurangi denominator |
+| POST `/{periodId}/pins` | pin+pemilih; targets voterId/pinVersion, mode issue/reset, reasonCode?,adminPassword | 25 maksimal/batch, 5 batch/15menit; **text/html** slip cetak sekali dengan base URL portal siswa/guru lengkap, tidak menyimpan plaintext; check-all dan stale version tetap |
 
-Tidak ada export ballot mentah, endpoint kandidat dengan field votes sebelum tutup, maupun drilldown pilihan siswa. Ekspor hasil awal cukup melalui halaman cetak agregat setelah gate yang sama; tidak perlu endpoint CSV tambahan. Operasi close yang diulang pada CLOSED mengembalikan state tersimpan, bukan menghitung atau mengganti hasil. Selisih ledger/ballot menghasilkan `409 RECONCILIATION_FAILED`; detail sensitif tidak masuk respons/log publik.
+Membership siswa/guru hanya sebelum buka (DRAFT boleh tanggal lama); tiap voter mendapat tepat N participation false. PIN issue/reset tidak membuat hak tambahan. Sesi lengkap tidak bisa direset; reset mencabut PIN/sesi lama tanpa mengubah suara. Masa berlaku hanya periode, bukan login akun internal/portal akademik.
 
-Sebelum deadline tanpa `early: true`, atau periode belum dibuka: `409 BEFORE_DEADLINE`. Opt-in lebih awal dengan roster kosong/ada pemilih belum selesai: `409 EARLY_CLOSE_INCOMPLETE`; pemeriksaan mendahului query tally kandidat. PIN nonaktif tetap dihitung. Password akun caller, limiter, izin `evoting.tutup`, Origin dan CSRF tetap wajib. Unknown field/nonboolean `early` ditolak `400 INVALID_INPUT`. Form early yang tiba sesudah deadline mengikuti penutupan normal. `closesAt` tetap, audit menyimpan alasan dan waktu aktual; publikasi terpisah.
+GET `/api/e-voting/{periodId}/session` bootstrap nonce preauth; POST siswa `{nisn,pin}`, guru `{voterType:"TEACHER",code,pin}`. Generic credential error, limiter5/15menit; hasil login menuju dashboard realm, yang sudah lengkap ke layar selesai tanpa sesi baru. Satu sesi/voter, maksimum tiga sesi global, idle5menit/absolut15 atau deadline. T04 menegakkan batas global dengan advisory lock login; perangkat keempat mendapat409 SESSION_CAPACITY, sedangkan reautentikasi pemilih yang sama mengganti sesi lamanya. Logout existing `/api/e-voting/logout`; POST activity periode hanya aksi eksplisit, bukan polling. Tidak membuat self-register/password/reset siswa.
 
-## API pembersihan sampel ? implementasi 15 Oktober 2026
+## Dashboard, status, suara dan partisipasi dinamis
 
-GET dan POST /api/admin/e-voting/[periodId]/test-cleanup hanya untuk superadmin aktif dengan evoting.lihat, evoting.kelola, evoting.hapus-uji yang tidak dicabut. GET memberi jumlah data, versi preview dan CSRF; POST menerima tepat {confirmation,previewVersion,adminPassword} dan sukses 204. Reautentikasi dan rate limit wajib; nama/slug serta versi diverifikasi ulang di server. Periode biasa atau hasil terpublikasi mendapat 409. [Kontrak lengkap dan kode error](08-pembersihan-data-uji.md).
+GET `/api/siswa/dashboard` dan `/api/pemilih/dashboard` tetap `{data,csrfToken}` dengan csrfToken di root. data mempertahankan scope,period,participation,complete,nextOrganization,services; menambahkan `contests` metadata snapshot. period tetap punya id/name/slug/**opensAt**/closesAt. Kartu Coming Soon tanpa href/action; layanan pribadi tidak tersedia untuk sesi PIN.
+
+GET `/api/e-voting/{periodId}/status` tetap `{data:{phase:"OPEN",participation,complete,nextOrganization,idleExpiresAt,absoluteExpiresAt}}`, ditambah contests. participation dictionary key harus tepat contest periode, nextOrganization pertama false menurut sortOrder; null hanya lengkap. Hak hilang/ekstra409 RECONCILIATION_FAILED. Hasil/angka tetap bukan sumber grant.
+
+POST `/api/e-voting/{periodId}/votes {organization,candidateId}`201 `{data:{recorded:true,complete,nextOrganization,redirectTo?}}`; vote terakhir menambah redirect realm/selesai dan mencabut sesi atomik. Tanpa calon/ballot ID di respons. Vote boleh ke jenis pending mana pun; urutan UI bukan kontrol keamanan. Tidak menambah API daftar kandidat: SSR route pilih memakai sesi dan contest periode.
+
+GET `/{periodId}/participation` izin partisipasi: `{data:{period,eligible,notStarted,partial,complete,contests,byOrganization}}`. **byOrganization tetap array** `{organization,eligible,voted,pending}`, bukan dictionary baru. N dari contest; complete=k=N, partial=0<k<N, belum=k0. N1 partial0.
+
+GET `/{periodId}/participation/voters` partisipasi+pemilih: `{data:{data:[{voterType,loginCode,nisn,name,className,participation}],nextCursor,contests}}`; cursor existing UUID opaque, limit default50 max100. Kolom dibangun dari contests, bukan hardcode. Status tidak membawa kandidat/waktu pengiriman; tanpa izin pemilih hanya agregat. Tidak ada breakdown tally siswa/guru.
+
+## Penutupan dan hasil
+
+Implementasi T07 diuji melalui middleware, endpoint dan Prisma/SQL terisolasi. Password maksimum256 karakter tetap tidak di-trim; password salah401 `INVALID_REAUTH`, limiter429 `RATE_LIMITED`, malformed JSON400, body>16KiB413, content-type salah415. UI menampilkan ringkasan lengkap/parsial/belum mulai, meminta alasan hanya jika dini, mengonfirmasi berakhirnya hak tersisa, lalu membersihkan password saat batal/gagal.
+
+POST `/{periodId}/close` tutup: `{adminPassword,early?:boolean,reason?:string}`. early defaultfalse; bila early=true **reason trimmed10–500 wajib walau request tiba sesudah deadline**. Jika early=false reason boleh dihilangkan; jika ada tetap divalidasi. Saat now<closesAt perlu early=true; sebelum opensAt409 BEFORE_DEADLINE. Tidak ada EARLY_CLOSE_INCOMPLETE akibat pemilih absen. Roster kosong/hak tidak lengkap/ballot mismatch409 RECONCILIATION_FAILED. Nol ballot sah dengan roster valid.
+
+Setelah lock periode dan waktu DB, audit reasonCode COMMITTEE_EARLY_CLOSE jika masih sebelum deadline, DEADLINE_REACHED jika sudah lewat; simpan reason bila ada, jadwal asli dan closedAt aktual. Jika early=true tiba terlambat tetap close normal dengan reason tersimpan. Rekonsiliasi+snapshotv2+CLOSED+revoke sesi+audit commit bersama. Retry CLOSED/ARCHIVED setelah seluruh pemeriksaan auth/CSRF/reauth memberi200 `{data:{state,closedAt}}` tanpa menghitung/mengubah snapshot atau audit lagi. Password tidak masuk audit. Tidak auto-publish/reopen.
+
+GET `/{periodId}/results` hasil: **diterapkan T11**200 `{data:ResultSnapshot}` sesudah CLOSED/ARCHIVED; sebelumnya409 RESULTS_NOT_AVAILABLE tanpa query tally. POST `/{periodId}/publish {adminPassword}` publikasi: CLOSED saja,200 `{data:{publishedAt}}`, idempoten bila terbit; tidak ada unpublish. Hasil publik GET `/api/e-voting/{periodId}/results` tetap `{data:{period:{slug,name,academicYear,closedAt,publishedAt},result}}` dan halaman `/e-voting/{slug}/hasil`; harus CLOSED/ARCHIVED+publishedAt, selain itu404. Tidak ada raw ballot export/PII pemilih/hasil kandidat sebelum gate, termasuk superadmin.
+
+T08 memakai layanan snapshot yang sama untuk HTML hasil dan API publik. Hasil CLOSED/ARCHIVED yang belum dipublikasikan tetap404, snapshot rusak/storage gagal503 aman. Read publik tidak menghitung Ballot atau membaca master Student/Teacher/jenis. Middleware menolak segmen ID tidak valid dengan403 sebelum handler; UUID sah yang tidak ditemukan404. Respons HTML dan JSON pemilihan tetap private, no-store. T08 menyelesaikan penyajian publik; endpoint internal diselesaikan T11, dengan izin lihat+hasil terkini dan state+snapshot dibaca atomik dalam satu statement. Snapshot rusak/storage gagal503 aman; tanpa query Ballot/master.
+
+Snapshot v2 berisi metadata jenis dan foto/nama/kelas snapshot calon, tanpa studentId; query riwayat calon internal tetap melalui CandidateMember.studentId. Denominator infografis: lengkap/eligible untuk orang selesai, votesCast/eligible untuk perjenis, suara kandidat/votesCast dengan nol-safe. Label Perolehan tertinggi bukan keputusan pemenang; seri/nol eksplisit.
+
+T09: GET `/api/admin/e-voting/periods` menambahkan metadata nullable `publishedAt` pada setiap baris; field lainnya dipertahankan. Tidak mengambil resultSnapshot atau tally. Daftar/detail memakai metadata status+publishedAt untuk CTA publik, bukan endpoint hasil internal. POST publish existing tetap memerlukan izin terkini/Origin/CSRF/password; UI hanya menawarkannya pada CLOSED belum terbit. Regresi API membuktikan izin dicabut ditolak, password salah tidak menerbitkan hasil dan publikasi ulang tidak menggandakan audit. T11 menyelaraskan INVALID_REAUTH401 dan RATE_LIMITED429. Body rusak/unknown400, oversized413 dan content-type tidak didukung415, sebelum reauth atau mutasi. UI tetap memakai error.code dan sudah diuji ulang dengan401/429.
+
+## Cleanup dan kompatibilitas
+
+GET/POST `/{periodId}/test-cleanup` existing tetap superadmin+lihat+kelola+hapus-uji, password dan previewVersion/confirmation; hanya isTest belum terbit. [Kontrak historis yang tetap berlaku](08-pembersihan-data-uji.md). Izin pengguna menghapus sampel untuk migrasi dilaksanakan terpisah oleh migrator offline dengan manifest; tidak memperluas endpoint ini.
+
+Tidak mengandalkan client lama mengenal enum baru. Rilis schema/runtime/form/validator sebagai paket pada maintenance. Snapshot parser v2-only hanya jika inventaris memastikan seluruh v1 sampel sudah bersih; data lain menghentikan cleanup. Endpoint yang menambah field harus memperbarui semua caller/fixture T04–T11. [Operasional](07-operasional.md).
