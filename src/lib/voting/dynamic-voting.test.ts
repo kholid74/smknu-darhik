@@ -62,13 +62,14 @@ const { syncTeacherRoster, syncMasterRoster } = await import('./voters');
 const { saveCandidatePair, deleteCandidatePair } = await import('./candidates');
 const { schedulePeriod, getPeriodSetup, publishPeriod, listPeriods } = await import('./periods');
 const { closePeriodTransaction } = await import('./period-close');
-const { getPublishedResult } = await import('./public-results');
+const { getPublishedResult, getResultDisplayLogos } = await import('./public-results');
 const { deleteMedia, MediaInUseError } = await import('../media-delete');
 const { issuePins } = await import('./pins');
 const { onRequest } = await import('../../middleware');
 const { POST: voteEndpoint } = await import('../../pages/api/e-voting/[periodId]/votes');
 const { POST: closeEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/close');
 const { POST: publishEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/publish');
+const { GET: cleanupPreviewEndpoint, POST: cleanupEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/test-cleanup');
 const { GET: publicResultsEndpoint } = await import('../../pages/api/e-voting/[periodId]/results');
 const { GET: internalResultsEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/results');
 const { csrfHeader } = await import('./admin-http');
@@ -184,6 +185,89 @@ for(const n of [1,5,6])test(n+' types: student and teacher login, partial resume
   assert.equal(published.result.version,2);assert.equal(published.result.contests.length,n);
   assert.deepEqual(published.result.contests.map(c=>c.name),originalNames);
   assert.doesNotMatch(JSON.stringify(published.result),/studentId|teacherId|voterId|GURU-|pinHash|nisn/);
+});
+
+test('result display fills missing logos from the master without rewriting historical logos, names, totals or API snapshots',async()=>{
+  const p=await setup();
+  await prisma.$transaction(tx=>closePeriodTransaction(tx,p.id,'actor',true,'Penutupan sesuai keputusan panitia'));
+  await publishPeriod(p.id,'actor','synthetic-password');
+  const before=await getPublishedResult({id:p.id});assert.ok(before);
+  const stored=(await prisma.electionPeriod.findUniqueOrThrow({where:{id:p.id}})).resultSnapshot;
+  for(const code of ['OSIS','PRADANA_PUTRA']){
+    const url='/api/image/qa/logo-'+code+'.webp';
+    await prisma.media.create({data:{url,filename:code+'.webp',kind:'image'}});
+    await services.updateElectionType(code,{logoUrl:url,name:'Changed master '+code,active:false,expectedRevision:0},'actor','http://localhost:4321');
+  }
+  const start=statements.length,logos=await getResultDisplayLogos(before.result.contests,'http://localhost:4321');
+  assert.equal(logos.get('OSIS'),'/api/image/qa/logo-OSIS.webp');assert.equal(logos.get('PRADANA_PUTRA'),'/api/image/qa/logo-PRADANA_PUTRA.webp');
+  assert.equal(logos.get('IPNU'),null);
+  assert.ok(!statements.slice(start).some(sql=>/FROM "(?:Ballot|Student|Teacher|CandidatePair|ElectionVoter)"/.test(sql)));
+  assert.deepEqual(await getPublishedResult({id:p.id}),before);
+  assert.deepEqual((await prisma.electionPeriod.findUniqueOrThrow({where:{id:p.id}})).resultSnapshot,stored);
+  const historical=[{organization:'OSIS',logoUrl:'/api/image/qa/original-logo.webp'}],queries=statements.length;
+  assert.equal((await getResultDisplayLogos(historical,'http://localhost:4321')).get('OSIS'),historical[0].logoUrl);
+  assert.equal(statements.length,queries);
+  const findMany=prisma.electionType.findMany;
+  try {
+    prisma.electionType.findMany=async()=>{throw new Error('Private database detail')};
+    assert.equal((await getResultDisplayLogos(before.result.contests,'http://localhost:4321')).get('OSIS'),null);
+  } finally {prisma.electionType.findMany=findMany;}
+});
+
+for (const [state,published] of [['CLOSED',true],['ARCHIVED',true],['ARCHIVED',false]] as const) test(`test cleanup permits ${state} published=${published}, preserves masters/audit and rejects unsafe requests`,async()=>{
+  const p=await setup(),voter=p.voters[0],session=await login(p.id,voter);if(session.complete)throw Error('missing session');
+  await prisma.accountRole.create({data:{accountId:'actor',role:'superadmin'}});
+  await submitVote(session.sessionId,voter.id,p.id,{organization:p.codes[0],candidateId:p.candidates.find(c=>c.organization===p.codes[0])!.id});
+  await prisma.$transaction(tx=>closePeriodTransaction(tx,p.id,'actor',true,'Pemilihan uji selesai sesuai panitia'));
+  if(published)await publishPeriod(p.id,'actor','synthetic-password');
+  const other=await services.createPeriod({slug:'preserve-official',name:'Official',academicYear:'2026/2027',isTest:false,opensAt:new Date(Date.now()+86400000),closesAt:new Date(Date.now()+172800000),organizations:['OSIS']},'actor');
+  const masterBefore={students:await prisma.student.findMany(),teachers:await prisma.teacher.findMany(),accounts:await prisma.account.findMany(),classes:await prisma.schoolClass.findMany(),departments:await prisma.department.findMany(),types:await prisma.electionType.findMany(),media:await prisma.media.findMany()};
+  const visit=async(method='GET',body?:unknown,csrf=true,id=p.id)=>{
+    const context=createContext({request:new Request('http://localhost:4321/api/admin/e-voting/'+id+'/test-cleanup',{method,headers:{Cookie:'smkdh_token='+adminToken,...(method==='POST'?{Origin:'http://localhost:4321','Content-Type':'application/json',...(csrf?{'X-CSRF-Token':csrfHeader('actor',adminToken)}:{})}:{})},...(body?{body:JSON.stringify(body)}:{})}),params:{periodId:id}});
+    return onRequest(context,()=>method==='GET'?cleanupPreviewEndpoint!(context):cleanupEndpoint!(context));
+  };
+  const previewResponse=await visit();assert.equal(previewResponse.status,200);const preview=(await previewResponse.json()).data;
+  assert.equal(preview.ballots,1);assert.equal(!!preview.publishedAt,published);
+  for(const sql of ['DELETE FROM "Ballot" WHERE "periodId"=$1','UPDATE "Ballot" SET id=gen_random_uuid() WHERE "periodId"=$1','DELETE FROM "VotingAuditEvent" WHERE "periodId"=$1']){
+    await pg.exec('SAVEPOINT published_guards');await assert.rejects(pg.query(sql,[p.id]));await pg.exec('ROLLBACK TO SAVEPOINT published_guards; RELEASE SAVEPOINT published_guards');
+  }
+  await prisma.account.update({where:{id:'actor'},data:{active:false}});
+  assert.equal((await pg.query<{data:{error:string}}>('SELECT evoting_delete_test_period($1,$2,$3,$4) AS data',[p.id,'actor','HAPUS synthetic-period',preview.version])).rows[0].data.error,'FORBIDDEN');
+  await prisma.account.update({where:{id:'actor'},data:{active:true}});
+  const body={confirmation:'HAPUS synthetic-period',previewVersion:preview.version,adminPassword:'synthetic-password'};
+  assert.equal((await visit('POST',body,false)).status,403);
+  assert.equal((await visit('POST',{...body,adminPassword:'wrong'})).status,401);
+  assert.equal((await visit('POST',{...body,confirmation:'HAPUS preserve-official'})).status,409);
+  await prisma.accountOverride.create({data:{accountId:'actor',capability:'evoting.hapus-uji',effect:'revoke'}});
+  assert.equal((await visit('POST',body)).status,403);await prisma.accountOverride.deleteMany();
+  if(state==='ARCHIVED')await prisma.electionPeriod.update({where:{id:p.id},data:{state:'ARCHIVED'}});
+  else await prisma.votingAuditEvent.create({data:{periodId:p.id,event:'CLEANUP_PREVIEW_CHANGED',actorAccountId:'actor'}});
+  assert.equal((await visit('POST',body)).status,409);
+  const fresh=(await (await visit()).json()).data;
+  const auditBefore=await prisma.votingAuditEvent.findMany({where:{periodId:p.id},orderBy:{id:'asc'}});
+  if(state==='CLOSED'){
+    await pg.exec(`CREATE FUNCTION fail_published_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Synthetic cleanup rollback'; END $$;
+      CREATE TRIGGER fail_published_cleanup BEFORE DELETE ON "ElectionVoter" FOR EACH ROW EXECUTE FUNCTION fail_published_cleanup();`);
+    assert.equal((await visit('POST',{...body,previewVersion:fresh.version})).status,503);
+    assert.equal(await prisma.ballot.count({where:{periodId:p.id}}),1);
+    assert.deepEqual(await prisma.votingAuditEvent.findMany({where:{periodId:p.id},orderBy:{id:'asc'}}),auditBefore);
+    await pg.exec('DROP TRIGGER fail_published_cleanup ON "ElectionVoter"; DROP FUNCTION fail_published_cleanup();');
+    assert.equal((await visit('POST',{...body,previewVersion:fresh.version})).status,429);
+    await prisma.votingRateBucket.updateMany({data:{expiresAt:new Date(Date.now()-1000)}});
+  }
+  assert.equal((await visit('POST',{...body,previewVersion:fresh.version})).status,204);
+  await pg.exec('SET CONSTRAINTS ALL IMMEDIATE; SET CONSTRAINTS ALL DEFERRED');
+  for(const model of ['electionVoter','voterParticipation','ballot','candidateMember','candidatePair','electionContest'] as const)assert.equal(await prisma[model].count({where:{periodId:p.id}}),0,model);
+  assert.equal(await prisma.electionPeriod.count({where:{id:p.id}}),0);assert.equal(await prisma.votingSession.count(),0);
+  assert.ok(await prisma.votingRateBucket.count());
+  assert.equal(await getPublishedResult({id:p.id}),null);
+  assert.ok(await prisma.electionPeriod.findUnique({where:{id:other.id}}));
+  assert.deepEqual({students:await prisma.student.findMany(),teachers:await prisma.teacher.findMany(),accounts:await prisma.account.findMany(),classes:await prisma.schoolClass.findMany(),departments:await prisma.department.findMany(),types:await prisma.electionType.findMany(),media:await prisma.media.findMany()},masterBefore);
+  const events=await prisma.votingAuditEvent.findMany({where:{periodId:p.id}}),deleted=events.find(e=>e.event==='TEST_PERIOD_DELETED')!;
+  assert.deepEqual(events.filter(e=>e.event!=='TEST_PERIOD_DELETED').sort((a,b)=>a.id.localeCompare(b.id)),auditBefore);
+  assert.equal((deleted.detail as any).state,state);assert.equal(!!(deleted.detail as any).publishedAt,published);assert.equal((deleted.detail as any).ballots,1);
+  assert.equal((await visit('GET',undefined,true,other.id)).status,409);
+  assert.equal((await pg.query<{data:{error:string}}>('SELECT evoting_delete_test_period($1,$2,$3,$4) AS data',[other.id,'actor','HAPUS preserve-official','0'.repeat(32)])).rows[0].data.error,'TEST_CLEANUP_NOT_ALLOWED');
 });
 
 test('a fourth voter is refused, same voter may replace its session, logout/expiry release a slot',async()=>{

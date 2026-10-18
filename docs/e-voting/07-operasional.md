@@ -42,7 +42,7 @@ T12 harus menyiapkan manifest reviewable dari inventaris aktual: exact period UU
 
 Rate bucket tidak mempunyai FK period universal; jangan membersihkan semua bucket sebagai efek cleanup. Kredensial aktif dicabut dengan penghapusan sesi/voter target. Referensi audit period UUID sengaja tetap meski parent terhapus; actor Account FK restriktif tidak dilepas. Master ElectionType legacy hanya dibuang bila tidak punya referensi dan memang perlu untuk transisi; tidak menambah sampel baru di Neon.
 
-Runtime `/test-cleanup` tetap hanya isTest dan belum dipublikasi dengan popup+password+previewVersion. Jika target sesuai syarat, reuse jalur tersebut dalam rehearsal. Sampel published/legacy di luar aturan runtime **tidak** diberi bypass endpoint; pembersihan yang sudah diotorisasi dilakukan migrator offline berikut, bukan mengubah klasifikasi/isTest agar lolos guard.
+Runtime `/test-cleanup` hanya untuk `isTest=true`, dengan popup+password+previewVersion. Keputusan18Oktober memperbolehkan data uji sesudah publish/archive; status/publikasi tetap masuk pratinjau dan audit. Sesudah migrasi `20261018090000_published_test_cleanup`, gunakan alur dashboard tersebut untuk data uji. Sampel legacy yang bukan isTest tetap di luar aturan runtime; pembersihan yang sudah diotorisasi dilakukan migrator offline berikut, bukan mengubah klasifikasi/isTest agar lolos guard. Migrasi guard tidak menjalankan penghapusan data.
 
 ### Memakai artifact cleanup offline pada T12
 
@@ -103,6 +103,10 @@ Sebelum rilis hosted, lengkapi env R2 dan verifikasi upload/multipart/cold start
 6. Monitor hanya partisipasi; belum/parsial boleh didampingi tanpa melihat pilihan. Tidak ada tally kandidat sebelum close, termasuk saat semua selesai. PIN disabled tetap denominator dan tidak menghapus hak/suara.
 7. Sesudah opensAt panitia boleh close walau absen/parsial. Sebelum deadline, alasan10–500+early opt-in+password+konfirmasi konsekuensi. Rekonsiliasi wajib, nol suara sah dengan roster nonkosong. Close permanen, jadwal asli tetap; publikasi terpisah. Dua saksi adalah prosedur, tidak diklaim aplikasi membuktikan kehadiran mereka.
 8. Periksa hasil internal/rekonsiliasi, setujui berita acara lalu publish. CTA Lihat hasil voting membuka tabbaru. Seri/nol ditangani kebijakan sekolah; aplikasi tidak menetapkan pemenang/quorum. Archive setelah proses resmi; jangan hapus periode nyata untuk mengulang hasil.
+
+### Logo jenis pada hasil
+
+Tombol jenis di bawah statistik dan judul tiap bagian memakai logo snapshot. Jika snapshot tidak memiliki logo, HTML hasil menggunakan logo master pada menu Jenis Pemilihan; logo yang diunggah setelah periode dibuat dapat muncul tanpa membuka ulang, menerbitkan ulang atau mengubah hasil suara. Logo historis yang sudah ada tidak diganti. Inisial hanya menjadi cadangan bila kedua sumber kosong, URL master tidak valid atau lookup logo gagal. Snapshot tersimpan dan API hasil tetap beku; cadangan master ini hanya untuk tampilan HTML.
 
 ## Insiden, rollback dan retensi
 

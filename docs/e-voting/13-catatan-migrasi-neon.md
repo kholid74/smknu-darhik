@@ -49,6 +49,14 @@ Kemudian Prisma `migrate deploy` menerapkan [20261017090000_dynamic_election_typ
 
 ## Pekerjaan yang tetap tersisa
 
+### Pembaruan guard hapus data uji, 18 Oktober 2026
+
+Migrasi `20261018090000_published_test_cleanup` sudah diterapkan ke Neon melalui `prisma migrate deploy`. Fungsi `evoting_test_cleanup_allowed` dan `evoting_delete_test_period` kini memperbolehkan periode isTest pada seluruh status, termasuk published/archived; klasifikasi immutable, role/izin, konfirmasi, versi pratinjau, lock, audit dan transaksi tetap berlaku. Migrasi tidak menghapus periode atau mengubah klasifikasinya.
+
+Definisi dua fungsi sebelum perubahan disimpan di artifact lokal yang diabaikan Git. Checksum migrasi cocok dengan file SQL; hash/count seluruh37tabel aplikasi identik sebelum/sesudah. Tetap **2periode,52Student,7Teacher dan184audit**. Tidak menjalankan uji penghapusan pada Neon. Regresi lokal236tes lulus (1penanda DB terpisah), PostgreSQL lintas koneksi6/6,39skenario browser, build, kontrak dan pemeriksaan dokumen lulus. Server PostgreSQL lokal telah dihentikan.
+
+Kode aplikasi untuk menampilkan aksi pada periode uji yang sudah terbit/diarsipkan belum di-commit/push/deploy pada langkah ini; aplikasi lama masih menyembunyikan aksi tersebut. Tiga arsip migrasi historis yang sudah tercatat di database tetap belum tersedia lokal, sebagaimana inventaris sebelumnya.
+
 T10 upload WebP, T11 pengujian gabungan/endpoint hasil internal/status HTTP publikasi, pemulihan tiga arsip migrasi historis, role runtime nonowner, commit/push, deployment aplikasi yang kompatibel dan smoke test hosted/Chromebook belum selesai. Tidak mengklaim migrasi DB sebagai selesainya seluruh rilis.
 
 **Vercel belum diperbarui pada langkah ini.** Runtime lama yang mengasumsikan empat enum/hasil v1 dapat gagal pada fitur e-voting terhadap schema baru. Jangan membuat periode resmi atau memakai pemungutan suara hosted sebelum artifact yang kompatibel terpasang dan diverifikasi. Rollback kode lama saja tidak memulihkan schema atau sampel yang dihapus; gunakan cadangan dan prosedur pemulihan yang sesuai.

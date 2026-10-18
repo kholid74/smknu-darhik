@@ -63,7 +63,7 @@ Nama existing di bawah sudah dicocokkan dengan migrasi repo pada T02; inventaris
 | `evoting_reject_ballot_change` | UPDATE/DELETE tetap ditolak runtime; larangan TRUNCATE/grant tetap. Tidak ada perubahan izin demi migrasi harian |
 | `evoting_protect_period_identity` | Pertahankan state/identity/freeze/snapshot immutable; tambahkan contestsRevision hanya untuk penggantian DRAFT, larang close sebelum opensAt. Hapus syarat turnout penuh, bukan rekonsiliasi |
 | Audit insert/existing period + append-only | Audit master dengan periodId null valid. Event close/CRUD dan mutasi satu transaksi; insert cleanup sebelum parent dihapus, audit UUID periode tetap tersimpan |
-| `evoting_test_cleanup_allowed`, `evoting_delete_test_period` | Runtime cleanup existing tetap exact satu periode isTest dan belum dipublikasi; sesuaikan cascade eksplisit children contest. Tidak menjadi jalan hapus master atau audit |
+| `evoting_test_cleanup_allowed`, `evoting_delete_test_period` | Exact satu periode isTest, termasuk published/archived sesuai keputusan18Oktober dan migrasi20261018090000. Superadmin/izin/konfirmasi/versi tetap diperiksa; DELETE berurutan dan atomik, master/audit tetap tersimpan |
 
 Semua operasi periode memakai lock urut periode → voter → sesi. Vote memakai FOR SHARE pada periode; mutasi administrasi/close FOR UPDATE. CRUD master hanya lock master, sementara penggantian contest lock periode lalu master terurut code; master tidak mengambil lock periode. Hindari deadlock dan validasi berdasarkan clock sebelum menunggu lock. Lihat [desain](02-desain.md).
 

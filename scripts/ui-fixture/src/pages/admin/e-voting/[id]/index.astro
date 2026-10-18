@@ -1,6 +1,6 @@
 ---
 import Period from '../../../../../../../src/pages/admin/e-voting/[id]/index.astro';
-export function getStaticPaths(){return [1,2,5,6,7,8,9,10,11,12,13,14,15].map(n=>({params:{id:'10000000-0000-4000-8000-'+String(n).padStart(12,'0')}}));}
+export function getStaticPaths(){return [1,2,5,6,7,8,9,10,11,12,13,14,15,18,19,20].map(n=>({params:{id:'10000000-0000-4000-8000-'+String(n).padStart(12,'0')}}));}
 Astro.locals.principal=['008','013'].some(n=>Astro.params.id?.endsWith(n))?{roles:['guru'],grants:['evoting.lihat']}:Astro.params.id?.endsWith('005')?{roles:['guru'],grants:['evoting.lihat','evoting.tutup']}:{roles:['superadmin']};
 Astro.locals.session={sub:'qa-admin',role:'superadmin',roles:['superadmin']};
 ---

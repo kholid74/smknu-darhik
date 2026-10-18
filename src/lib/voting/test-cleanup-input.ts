@@ -24,5 +24,5 @@ export type TestCleanupPreview = {
 
 export function assertTestCleanupAllowed(preview: TestCleanupPreview | null): asserts preview is TestCleanupPreview {
   if (!preview) throw new PeriodError('NOT_FOUND');
-  if (!preview.isTest || preview.publishedAt !== null) throw new PeriodError('TEST_CLEANUP_NOT_ALLOWED');
+  if (preview.isTest !== true) throw new PeriodError('TEST_CLEANUP_NOT_ALLOWED');
 }

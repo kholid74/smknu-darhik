@@ -4,7 +4,7 @@ const {periodId, name, slug} = Astro.props;
 ---
 <section class="card cleanup-card" data-test-cleanup data-period-id={periodId} data-slug={slug}>
   <h3>Hapus data uji</h3>
-  <p>Hapus periode <strong>{name}</strong> beserta calon, daftar pemilih, PIN, sesi, partisipasi, dan suara uji. Master siswa/guru dan catatan audit tetap tersimpan.</p>
+  <p>Hapus periode <strong>{name}</strong> beserta calon, daftar pemilih, PIN, sesi, partisipasi, suara uji, dan hasil, termasuk yang sudah dipublikasikan atau diarsipkan. Master siswa/guru dan catatan audit tetap tersimpan.</p>
   <button type="button" class="btn btn-danger" data-cleanup-open>Hapus periode uji</button>
   <p data-cleanup-message role="status" aria-live="polite" hidden></p>
   <dialog class="ui-dialog" data-cleanup-preview aria-labelledby="cleanup-preview-title">
@@ -47,7 +47,7 @@ const {periodId, name, slug} = Astro.props;
     const feedback = (text: string) => {message.textContent = text; message.hidden = false;};
     const labels: Record<string, string> = {
       INVALID_REAUTH: 'Password admin tidak cocok.', RATE_LIMITED: 'Terlalu banyak percobaan verifikasi. Tunggu 15 menit.',
-      FORBIDDEN: 'Akun tidak memiliki izin menghapus data uji.', TEST_CLEANUP_NOT_ALLOWED: 'Periode ini bukan data uji atau hasilnya sudah dipublikasikan.',
+      FORBIDDEN: 'Akun tidak memiliki izin menghapus data uji.', TEST_CLEANUP_NOT_ALLOWED: 'Periode ini bukan data uji dan tidak dapat dihapus melalui fitur ini.',
       STALE_CLEANUP_PREVIEW: 'Data periode berubah. Buka kembali pratinjau sebelum menghapus.',
       CSRF_REJECTED: 'Verifikasi kedaluwarsa. Buka kembali pratinjau.', CONFIRMATION_MISMATCH: 'Teks konfirmasi tidak cocok dengan periode.',
     };
@@ -62,7 +62,7 @@ const {periodId, name, slug} = Astro.props;
         if (data.id !== root.dataset.periodId || data.slug !== root.dataset.slug) throw new Error('Data periode berubah. Muat ulang halaman.');
         version = data.version; csrf = response.headers.get('x-csrf-token') ?? '';
         if (!csrf) throw new Error('Sesi keamanan belum siap. Muat ulang halaman.');
-        root.querySelector<HTMLElement>('[data-cleanup-summary]')!.textContent = `${data.contests} organisasi, ${data.candidates} pasangan calon, ${data.members} anggota calon, ${data.voters} pemilih, ${data.pins} PIN, ${data.participation} hak suara, ${data.ballots} suara uji, dan ${data.sessions} sesi akan dihapus. ${data.auditEvents} catatan audit tetap disimpan.`;
+        root.querySelector<HTMLElement>('[data-cleanup-summary]')!.textContent = `${data.contests} organisasi, ${data.candidates} pasangan calon, ${data.members} anggota calon, ${data.voters} pemilih, ${data.pins} PIN, ${data.participation} hak suara, ${data.ballots} suara uji, dan ${data.sessions} sesi akan dihapus. ${data.auditEvents} catatan audit tetap disimpan.${data.state === 'ARCHIVED' ? ' Periode ini sudah diarsipkan.' : ''}${data.publishedAt ? ' Hasil sudah dipublikasikan; tautan hasil publik tidak akan tersedia setelah penghapusan.' : ''}`;
         form.reset(); error.hidden = true; refreshSubmit(); preview.showModal();
       } catch (cause) {feedback(cause instanceof Error ? cause.message : 'Pratinjau gagal dimuat.');}
       finally {open.disabled = false;}
