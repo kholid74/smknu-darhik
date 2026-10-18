@@ -116,6 +116,44 @@ try{
  socket=new WebSocket(target.webSocketDebuggerUrl);await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true})});
  socket.addEventListener('message',event=>{const message=JSON.parse(event.data);if(message.id){const call=pending.get(message.id);pending.delete(message.id);if(message.error)call?.reject(new Error(message.error.message));else call?.resolve(message.result)}else if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.exception?.description??message.params.exceptionDetails.text);else if(message.method==='Network.requestWillBeSent'){const url=message.params.request.url;if(/fonts\.(?:googleapis|gstatic)\.com|\.woff2/.test(url))fontRequests.push(url);if(/youtube(?:-nocookie)?\.com\/embed|google\.com\/maps\/embed/.test(url))embedRequests.push(url)}});
  await cdp('Runtime.enable');await cdp('Page.enable');await cdp('Network.enable');
+ await check('student and teacher refresh stale preauth, distinguish failures and prevent duplicate login submissions',async()=>{
+   const mock=await cdp('Page.addScriptToEvaluateOnNewDocument',{source:`
+     window.qaPreauthGeneration=0;window.qaValidPreauth='';window.qaLoginMode='normal';
+     window.fetch=async(url,options)=>{
+       if(options?.method==='POST'){
+         const valid=options.headers['X-CSRF-Token']===window.qaValidPreauth;
+         const status=!valid||window.qaLoginMode==='csrf'?403:window.qaLoginMode==='server'?503:200;
+         const statuses=JSON.parse(sessionStorage.getItem('qaLoginStatuses')||'[]');statuses.push(status);sessionStorage.setItem('qaLoginStatuses',JSON.stringify(statuses));
+         const portal=document.querySelector('#login-form').dataset.voterType==='TEACHER'?'/pemilih':'/siswa';
+         return new Response(JSON.stringify(status===200?{redirectTo:portal+'/selesai'}:{error:{code:status===403?'CSRF_INVALID':'TEMPORARILY_UNAVAILABLE'}}),{status});
+       }
+       window.qaValidPreauth='synthetic-preauth-'+(++window.qaPreauthGeneration);
+       if(window.qaLoginMode==='preauth-unavailable')return new Response('{}',{status:503});
+       return new Response(JSON.stringify({csrfToken:window.qaValidPreauth,phase:window.qaLoginMode==='closed'?'CLOSED':'OPEN'}));
+     };`});
+   try{
+     for(const [path,identifier,portal]of [['/login-student','9900000000','/siswa'],['/pemilih/masuk','GURU-ABCDEF123456','/pemilih']])for(const mode of ['normal','csrf','server','preauth-unavailable','closed']){
+       await navigate(origin+path);
+       await waitFor(()=>evaluate("document.querySelector('#submit')?.disabled===false"),'login preauth');
+       // Expired/deleted cookie or another tab invalidates the page's original token.
+       await evaluate(`sessionStorage.setItem('qaLoginStatuses','[]');window.qaValidPreauth='expired';window.qaLoginMode=${JSON.stringify(mode)};document.querySelector('#identifier').value=${JSON.stringify(identifier)};document.querySelector('#pin').value='0011223344';document.querySelector('#login-form').requestSubmit();document.querySelector('#login-form').requestSubmit()`);
+       if(mode==='normal'){
+         await waitFor(()=>evaluate(`location.pathname===${JSON.stringify(portal+'/selesai')}`),'login with refreshed preauth');
+         assert.deepEqual(await evaluate("JSON.parse(sessionStorage.getItem('qaLoginStatuses'))"),[200]);
+       }else{
+         const expected={csrf:'Verifikasi halaman sudah kedaluwarsa',server:'Server belum dapat memproses login','preauth-unavailable':'Layanan belum dapat dihubungi',closed:'Periode pemilihan tidak sedang dibuka'}[mode];
+         await waitFor(()=>evaluate(`document.querySelector('#message').textContent.includes(${JSON.stringify(expected)})`),'specific login failure');
+         assert.deepEqual(await evaluate("JSON.parse(sessionStorage.getItem('qaLoginStatuses'))"),mode==='csrf'?[403]:mode==='server'?[503]:[]);
+         assert.equal(await evaluate('window.qaPreauthGeneration'),2);
+         if(mode==='csrf'||mode==='server')assert.equal(await evaluate("document.querySelector('#pin').value"),'');
+         if(mode!=='closed'){
+           await evaluate("window.qaLoginMode='normal';document.querySelector('#pin').value='0011223344';document.querySelector('#submit').click()");
+           await waitFor(()=>evaluate(`location.pathname===${JSON.stringify(portal+'/selesai')}`),'retry with same credentials');
+         }
+       }
+     }
+   }finally{await cdp('Page.removeScriptToEvaluateOnNewDocument',{identifier:mock.identifier});}
+ });
  await check('result navigation uses uploaded master logos when historical logos are missing, with matching section headings',async()=>{
    await navigate(origin+'/e-voting/qa-results-late-logo/hasil');
    assert.deepEqual(await evaluate("[...document.querySelectorAll('.contest-nav a')].slice(0,2).map(a=>a.querySelector('img')?.getAttribute('src').split('?')[0]??null)"),['/api/image/qa/logo-osis-current.png','/api/image/qa/logo-pradana-current.png']);

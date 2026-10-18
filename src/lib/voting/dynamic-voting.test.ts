@@ -50,7 +50,7 @@ register('data:text/javascript,' + encodeURIComponent(`
   }
 `), import.meta.url);
 const services = await import('./election-types');
-const { authenticateVoter } = await import('./student-auth');
+const { authenticateVoter, tokenHash } = await import('./student-auth');
 const { pinHashMaterial } = await import('./pin-input');
 const { submitVote } = await import('./votes');
 const { getParticipation, getParticipationVoters } = await import('./participation');
@@ -67,6 +67,7 @@ const { deleteMedia, MediaInUseError } = await import('../media-delete');
 const { issuePins } = await import('./pins');
 const { onRequest } = await import('../../middleware');
 const { POST: voteEndpoint } = await import('../../pages/api/e-voting/[periodId]/votes');
+const { GET: loginPreauthEndpoint, POST: loginEndpoint } = await import('../../pages/api/e-voting/[periodId]/session');
 const { POST: closeEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/close');
 const { POST: publishEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/publish');
 const { GET: cleanupPreviewEndpoint, POST: cleanupEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/test-cleanup');
@@ -74,7 +75,7 @@ const { GET: publicResultsEndpoint } = await import('../../pages/api/e-voting/[p
 const { GET: internalResultsEndpoint } = await import('../../pages/api/admin/e-voting/[periodId]/results');
 const { csrfHeader } = await import('./admin-http');
 const { signToken } = await import('../auth');
-const { createStudentSessionCsrfToken } = await import('./security');
+const { createStudentSessionCsrfToken, createPreauthCsrfToken } = await import('./security');
 const { VOTING_SESSION_COOKIE } = await import('./student-session');
 const five = ['OSIS', 'PRADANA_PUTRA', 'PRADANA_PUTRI', 'IPNU', 'IPPNU'];
 const secret = 'synthetic-dynamic-secret-'.repeat(3), pin = '0011223344';
@@ -385,6 +386,44 @@ test('PIN reset permits four of five completed rights, revokes old session, but 
   await assert.rejects(issuePins(p.id,{...request,targets:[{voterId:voter.id,pinVersion:2}]},'actor'),{code:'COMPLETED_VOTER'});
   assert.equal((await prisma.electionVoter.findUniqueOrThrow({where:{id:voter.id}})).pinVersion,2);
   assert.equal(await prisma.ballot.count(),5);
+});
+
+for(const voterType of ['STUDENT','TEACHER'] as const)for(const expiration of ['idle','absolute'] as const)test(`${voterType} can reauthenticate with the same PIN after ${expiration} expiry and finish partial votes through the real login API`,async()=>{
+  const p=await setup(),voter=p.voters.find(v=>v.voterType===voterType)!;
+  const first=await login(p.id,voter);if(first.complete)throw Error('missing first session');
+  const candidate=p.candidates.find(c=>c.organization===p.codes[0])!;
+  await submitVote(first.sessionId,voter.id,p.id,{organization:p.codes[0],candidateId:candidate.id});
+  const credentials=await prisma.electionVoter.findUniqueOrThrow({where:{id:voter.id},select:{pinHash:true,pinVersion:true,credentialEnabled:true}});
+  await prisma.votingSession.update({where:{id:first.sessionId},data:expiration==='idle'?{expiresAt:new Date(Date.now()-1000)}:{createdAt:new Date(Date.now()-16*60000),expiresAt:new Date(Date.now()+60000)}});
+  const expired=createContext({request:new Request('http://localhost:4321/api/'+(voterType==='TEACHER'?'pemilih':'siswa')+'/dashboard',{headers:{Cookie:VOTING_SESSION_COOKIE+'='+first.token}})});
+  assert.equal((await onRequest(expired,()=>Promise.resolve(new Response('must not enter')))).status,401);
+  const body=voterType==='TEACHER'?{voterType,code:voter.loginCode,pin}:{nisn:voter.nisn,pin};
+  const beforeRates=await prisma.votingRateBucket.findMany();
+  for(const invalid of ['expired','missing-cookie','replaced-cookie']){
+    const nonce='synthetic-login-nonce',csrf=createPreauthCsrfToken(secret,nonce,Date.now()-(invalid==='expired'?301000:0));
+    const rejected=createContext({request:new Request('http://localhost:4321/api/e-voting/'+p.id+'/session',{method:'POST',headers:{
+      Cookie:VOTING_SESSION_COOKIE+'='+first.token+(invalid==='missing-cookie'?'':'; smkdh_vote_pre_dev='+(invalid==='replaced-cookie'?'another-tab-nonce':nonce)),
+      Origin:'http://localhost:4321','Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify(body)}),params:{periodId:p.id}});
+    const response=await onRequest(rejected,()=>loginEndpoint!(rejected));
+    assert.equal(response.status,403);assert.equal((await response.json()).error.code,'CSRF_INVALID');
+  }
+  assert.deepEqual(await prisma.votingRateBucket.findMany(),beforeRates);
+  assert.equal(await prisma.votingSession.count({where:{voterId:voter.id}}),1);
+  assert.equal(await prisma.ballot.count({where:{periodId:p.id}}),1);
+  const preauth=createContext({request:new Request('http://localhost:4321/api/e-voting/'+p.id+'/session'),params:{periodId:p.id}});
+  const prepared=await onRequest(preauth,()=>loginPreauthEndpoint!(preauth));assert.equal(prepared.status,200);
+  const {csrfToken,phase}=await prepared.json();assert.equal(phase,'OPEN');
+  const nonce=preauth.cookies.get('smkdh_vote_pre_dev')!.value;
+  const context=createContext({request:new Request('http://localhost:4321/api/e-voting/'+p.id+'/session',{method:'POST',headers:{Cookie:'smkdh_vote_pre_dev='+nonce+'; '+VOTING_SESSION_COOKIE+'='+first.token,Origin:'http://localhost:4321','Content-Type':'application/json','X-CSRF-Token':csrfToken},body:JSON.stringify(body)}),params:{periodId:p.id}});
+  const response=await onRequest(context,()=>loginEndpoint!(context));assert.equal(response.status,200,JSON.stringify(await response.clone().json()));
+  assert.equal((await response.json()).redirectTo,voterType==='TEACHER'?'/pemilih':'/siswa');
+  const resumedToken=context.cookies.get(VOTING_SESSION_COOKIE)!.value;
+  const resumed=await prisma.votingSession.findUniqueOrThrow({where:{tokenHash:tokenHash(resumedToken)}});
+  assert.notEqual(resumed.id,first.sessionId);assert.equal(await prisma.votingSession.count({where:{id:first.sessionId}}),0);
+  assert.deepEqual(await prisma.electionVoter.findUniqueOrThrow({where:{id:voter.id},select:{pinHash:true,pinVersion:true,credentialEnabled:true}}),credentials);
+  assert.equal((await getBallotProgress(p.id,'synthetic-period',voter.id)).participation[p.codes[0]],true);
+  for(const code of p.codes.slice(1))await submitVote(resumed.id,voter.id,p.id,{organization:code,candidateId:p.candidates.find(c=>c.organization===code)!.id});
+  assert.equal(await prisma.ballot.count({where:{periodId:p.id}}),5);assert.equal(await prisma.votingSession.count({where:{voterId:voter.id}}),0);
 });
 
 test('idle and absolute expiration fail closed and preserve anonymous ballots',async()=>{
