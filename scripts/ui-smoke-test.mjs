@@ -3,9 +3,11 @@ import {mkdir,mkdtemp,writeFile,rm,readFile} from 'node:fs/promises';
 import {resolve,sep,extname} from 'node:path';
 import {createServer} from 'node:http';
 import assert from 'node:assert/strict';
+import sharp from 'sharp';
 import {tsImport} from 'tsx/esm/api';
 const {imageResponse}=await tsImport('../src/lib/image-response.ts',import.meta.url);
 const {prepareUpload}=await tsImport('../src/lib/upload-file.ts',import.meta.url);
+const landscapePhoto=await sharp({create:{width:1200,height:800,channels:3,background:'#cce2d4'}}).png().toBuffer();
 const uploadRequests=[],uploadedFiles=new Map();let uploadMode='normal';
 const fixtureRoot=resolve('scripts/ui-fixture/dist');
 const imageRenders=[];
@@ -82,7 +84,7 @@ const server=createServer(async(request,response)=>{try{
   }
   if(path.startsWith('/api/image/qa/')){
     const start=performance.now();
-    const result=await imageResponse(new Request(origin+request.url),path.slice('/api/image/'.length),async()=>({bytes:await readFile(resolve(fixtureRoot,path.includes('portrait')?'assets/kepala-sekolah.png':path.includes('/logo-')?'assets/logo.png':'assets/hero-siswa.png')),contentType:'image/png'}));
+    const result=await imageResponse(new Request(origin+request.url),path.slice('/api/image/'.length),async()=>({bytes:path.includes('landscape')?landscapePhoto:await readFile(resolve(fixtureRoot,path.includes('portrait')?'assets/kepala-sekolah.png':path.includes('/logo-')?'assets/logo.png':'assets/hero-siswa.png')),contentType:'image/png'}));
     const body=Buffer.from(await result.arrayBuffer());
     imageRenders.push({url:request.url,ms:Number((performance.now()-start).toFixed(1)),bytes:body.length});
     response.writeHead(result.status,Object.fromEntries(result.headers));response.end(body);return;
@@ -460,8 +462,8 @@ try{
      await waitFor(()=>evaluate("document.querySelector('#review-vote')?.disabled===false"),'dynamic ballot '+n);
      assert.equal(await evaluate("document.querySelector('.voting-progress progress').max"),n);
      assert.equal(await evaluate("document.querySelector('.voting-progress progress').value"),n-1);
-     assert.equal(await evaluate("document.querySelector('.member strong').textContent"),'Siswa <b>aman</b>');
-     assert.equal(await evaluate("document.querySelector('.member strong b')"),null);
+     assert.equal(await evaluate("document.querySelector('.member-caption strong').textContent"),'Siswa <b>aman</b>');
+     assert.equal(await evaluate("document.querySelector('.member-caption strong b')"),null);
      assert.equal(await evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"),true);
      await evaluate(`window.qaVotePayload=null;window.fetch=async(url,options)=>{window.qaVotePayload=JSON.parse(options.body);sessionStorage.setItem('qaVotePayload',options.body);return new Response(JSON.stringify({data:{complete:true,redirectTo:'/siswa/selesai'}}),{status:201,headers:{'Content-Type':'application/json'}})};document.querySelector('input[name=candidateId]').focus()`);
      await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32});await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
@@ -609,16 +611,20 @@ try{
    assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),true);
    await writeFile(resolve(artifactRoot,'candidate-form-mobile.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
  });
- await check('portrait ballots keep equal photo/fallback geometry and keyboard confirmation for students and teachers',async()=>{
-   for(const [kind,width] of [['student',1366],['student',390],['teacher',320]]){
+ await check('landscape ballot cards preserve original photo ratios, show logos and keep keyboard confirmation for students and teachers',async()=>{
+   for(const [kind,width] of [['student',1366],['student',768],['student',480],['student',390],['teacher',1366],['teacher',320]]){
      await cdp('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:false});
      await navigate(origin+'/portraits/'+kind+'/OSIS');await waitFor(()=>evaluate("document.querySelector('#review-vote')?.disabled===false&&document.querySelector('.member img')?.complete"),'portrait ballot');
      assert.equal(await evaluate("document.body.dataset.portalBase"),kind==='teacher'?'/pemilih':'/siswa');
-     const geometry=await evaluate("(()=>{const a=document.querySelector('.members.paired img'),b=document.querySelector('.members.paired .photo-fallback');return {a:a.getBoundingClientRect().height,b:b.getBoundingClientRect().height,aw:a.getBoundingClientRect().width,bw:b.getBoundingClientRect().width,natural:a.naturalWidth,url:a.currentSrc,loading:a.loading,priority:a.fetchPriority}})()");
-     assert.ok(geometry.a>=260&&geometry.a<=320);assert.equal(geometry.a,geometry.b);assert.ok(Math.abs(geometry.aw-geometry.bw)<=1);assert.ok(geometry.natural>0);assert.match(geometry.url,/\?w=\d+/);assert.equal(geometry.loading,'eager');assert.equal(geometry.priority,'high');
+     const geometry=await evaluate("(()=>{const a=document.querySelector('.members.paired img'),b=document.querySelector('.members.paired .photo-fallback'),card=document.querySelector('.candidate-content'),photos=card.querySelector('.members'),info=card.querySelector('.candidate-information');return {a:a.getBoundingClientRect().height,b:b.getBoundingClientRect().height,aw:a.getBoundingClientRect().width,bw:b.getBoundingClientRect().width,natural:a.naturalWidth,naturalHeight:a.naturalHeight,url:a.currentSrc,loading:a.loading,priority:a.fetchPriority,photoShare:photos.getBoundingClientRect().width/card.getBoundingClientRect().width,beside:info.getBoundingClientRect().left>=photos.getBoundingClientRect().right-1}})()");
+     assert.ok(Math.abs(geometry.aw/geometry.a-geometry.natural/geometry.naturalHeight)<.01);assert.ok(Math.abs(geometry.aw-geometry.bw)<=1);assert.ok(Math.abs(geometry.bw/geometry.b-.8)<.01);assert.match(geometry.url,/\?w=\d+/);assert.equal(geometry.loading,'eager');assert.equal(geometry.priority,'high');
+     assert.equal(geometry.beside,width>480);assert.ok(Math.abs(geometry.photoShare-(width>480?.4:1))<.01);
+     await evaluate("document.querySelectorAll('.members')[1].scrollIntoView()");await waitFor(()=>evaluate("document.querySelectorAll('.members')[1].querySelector('img').naturalWidth>0"),'landscape image');
+     assert.equal(await evaluate("(()=>{const i=document.querySelectorAll('.members')[1].querySelector('img'),r=i.getBoundingClientRect();return i.naturalWidth>i.naturalHeight&&Math.abs(r.width/r.height-i.naturalWidth/i.naturalHeight)<.01&&getComputedStyle(i).objectFit==='contain'})()"),true);
+     assert.equal(await evaluate("document.querySelector('.contest-title img').getAttribute('src').startsWith('/api/image/qa/logo-0.png?')"),true);
      assert.equal(await evaluate("document.querySelectorAll('.members')[1].querySelector('img').loading"),'lazy');
      assert.equal(await evaluate("document.querySelectorAll('.members')[1].children.length"),1);assert.equal(await evaluate("document.querySelectorAll('.members')[2].querySelectorAll('img').length"),0);
-     assert.equal(await evaluate("document.querySelector('.member strong b')"),null);assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),true);
+     assert.equal(await evaluate("document.querySelector('.member-caption strong b')"),null);assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),true);
      await evaluate("document.querySelector('.candidate').scrollIntoView()");await writeFile(resolve(artifactRoot,'portraits-'+kind+'-'+width+'.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
      await evaluate("document.querySelector('input[name=candidateId]').focus()");
      await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32});await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
@@ -788,7 +794,8 @@ try{
      assert.deepEqual(await evaluate("[...document.querySelectorAll('section.contest')].map(e=>[...e.querySelectorAll('.candidate-heading h3 span')].map(e=>e.textContent))"),expectedNumbers);
      assert.equal(await evaluate("document.querySelector('.contest-total span').textContent"),'70,0% dari 10 pemilih');
      assert.equal(await evaluate("document.querySelector('.percentage').textContent"),'57,1%');assert.equal(await evaluate("document.querySelector('.vote-track span').style.width"),'57.1429%');
-     assert.equal(await evaluate("document.querySelector('.member strong').textContent"),'Calon 1 <b>historis</b>');assert.equal(await evaluate("document.querySelector('.member strong b')"),null);
+     assert.equal(await evaluate("document.querySelector('.member-caption strong').textContent"),'Calon 1 <b>historis</b>');assert.equal(await evaluate("document.querySelector('.member-caption strong b')"),null);
+     assert.equal(await evaluate("[...document.querySelectorAll('.contest-title')].every((e,i)=>i%2===0?e.querySelector('img')?.getAttribute('src').startsWith('/api/image/qa/logo-'):!!e.querySelector('.logo-fallback'))"),true);
      assert.equal(await evaluate("document.querySelector('.position').textContent"),n===1?'Pradana historis':'Ketua historis');
      assert.equal(await evaluate(`document.querySelectorAll('.candidate .member')[${n===1?2:3}].querySelector('.photo-fallback')!==null`),true);
      assert.equal(await evaluate("document.documentElement.scrollWidth<=innerWidth+1"),true);
@@ -797,7 +804,8 @@ try{
      assert.equal(await evaluate("document.querySelectorAll('.candidate')[1].querySelector('.member img').loading"),'lazy');
      await writeFile(resolve(artifactRoot,'results-overview-'+width+'.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
      await evaluate("document.querySelector('section.contest').scrollIntoView()");await waitFor(()=>evaluate("document.querySelector('.candidate .member img').naturalWidth>0"),'result image');
-     const geometry=await evaluate("[...document.querySelector('.candidates').querySelectorAll('.member img,.photo-fallback')].map(e=>e.getBoundingClientRect().height)");assert.ok(geometry.every(h=>h>=260&&h<=320));
+     const geometry=await evaluate("(()=>{const card=document.querySelector('.candidate-content'),photos=card.querySelector('.members'),info=card.querySelector('.candidate-information'),i=photos.querySelector('img'),r=i.getBoundingClientRect();return {ratio:r.width/r.height,natural:i.naturalWidth/i.naturalHeight,photoShare:photos.getBoundingClientRect().width/card.getBoundingClientRect().width,beside:info.getBoundingClientRect().left>=photos.getBoundingClientRect().right-1}})()");
+     assert.ok(Math.abs(geometry.ratio-geometry.natural)<.01);assert.equal(geometry.beside,width>480);assert.ok(Math.abs(geometry.photoShare-(width>480?.4:1))<.01);
      await writeFile(resolve(artifactRoot,'results-candidates-'+width+'.png'),Buffer.from((await cdp('Page.captureScreenshot',{format:'png'})).data,'base64'));
      await evaluate("document.querySelector('.statements summary').focus()");await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32});await cdp('Input.dispatchKeyEvent',{type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
      assert.equal(await evaluate("document.querySelector('.statements').open"),true);assert.match(await evaluate("document.querySelector('.statements-content').textContent"),/Visi historis 1 <b>aman<\/b>/);assert.equal(await evaluate("document.querySelector('.statements-content b')"),null);
